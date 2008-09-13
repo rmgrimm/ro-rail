@@ -494,7 +494,7 @@ do
 	setmetatable(Actors,{
 		__index = function(self,idx)
 			if type(idx) ~= "number" then
-				return Actor[-1]
+				return Actors[-1]
 			end
 
 			rawset(self,idx,Actor:New(idx))
