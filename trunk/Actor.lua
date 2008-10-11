@@ -394,7 +394,7 @@ do
 						x = x.X[a]
 					end
 
-					return BlocksDistance(self.X[a],self.Y[0],x,y)
+					return BlockDistance(self.X[a],self.Y[0],x,y)
 
 				end -- function(x,y)
 

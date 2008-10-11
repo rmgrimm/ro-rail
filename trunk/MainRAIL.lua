@@ -1,11 +1,14 @@
+-- Alphabetical
 require "Actor.lua"
 require "Const.lua"
 require "Debug.lua"
+require "History.lua"
 require "Table.lua"
 require "Timeout.lua"
 require "Utils.lua"
 
-require "Commands.lua"
+-- Dependency
+require "Commands.lua"	-- depends on Table.lua at load time
 
 -- TODO: Config
 local SightRange = 14
@@ -72,7 +75,7 @@ function RAIL.AI(id)
 		RAIL.Self:Update()
 
 		-- Determine if we need to chase our owner
-		if RAIL.Self:BlocksTo(
+		if RAIL.Self:BlocksTo(0)(
 			-- 2.5 tiles ahead, to start moving before off screen
 			RAIL.Owner.X[-2.5*MsecPerCell],
 			RAIL.Owner.Y[-2.5*MsecPerCell]
@@ -95,12 +98,9 @@ function RAIL.AI(id)
 				if actor.Type == 45 and not terminate then
 					-- Get the block distances between the portal and the owner
 						-- roughly 2.5 tiles from now
-					local inFuture = actor:BlocksTo(
-						RAIL.Owner.X[-2.5*MsecPerCell],
-						RAIL.Owner.Y[-2.5*MsecPerCell]
-					)
+					local inFuture = RAIL.Owner:BlocksTo(-2.5*MsecPerCell)(actor)
 						-- and now
-					local now = actor:BlocksTo(RAIL.Owner)
+					local now = RAIL.Owner:BlocksTo(actor)
 
 					if inFuture < 3 and inFuture < now then
 						RAIL.Log(0,"Owner approaching portal; cycle terminating after data collection.")
@@ -170,12 +170,12 @@ function RAIL.AI(id)
 			elseif msg[1] == ATTACK_OBJECT_CMD then
 				-- Check for valid actor
 				local actor = Actors[msg[2]]
-				if GetTick() == actor.LastUpdate then
+				if math.abs(GetTick() - actor.LastUpdate) < 100 then
 					-- Chase it
 					Target.Chase = actor
 
 					-- And if close enough, attack it
-					if actor:DistanceTo(RAIL.Self) <= RAIL.Self.AttackRange then
+					if RAIL.Self:DistanceTo(actor) <= RAIL.Self.AttackRange then
 						Target.Attack = actor
 					end
 				end
