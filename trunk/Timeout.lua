@@ -10,14 +10,14 @@ do
 	Timeout.Update = function(self)
 		if not self[1] then
 			-- Not active; do nothing
-			return
+			return self
 		end
 
 		-- Check if the timeout should fire
 		local delta = GetTick() - (self[2]+self[3])
 		if delta >= 0 then
 			-- Fire the callback
-			self[5](delta,self[6])
+			self[5](self[6],delta)
 
 			if not self[4] then
 				-- Not repeating, so set the active element to false
@@ -42,7 +42,7 @@ do
 
 	RAIL.Timeouts.Iterate = function(self)
 		local i,k = 1,1
-		for i=1,self:GetN(),1 do
+		for i=1,self:GetN()-1,1 do
 			-- Update the timeout, then check if it's still active
 			if self[i]:Update()[1] == true then
 				-- Since it's still active, keep it in the table

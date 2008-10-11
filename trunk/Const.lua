@@ -160,11 +160,11 @@ SWORDMAN10	= 30
 -------------------------------------------------
 NONE_CMD			= 0		-- (Cmd)
 MOVE_CMD			= 1		-- (Cmd, X, Y)
-STOP_CMD			= 2		-- (Cmd)
+STOP_CMD			= 2		-- (Cmd)		** NOT USED **
 ATTACK_OBJECT_CMD		= 3		-- (Cmd, ID)
-ATTACK_AREA_CMD			= 4		-- (Cmd, X, Y)
-PATROL_CMD			= 5		-- (Cmd, X, Y)
-HOLD_CMD			= 6		-- (Cmd)
+ATTACK_AREA_CMD			= 4		-- (Cmd, X, Y)		** NOT USED **
+PATROL_CMD			= 5		-- (Cmd, X, Y)		** NOT USED **
+HOLD_CMD			= 6		-- (Cmd)		** NOT USED **
 SKILL_OBJECT_CMD		= 7		-- (Cmd, Level, Type, ID)
 SKILL_AREA_CMD			= 8		-- (Cmd, Level, Type, X, Y)
 FOLLOW_CMD			= 9		-- (Cmd)
