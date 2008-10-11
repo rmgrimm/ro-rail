@@ -169,7 +169,7 @@ do
 		ret.ID = ID
 		ret.Type = -1			-- "fixed" type (homus don't overlap players)
 		ret.Hide = false		-- hidden?
-		ret.LastUpdate = GetTick()	-- GetTick() of last :Update() call
+		ret.LastUpdate = -1		-- GetTick() of last :Update() call
 		ret.FullUpdate = false		-- Track position, motion, target, etc?
 		ret.TargetOf = { }		-- Other Actors that are targeting this one
 		ret.IgnoreTime = -1		-- Actor isn't currently ignored
@@ -200,7 +200,7 @@ do
 		return ret
 	end
 
-	-- A temporary "false" return for IsMonster, as long as an actor is a specific type
+	-- A temporary "false" return for IsEnemy, as long as an actor is a specific type
 	local ret_false = function() return false end
 
 	-- A "private" function to initialize new actor types
@@ -218,8 +218,8 @@ do
 		if self.Type == -1 then
 			self.ActorType = "Unknown"
 
-			-- Unknown types are never monsters
-			self.IsMonster = ret_false
+			-- Unknown types are never enemies
+			self.IsEnemy = ret_false
 
 			-- Track information on unknowns anyway
 			self.FullUpdate = true
@@ -228,8 +228,8 @@ do
 		elseif self.Type == 45 then
 			self.ActorType = "Portal"
 
-			-- Portals are monsters? Hah! Never!
-			self.IsMonster = ret_false
+			-- Portals are enemies? Hah! Never!
+			self.IsEnemy = ret_false
 
 			-- Don't track position, motion, etc...
 			self.FullUpdate = false
@@ -241,9 +241,9 @@ do
 		then
 			self.ActorType = "Player"
 
-			-- Allow the actor to be a monster if it was previous blocked
-			if rawget(self,"IsMonster") == ret_false then
-				rawset(self,"IsMonster",nil)
+			-- Allow the actor to be an enemy if it was previous blocked
+			if rawget(self,"IsEnemy") == ret_false then
+				rawset(self,"IsEnemy",nil)
 			end
 
 			-- Track all the data about them
@@ -253,8 +253,8 @@ do
 		elseif self.Type < 1000 then
 			self.ActorType = "NPC"
 
-			-- NPCs aren't monsters
-			self.IsMonster = ret_false
+			-- NPCs aren't enemies
+			self.IsEnemy = ret_false
 
 			-- And they don't do much either
 			self.FullUpdate = false
@@ -263,9 +263,9 @@ do
 		else
 			self.ActorType = "Actor"
 
-			-- Allow the actor to be a monster if it was previous blocked
-			if rawget(self,"IsMonster") == ret_false then
-				rawset(self,"IsMonster",nil)
+			-- Allow the actor to be an enemy if it was previous blocked
+			if rawget(self,"IsEnemy") == ret_false then
+				rawset(self,"IsEnemy",nil)
 			end
 
 			-- Track all the data about them
@@ -367,8 +367,8 @@ do
 	--------------------
 	-- The following functions support other parts of the script
 
-	-- Check if the actor is a monster
-	Actor.IsMonster = function(self)
+	-- Check if the actor is an enemy (monster/pvp-player)
+	Actor.IsEnemy = function(self)
 		return IsMonster(self.ID) == 1
 	end
 
