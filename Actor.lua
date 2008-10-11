@@ -241,9 +241,9 @@ do
 		History.Clear(self.Y)
 	end
 
-	--------------------
-	-- Categorization --
-	--------------------
+	-------------
+	-- Support --
+	-------------
 	-- The following functions support other parts of the script
 
 	-- Check if the actor is an enemy (monster/pvp-player)
@@ -281,6 +281,11 @@ do
 		-- TODO: Log
 
 		self.IgnoreTime = ticks
+	end
+
+	-- Estimate Movement Speed
+	Actor.EstimateMoveSpeed = function(self)
+		-- TODO
 	end
 
 	--------------------
@@ -342,6 +347,11 @@ do
 	-- Remember:
 	--	- negative values represent future (estimated)
 	--	- positive values represent past (recorded)
+	--
+	-- NOTE:
+	--	Because of the nature of closures, a new function is generated for each
+	--	originating actor and for each millisecond value. In effort to reduce
+	--	memory bloat, keep arbitrary actors/numbers to a minimum.
 	--		
 
 	-- Pythagorean Distance
@@ -375,6 +385,8 @@ do
 		-- Not requesting specific closure, so use 0
 		return Actor.DistanceTo(self,0)(a,b)
 	end
+
+	-- TODO: DistancePlot
 
 	-- Straight-line Block Distance
 	Actor.BlocksTo = function(self,a,b)
@@ -514,4 +526,5 @@ do
 	-- After setting up the Actor class and Actors table,
 	--	rework the API to allow Actor inputs
 	--local
+	-- TODO? Don't think I even want this...
 end
