@@ -587,10 +587,10 @@ do
 	--	hooked in a more efficient manner than hooking Attack() base API
 
 	Actor.Attack = function(self)
-		Attack(RAIL.Self,self.ID)
+		Attack(RAIL.Self.ID,self.ID)
 	end
 	Actor.SkillObject = function(self,level,skill_id)
-		SkillObject(RAIL.Self,level,skill_id,self.ID)
+		SkillObject(RAIL.Self.ID,level,skill_id,self.ID)
 	end
 
 	-----------------------
