@@ -74,10 +74,10 @@ do
 						msg[msg_i] = tostring(msg[msg_i])
 					end
 
-					str:Append(t)
+					str:Append(string.format(t,msg[msg_i]))
 				end
 
-				RAIL.Log(0,string.format(str:Append(")"):Get(),msg))
+				RAIL.Log(0,str:Append(")"):Get())
 			end
 		end
 	})

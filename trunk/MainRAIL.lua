@@ -1,5 +1,4 @@
 -- Alphabetical
-require "Actor.lua"
 require "Const.lua"
 require "Debug.lua"
 require "History.lua"
@@ -7,11 +6,12 @@ require "Table.lua"
 require "Timeout.lua"
 require "Utils.lua"
 
--- Dependency
-require "Commands.lua"	-- depends on Table.lua at load time
+-- Load-time Dependency
+require "Actor.lua"	-- depends on History.lua
+require "Commands.lua"	-- depends on Table.lua
 
 -- TODO: Config
-local SightRange = 14
+local MaxDistance = 14
 
 -- TODO: Detect movement speeds automatically
 --	(from http://forums.roempire.com/archive/index.php/t-137959.html)
@@ -76,10 +76,10 @@ function RAIL.AI(id)
 
 		-- Determine if we need to chase our owner
 		if RAIL.Self:BlocksTo(0)(
-			-- 2.5 tiles ahead, to start moving before off screen
-			RAIL.Owner.X[-2.5*MsecPerCell],
-			RAIL.Owner.Y[-2.5*MsecPerCell]
-		) >= SightRange then
+			-- 3 tiles ahead, to start moving before off screen
+			RAIL.Owner.X[-3*MsecPerCell],
+			RAIL.Owner.Y[-3*MsecPerCell]
+		) >= MaxDistance then
 			Target.Chase = RAIL.Owner
 		end
 
@@ -165,12 +165,31 @@ function RAIL.AI(id)
 			local msg = RAIL.Cmd.Queue[RAIL.Cmd.Queue.first]
 
 			if msg[1] == MOVE_CMD then
-				Target.Chase = msg
-				break
+				-- Check for a couple states that would invalidate the move
+				if
+					-- Move would be out of range
+					RAIL.Owner:BlocksTo(msg[2],msg[3]) > MaxDistance or
+					-- Already arrived
+					RAIL.Self:DistanceTo(msg[2],msg[3]) < 1
+				then
+					-- Remove this command
+					RAIL.Cmd.Queue:PopLeft()
+				else
+					-- Set this command, unless chasing owner
+					if Target.Chase ~= RAIL.Owner then
+						Target.Chase = msg
+					end
+					break
+				end
 			elseif msg[1] == ATTACK_OBJECT_CMD then
 				-- Check for valid actor
 				local actor = Actors[msg[2]]
-				if math.abs(GetTick() - actor.LastUpdate) < 100 then
+				if math.abs(GetTick() - actor.LastUpdate) > 50 or
+					actor.Motion[0] ~= MOTION_DEAD
+				then
+					-- Invalid actor
+					RAIL.Cmd.Queue:PopLeft()
+				else
 					-- Chase it
 					Target.Chase = actor
 
@@ -178,8 +197,8 @@ function RAIL.AI(id)
 					if RAIL.Self:DistanceTo(actor) <= RAIL.Self.AttackRange then
 						Target.Attack = actor
 					end
+					break
 				end
-				break
 			else
 				-- Skill commands are only thing left over
 				if Target.Skill == nil then
@@ -232,7 +251,7 @@ function RAIL.AI(id)
 
 		-- Attack
 		if Target.Attack ~= nil then
-			Attack(RAIL.Self.ID,Target.Attack.ID)
+			Target.Attack:Attack()
 		end
 
 		-- Move
@@ -256,3 +275,5 @@ function RAIL.AI(id)
 	end
 end
 
+-- Script is loaded...
+RAIL.Log(0,"\r\n\r\n\r\nRAIL loaded...")

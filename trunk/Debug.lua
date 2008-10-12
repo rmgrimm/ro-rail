@@ -45,21 +45,13 @@ do
 
 		-- Add each argument
 		local t
-		for arg_i=1,Table.getn(arg) do
-			-- Check if it should be quoted
-			if type(arg[arg_i]) == "string" then
-				t = "%q"
-			else
-				t = "%s"
-				arg[arg_i] = tostring(arg[arg_i])
-			end
-
-			-- Add the argument
-			str:Append(","):Append(t)
+		for arg_i=1,Table.GetN(arg)-1 do
+			-- Add the argument type
+			str:Append(", "):Append(type(arg[arg_i]))
 		end
 
 		-- Add the ending parenthesis and return the string
-		return string.format(str:Append(")"):Get(),unpack(arg))
+		return str:Append(")"):Get()
 	end
 
 	local antidup = ""

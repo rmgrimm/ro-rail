@@ -58,6 +58,18 @@ do
 		ret.X = History.New(-1,true,pos_diff)
 		ret.Y = History.New(-1,true,pos_diff)
 
+		-- Set initial position
+		local x,y = GetV(V_POSITION,ret.ID)
+		if x ~= -1 then
+			-- Hiding?
+			if x == 0 and y == 0 then
+				ret.Hide = true
+			else
+				History.Update(ret.X,x)
+				History.Update(ret.Y,y)
+			end
+		end
+
 		-- Setup the expiration timeout for 2.5 seconds...
 		--	(it will be updated in Actor.Update)
 		ret.ExpireTimeout = RAIL.Timeouts:New(2500,false,Actor.Expire,ret)
@@ -74,7 +86,8 @@ do
 		-- Initialize the type
 		Actor[actor_key](ret)
 
-		-- TODO: Log
+		-- Log
+		RAIL.Log(0,"Actor class generated for %s.",tostring(ret))
 
 		return ret
 	end
@@ -89,7 +102,9 @@ do
 		self.Type = self[actor_key]
 
 		-- Check the type for sanity
-		if self.ID < 100000 and LIF <= self.Type and self.Type <= VANILMIRTH_H2 then
+		if (self.ID < 100000 or self.ID > 110000000) and
+			LIF <= self.Type and self.Type <= VANILMIRTH_H2
+		then
 			self.Type = self.Type + 6000
 		end
 
@@ -154,9 +169,21 @@ do
 
 	-- Update information about the actor
 	Actor.Update = function(self)
+		-- Don't update the fail-actor
+		if self.ID == -1 then
+			return self
+		end
+
 		-- Check for a type change
 		if GetV(V_HOMUNTYPE,self.ID) ~= self[actor_key] then
+			-- Pre-log
+			local str = tostring(self)
+
+			-- Call the private type changing function
 			Actor[actor_key](self)
+
+			-- Log
+			RAIL.Log(0,"%s changed type to %s.",str,tostring(self))
 		end
 
 		-- Update the expiration timeout
@@ -203,11 +230,21 @@ do
 
 		-- Check if the actor is able to have a target
 		if self.Motion[0] ~= MOTION_DEAD and self.Motion[0] ~= MOTION_SIT then
-			-- Update the target
-			History.Update(self.Target,GetV(V_TARGET,self.ID))
+			-- Get the current target
+			local targ = GetV(V_TARGET,self.ID)
+
+			-- Normalize it...
+			if targ == 0 then
+				targ = -1
+			end
+
+			-- Keep a history of it
+			History.Update(self.Target,targ)
 
 			-- Tell the other actor that it's being targeted
-			Actors[self.Target[0]]:TargetedBy(self)
+			if targ ~= -1 then
+				Actors[targ]:TargetedBy(self)
+			end
 		else
 			-- Can't target, so it should be targeting nothing
 			History.Update(self.Target,-1)
@@ -232,7 +269,8 @@ do
 
 	-- Clear out memory
 	Actor.Expire = function(self)
-		-- TODO: Log
+		-- Log
+		RAIL.Log(0,"Clearing history for %s due to timeout.",tostring(self))
 
 		-- Clear the histories
 		History.Clear(self.Motion)
@@ -269,6 +307,7 @@ do
 	Actor.Ignore = function(self,ticks)
 		-- If it's already ignored, do nothing
 		if self:IsIgnored() then
+			-- TODO: Update the time? Max(ticks,self.IgnoreTime)?
 			return self
 		end
 
@@ -279,6 +318,7 @@ do
 		end
 
 		-- TODO: Log
+		RAIL.Log(0,"%s ignored for %d milliseconds.",tostring(self),ticks)
 
 		self.IgnoreTime = ticks
 	end
@@ -386,7 +426,39 @@ do
 		return Actor.DistanceTo(self,0)(a,b)
 	end
 
-	-- TODO: DistancePlot
+	-- Point along line of self and (x,y)
+	Actor.DistancePlot = function(self,a,b,c)
+		-- Check if a specific closure is requested
+		if type(a) == "number" and c == nil then
+
+			-- Check if a closure already exists
+			if not self[closures].DistancePlot[a] then
+
+				-- Create closure
+				self[closures].DistancePlot[a] = function(x,y,dist)
+					-- Main function logic follows
+
+					-- Check if "x" is an actor table
+					if RAIL.IsActor(x) then
+						dist = y
+						y = x.Y[a]
+						x = x.X[a]
+					end
+
+					-- TODO: finish
+					return 0,0
+
+				end -- function(x,y,dist)
+
+			end -- not self[closures].DistancePlot[a]
+
+			-- Return the requested closure
+			return self[closures].DistancePlot[a]
+		end
+
+		-- Not requesting specific closure, so use 0
+		return Actor.DistancePlot(self,0)(a,b,c)
+	end
 
 	-- Straight-line Block Distance
 	Actor.BlocksTo = function(self,a,b)
@@ -406,7 +478,7 @@ do
 						x = x.X[a]
 					end
 
-					return BlockDistance(self.X[a],self.Y[0],x,y)
+					return BlockDistance(self.X[a],self.Y[a],x,y)
 
 				end -- function(x,y)
 
@@ -507,6 +579,20 @@ do
 		return Actor.AnglePlot(self,0)(a,b)
 	end
 
+	------------------
+	-- API Wrappers --
+	------------------
+
+	-- These are mainly to allow attacks/skills vs. specific monsters to be
+	--	hooked in a more efficient manner than hooking Attack() base API
+
+	Actor.Attack = function(self)
+		Attack(RAIL.Self,self.ID)
+	end
+	Actor.Skill = function(self,level,skill_id)
+		SkillObject(RAIL.Self,level,skill_id,self.ID)
+	end
+
 	-----------------------
 	-- Actors Collection --
 	-----------------------
@@ -522,6 +608,14 @@ do
 			return self[idx]
 		end
 	})
+
+	-- Create Actors[-1], and disable certain features
+	Actors[-1].ExpireTimeout[1] = false
+
+	Actors[-1].IsEnemy   = function() return false end
+	Actors[-1].IsFriend  = function() return false end
+	Actors[-1].IsIgnored = function() return true end
+	Actors[-1].IsAllowed = function() return false end
 
 	-- After setting up the Actor class and Actors table,
 	--	rework the API to allow Actor inputs
