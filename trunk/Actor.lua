@@ -589,7 +589,7 @@ do
 	Actor.Attack = function(self)
 		Attack(RAIL.Self,self.ID)
 	end
-	Actor.Skill = function(self,level,skill_id)
+	Actor.SkillObject = function(self,level,skill_id)
 		SkillObject(RAIL.Self,level,skill_id,self.ID)
 	end
 

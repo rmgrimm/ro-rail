@@ -181,11 +181,12 @@ function RAIL.AI(id)
 					end
 					break
 				end
+
 			elseif msg[1] == ATTACK_OBJECT_CMD then
 				-- Check for valid actor
 				local actor = Actors[msg[2]]
 				if math.abs(GetTick() - actor.LastUpdate) > 50 or
-					actor.Motion[0] ~= MOTION_DEAD
+					actor.Motion[0] == MOTION_DEAD
 				then
 					-- Invalid actor
 					RAIL.Cmd.Queue:PopLeft()
@@ -231,11 +232,9 @@ function RAIL.AI(id)
 		if Target.Skill ~= nil then
 			if Target.Skill[1] == SKILL_OBJECT_CMD then
 				-- Actor-targeted skill
-				SkillObject(
-					RAIL.Self.ID,
+				Actors[Target.Skill[4]]:SkillObject(
 					Target.Skill[2],	-- level
-					Target.Skill[3],	-- skill
-					Target.Skill[4]		-- target
+					Target.Skill[3],	-- skill id
 				)
 			else
 				-- Ground-targeted skill
