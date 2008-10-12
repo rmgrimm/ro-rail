@@ -234,7 +234,7 @@ function RAIL.AI(id)
 				-- Actor-targeted skill
 				Actors[Target.Skill[4]]:SkillObject(
 					Target.Skill[2],	-- level
-					Target.Skill[3],	-- skill id
+					Target.Skill[3]		-- skill id
 				)
 			else
 				-- Ground-targeted skill
