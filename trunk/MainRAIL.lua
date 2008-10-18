@@ -206,7 +206,7 @@ function RAIL.AI(id)
 					-- Invalid actor
 					RAIL.Cmd.Queue:PopLeft()
 				else
-					-- Chase it
+					-- Chase it (to allow attacks on other actors while heading toward it)
 					Target.Chase = actor
 
 					-- And if close enough, attack it
@@ -230,14 +230,18 @@ function RAIL.AI(id)
 	do
 		-- Skill
 		if Target.Skill == nil and Target.Chase ~= RAIL.Owner then
+			-- TODO
 		end
 
 		-- Attack
 		if Target.Attack == nil and Target.Chase ~= RAIL.Owner then
+			-- TODO: Find highest priority monster that is within attack range
 		end
 
 		-- Move
 		if Target.Chase == nil then
+			-- TODO: Find highest priority monster to move toward
+			-- TODO: Make sure to stay outside of range of all kited monsters
 		end
 	end
 
