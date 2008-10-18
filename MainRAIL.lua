@@ -1,3 +1,6 @@
+-- Load State.lua before all others, to allow others to add state validation options
+require "State.lua"
+
 -- Alphabetical
 require "Const.lua"
 require "Debug.lua"
@@ -10,8 +13,9 @@ require "Utils.lua"
 require "Actor.lua"	-- depends on History.lua
 require "Commands.lua"	-- depends on Table.lua
 
--- TODO: Config
-local MaxDistance = 14
+-- State validation options
+RAIL.Validate.MaxDistance = {"number", 14, 3, 14}
+RAIL.Validate.Aggressive = {"boolean", false}
 
 -- TODO: Detect movement speeds automatically
 --	(from http://forums.roempire.com/archive/index.php/t-137959.html)
@@ -43,6 +47,18 @@ function AI(id)
 	else
 		RAIL.Self.AI_Type = GetV(V_HOMUNTYPE,id)
 	end
+
+	-- Load persistent state data
+	RAIL.State:Load(true)
+
+	-- Periodically save state data
+	RAIL.Timeouts:New(2500,true,function()
+		-- Only load data if the "update" flag is on in the file
+		RAIL.State:Load(false)
+
+		-- Save data (if any data was loaded, it won't be dirty and won't save)
+		RAIL.State:Save()
+	end)
 
 	AI = RAIL.AI
 	AI(id)
@@ -79,7 +95,7 @@ function RAIL.AI(id)
 			-- 3 tiles ahead, to start moving before off screen
 			RAIL.Owner.X[-3*MsecPerCell],
 			RAIL.Owner.Y[-3*MsecPerCell]
-		) >= MaxDistance then
+		) >= RAIL.State.MaxDistance then
 			Target.Chase = RAIL.Owner
 		end
 
@@ -157,7 +173,12 @@ function RAIL.AI(id)
 	end
 
 	-- Check if the cycle should terminate early
-	if terminate then return end
+	if terminate then
+		-- Save state data before terminating
+		RAIL.State:Save()
+
+		return
+	end
 
 	-- Pre-decision cmd queue evaluation
 	do
@@ -168,7 +189,7 @@ function RAIL.AI(id)
 				-- Check for a couple states that would invalidate the move
 				if
 					-- Move would be out of range
-					RAIL.Owner:BlocksTo(msg[2],msg[3]) > MaxDistance or
+					RAIL.Owner:BlocksTo(msg[2],msg[3]) > RAIL.State.MaxDistance or
 					-- Already arrived
 					RAIL.Self:DistanceTo(msg[2],msg[3]) < 1
 				then

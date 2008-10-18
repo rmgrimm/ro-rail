@@ -45,7 +45,8 @@ do
 
 			-- "alt+t"
 			[FOLLOW_CMD] = function(shift,msg)
-				-- TODO: Toggle aggro/passive
+				-- Toggle aggressive mode
+				RAIL.State.Aggressive = not RAIL.State.Aggressive
 			end,
 		},
 	}
