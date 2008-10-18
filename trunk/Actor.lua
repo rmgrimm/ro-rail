@@ -1,3 +1,7 @@
+-- A few persistent-state options used
+RAIL.Validate.DefendFriends = {"boolean",false}
+
+-- Actor data-collection
 do
 	-- This unique table ID will be used as a key to identify Actor tables
 	local actor_key = {}
@@ -42,6 +46,29 @@ do
 		ret.FullUpdate = false		-- Track position, motion, target, etc?
 		ret.TargetOf = { }		-- Other Actors that are targeting this one
 		ret.IgnoreTime = -1		-- Actor isn't currently ignored
+		ret.BattleOpts = { }		-- Battle options
+
+		-- Set defaults for battle options
+		setmetatable(ret.BattleOpts,{
+			__index = function(self,key)
+				local t =
+					--BattleOptsByID[ret.ID] or
+					--BattleOptsByType[ret.Type] or
+					BattleOptsDefaults or
+					{
+						Priority = 0,
+						AttackAllowed = true,
+						DefendOnly = false,
+						SkillsAllowed = false,
+						MinSkillLevel = 1,
+						MaxSkillLevel = 5,
+						TicksBetweenSkills = 0,
+						MaxCastsAgainst = 0,
+					}
+
+				return t[key]
+			end,
+		})
 
 		-- The following have their histories tracked
 		ret.Target = History.New(-1,false)
@@ -87,7 +114,9 @@ do
 		Actor[actor_key](ret)
 
 		-- Log
-		RAIL.Log(0,"Actor class generated for %s.",tostring(ret))
+		if ID ~= -1 then
+			RAIL.Log(0,"Actor class generated for %s.",tostring(ret))
+		end
 
 		return ret
 	end
@@ -258,7 +287,7 @@ do
 	Actor.TargetedBy = function(self,actor)
 		-- Use a table to make looping through and counting it faster
 		--	* to determine if an actor is targeting this one, use Actors[id].Target[0] == self.ID
-		if self.TargetOf[targeted_time] ~= GetTick() then
+		if math.abs(self.TargetOf[targeted_time] - GetTick()) > 50 then
 			self.TargetOf = Table:New()
 			self.TargetOf[targeted_time] = GetTick()
 		end
@@ -271,6 +300,12 @@ do
 	Actor.Expire = function(self)
 		-- Log
 		RAIL.Log(0,"Clearing history for %s due to timeout.",tostring(self))
+
+		-- Unset any per-actor battle options
+		local k,v
+		for k,v in pairs(self.BattleOpts) do
+			self.BattleOpts[k] = nil
+		end
 
 		-- Clear the histories
 		History.Clear(self.Motion)
@@ -325,7 +360,12 @@ do
 
 	-- Estimate Movement Speed
 	Actor.EstimateMoveSpeed = function(self)
-		-- TODO
+		-- TODO: Detect movement speeds automatically
+		--	(from http://forums.roempire.com/archive/index.php/t-137959.html)
+		--	0.15 sec per cell at regular speed
+		--	0.11 sec per cell w/ agi up
+		--	0.06 sec per cell w/ Lif's emergency avoid
+		return 150
 	end
 
 	--------------------
@@ -334,23 +374,73 @@ do
 
 	-- RAIL allowed to kill monster?
 	Actor.IsAllowed = function(self)
-		-- TODO: This... Attack/Skill Allowed
-		return true
+		-- Determine if the monster is allowed at all
+		return self.BattleOpts.AttackAllowed or self.BattleOpts.SkillsAllowed
 	end
 
-	-- TODO: Anti-kill-steal code
+	-- Determine if attacking this actor would be kill-stealing
+	Actor.WouldKillSteal = function(self)
+		-- Free-for-all monsters are never kill-stealed
+		if self.BattleOpts.FreeForAll then
+			return false
+		end
 
-	-- The follow list should be retrieved from shared tables (referenced by type):
-	-- * Priority
+		-- Check if it's an enemy
+		if not self:IsEnemy() then
+			return false
+		end
 
-	-- * Attack Allowed
-	-- * Defend-only
-	-- * Ignore KS
+		-- Check if this actor is targeting anything
+		local targ = self.Target[0]
+		if targ ~= -1 then
+			-- Owner and self don't count
+			if targ == RAIL.Self.ID or targ == RAIL.Owner.ID then
+				return false
+			end
 
-	-- * Skills Allowed
-	-- * Min/Max Skill Level
-	-- * Time Between Skills
-	-- * Max Casts Against
+			local targ = Actors[targ]
+
+			-- Determine if we're supposed to defend friends
+			if RAIL.State.DefendFriends and targ:IsFriend() then
+				return false
+			end
+
+			-- Determine if it's not targeting another enemy
+			if not targ:IsEnemey() then
+
+				-- Determine if the target has been updated recently
+				if math.abs(targ.LastUpdate - GetTick()) < 50 then
+					-- It would be kill stealing
+					return true
+				end
+
+			end
+		end
+
+		-- Check if this actor is the target of anything
+		local i
+		for i=1,self.TargetOf:Size(),1 do
+			targ = self.TargetOf[i]
+
+			-- Determine if the targeter is...
+			if
+				targ ~= RAIL.Owner and				-- not the owner
+				targ ~= RAIL.Self and				-- not ourself
+				not targ:IsEnemy() and				-- not an enemy
+				not targ:IsFriend() and				-- not a friend
+				math.abs(GetTick() - targ.LastUpdate) < 50	-- updated recently
+			then
+				-- Likely kill-stealing
+				return true
+			end
+		end
+
+		-- TODO: Moving
+
+		-- Default is not kill-steal
+		return false
+	end
+
 
 
 	-- Kite / Attack**
@@ -435,7 +525,7 @@ do
 			if not self[closures].DistancePlot[a] then
 
 				-- Create closure
-				self[closures].DistancePlot[a] = function(x,y,dist)
+				self[closures].DistancePlot[a] = function(x,y,dist_delta)
 					-- Main function logic follows
 
 					-- Check if "x" is an actor table
@@ -587,10 +677,21 @@ do
 	--	hooked in a more efficient manner than hooking Attack() base API
 
 	Actor.Attack = function(self)
+		-- Send the attack
 		Attack(RAIL.Self.ID,self.ID)
+
+		-- After sending an attack, this actor can never be kill-stealed (until Actor.Expire)
+		self.BattleOpts.FreeForAll = true
 	end
 	Actor.SkillObject = function(self,level,skill_id)
+		-- Send the skill
 		SkillObject(RAIL.Self.ID,level,skill_id,self.ID)
+
+		-- Increment skill counter
+		self.BattleOpts.SkillsAgainst = (self.BattleOpts.SkillsAgainst or 0) + 1
+
+		-- And never see it as kill-stealing
+		self.BattleOpts.FreeForAll = true
 	end
 
 	-----------------------

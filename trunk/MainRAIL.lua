@@ -17,13 +17,6 @@ require "Commands.lua"	-- depends on Table.lua
 RAIL.Validate.MaxDistance = {"number", 14, 3, 14}
 RAIL.Validate.Aggressive = {"boolean", false}
 
--- TODO: Detect movement speeds automatically
---	(from http://forums.roempire.com/archive/index.php/t-137959.html)
---	0.15 sec per cell at regular speed
---	0.11 sec per cell w/ agi up
---	0.06 sec per cell w/ Lif's emergency avoid
-local MsecPerCell = 150
-
 function AI(id)
 	-- Get Owner and Self
 	RAIL.Owner = Actors[GetV(V_OWNER,id)]
@@ -93,8 +86,8 @@ function RAIL.AI(id)
 		-- Determine if we need to chase our owner
 		if RAIL.Self:BlocksTo(0)(
 			-- 3 tiles ahead, to start moving before off screen
-			RAIL.Owner.X[-3*MsecPerCell],
-			RAIL.Owner.Y[-3*MsecPerCell]
+			RAIL.Owner.X[-3*RAIL.Owner:EstimateMoveSpeed()],
+			RAIL.Owner.Y[-3*RAIL.Owner:EstimateMoveSpeed()]
 		) >= RAIL.State.MaxDistance then
 			Target.Chase = RAIL.Owner
 		end
@@ -114,7 +107,7 @@ function RAIL.AI(id)
 				if actor.Type == 45 and not terminate then
 					-- Get the block distances between the portal and the owner
 						-- roughly 2.5 tiles from now
-					local inFuture = RAIL.Owner:BlocksTo(-2.5*MsecPerCell)(actor)
+					local inFuture = RAIL.Owner:BlocksTo(-2.5*RAIL.Owner:EstimateMoveSpeed())(actor)
 						-- and now
 					local now = RAIL.Owner:BlocksTo(actor)
 
