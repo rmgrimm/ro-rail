@@ -358,7 +358,7 @@ do
 		self.IgnoreTime = ticks
 	end
 
-	-- Estimate Movement Speed
+	-- Estimate Movement Speed (in milliseconds per cell)
 	Actor.EstimateMoveSpeed = function(self)
 		-- TODO: Detect movement speeds automatically
 		--	(from http://forums.roempire.com/archive/index.php/t-137959.html)
