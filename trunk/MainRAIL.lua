@@ -53,7 +53,7 @@ function AI(id)
 		RAIL.State:Save()
 	end)
 
-	AI = RAIL.AI
+	AI = ProfilingHook("RAIL.AI",RAIL.AI,5)
 	AI(id)
 end
 
@@ -112,7 +112,7 @@ function RAIL.AI(id)
 					local now = RAIL.Owner:BlocksTo(actor)
 
 					if inFuture < 3 and inFuture < now then
-						RAIL.Log(0,"Owner approaching portal; cycle terminating after data collection.")
+						RAIL.Log(7,"Owner approaching portal; cycle terminating after data collection.")
 						terminate = true
 					end
 				end
@@ -170,6 +170,7 @@ function RAIL.AI(id)
 		-- Save state data before terminating
 		RAIL.State:Save()
 
+		-- Terminate this cycle early
 		return
 	end
 

@@ -115,7 +115,7 @@ do
 
 		-- Log
 		if ID ~= -1 then
-			RAIL.Log(0,"Actor class generated for %s.",tostring(ret))
+			RAIL.Log(10,"Actor class generated for %s.",tostring(ret))
 		end
 
 		return ret
@@ -212,7 +212,7 @@ do
 			Actor[actor_key](self)
 
 			-- Log
-			RAIL.Log(0,"%s changed type to %s.",str,tostring(self))
+			RAIL.Log(10,"%s changed type to %s.",str,tostring(self))
 		end
 
 		-- Update the expiration timeout
@@ -299,7 +299,7 @@ do
 	-- Clear out memory
 	Actor.Expire = function(self)
 		-- Log
-		RAIL.Log(0,"Clearing history for %s due to timeout.",tostring(self))
+		RAIL.Log(10,"Clearing history for %s due to timeout.",tostring(self))
 
 		-- Unset any per-actor battle options
 		local k,v
@@ -353,7 +353,7 @@ do
 		end
 
 		-- TODO: Log
-		RAIL.Log(0,"%s ignored for %d milliseconds.",tostring(self),ticks)
+		RAIL.Log(2,"%s ignored for %d milliseconds.",tostring(self),ticks)
 
 		self.IgnoreTime = ticks
 	end

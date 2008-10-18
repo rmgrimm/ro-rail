@@ -149,7 +149,7 @@ do
 				file:close()
 			end
 
-			RAIL.Log(0,"Saved state to %s",self[filename])
+			RAIL.Log(3,"Saved state to %s",self[filename])
 		end,
 		Load = function(self,forced)
 			-- Make sure we have a proper filename
@@ -162,7 +162,7 @@ do
 
 			if f == nil then
 				if forced then
-					RAIL.Log(0,"Failed to load state from %s: %s",self[filename],tostring(err))
+					RAIL.Log(3,"Failed to load state from %s: %s",self[filename],tostring(err))
 				end
 				return
 			end
@@ -180,7 +180,7 @@ do
 			if rail_state.update or forced then
 				self[state] = rail_state
 				self[dirty] = false
-				RAIL.Log(0,"Loaded state from %s",self[filename])
+				RAIL.Log(3,"Loaded state from %s",self[filename])
 
 				-- Resave with the update flag off if we need to
 				if self[state].update then
