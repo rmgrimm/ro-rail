@@ -133,9 +133,9 @@ do
 		[filename] = "",
 
 		-- Function to save the data
-		Save = function(self)
+		Save = function(self,forced)
 			-- Only save the state if it's changed
-			if not self[dirty] then
+			if not forced and not self[dirty] then
 				return
 			end
 
@@ -199,6 +199,11 @@ do
 			rail_state = nil
 		end,
 	}
+
+	-- TODO:
+	--	setup some functions to apply proxying metatables to sub-tables within
+	--	RAIL.State[state]
+	--		* - clear them whenever the table reloaded via RAIL.State.Load
 
 	-- Force RAIL.State to act as a proxy to sub state table
 	setmetatable(RAIL.State,{
