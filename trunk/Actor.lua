@@ -287,7 +287,7 @@ do
 	Actor.TargetedBy = function(self,actor)
 		-- Use a table to make looping through and counting it faster
 		--	* to determine if an actor is targeting this one, use Actors[id].Target[0] == self.ID
-		if math.abs(self.TargetOf[targeted_time] - GetTick()) > 50 then
+		if math.abs((self.TargetOf[targeted_time] or 0) - GetTick()) > 50 then
 			self.TargetOf = Table:New()
 			self.TargetOf[targeted_time] = GetTick()
 		end
