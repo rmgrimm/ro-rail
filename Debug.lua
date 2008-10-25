@@ -80,6 +80,9 @@ do
 		if str == antidup then
 			-- Duplicate lines get level replaced with "D"
 			TraceAI("(DD) " .. str)
+
+			-- Don't anti-dup next time
+			str = nil
 		else
 			-- Prepend the debug level
 			TraceAI(string.format("(%2d) %s",level,str))
