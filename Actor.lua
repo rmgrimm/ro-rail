@@ -1,5 +1,123 @@
 -- A few persistent-state options used
 RAIL.Validate.DefendFriends = {"boolean",false}
+RAIL.Validate.ActorOptions = {is_subtable=true}
+RAIL.Validate.ActorOptions.Default = {is_subtable=true,
+	Friend = {"boolean",false},
+	Priority = {"number",0},
+	AttackAllowed = {"boolean",true},
+	DefendOnly = {"boolean",false},
+	SkillsAllowed = {"boolean",false},
+	MinSkillLevel = {"number",1,1,10},
+	MaxSkillLevel = {"number",5,1,10},
+	TicksBetweenSkills = {"number",0,0},
+	MaxCastsAgainst = {"number",0,0},
+}
+RAIL.Validate.ActorOptions.ByType = {is_subtable=true}
+RAIL.Validate.ActorOptions.ByID = {is_subtable=true}
+
+-- Actor Battle Options
+do
+	-- Defaults
+	do
+		BattleOptsDefaults = { }
+		setmetatable(BattleOptsDefaults,{
+			__index = function(t,key)
+				return RAIL.State.ActorOptions.Default[key]
+			end
+		})
+	end
+
+	-- By Type
+	do
+		-- Private key to access each type
+		local type_key = {}
+
+		local mt = {
+			__index = function(t,key)
+				-- Check the RAIL.State.ActorOptions.ByType table
+				local ByType = RAIL.State.ActorOptions.ByType
+				local type_num = t[type_key]
+				if type(ByType[type_num]) ~= "table" then
+					ByType[type_num] = { }
+				end
+
+				-- Use value from ByType table if non-nil
+				if ByType[type_num][key] ~= nil then
+					-- TODO: Validation
+					return ByType[type_num][key]
+				end
+
+				-- Otherwise, use default
+				return BattleOptsDefaults[key]
+			end
+		}
+
+		BattleOptsByType = { }
+		setmetatable(BattleOptsByType,{
+			__index = function(t,key)
+				-- Make sure there are options for it
+				if RAIL.State.ActorOptions.ByType[key] == nil then
+					return nil
+				end
+
+				local ret = {
+					[type_key] = key,
+				}
+
+				setmetatable(ret,mt)
+				t[key] = ret
+
+				return ret
+			end
+		})
+	end
+
+	-- By ID
+	do
+		-- Private key to access each ID
+		local id_key = {}
+
+		local mt = {
+			__index = function(t,key)
+				-- Check the RAIL.State.ActorOptions.ByID table
+				local ByID = RAIL.State.ActorOptions.ByID
+				local id_num = t[id_key]
+				if type(ByID[id_num]) ~= "table" then
+					ByID[id_num] = { }
+				end
+
+				-- Use value from ByID table if non-nil
+				if ByID[id_num][key] ~= nil then
+					-- TODO: Validation
+					return ByID[id_num][key]
+				end
+
+				-- Otherwise, use ByType table
+				return BattleOptsByType[Actors[id_num].Type][key]
+			end
+		}
+
+		BattleOptsByID = { }
+		setmetatable(BattleOptsByID,{
+			__index = function(t,key)
+				-- Make sure there are options for it
+				if RAIL.State.ActorOptions.ByID[key] == nil then
+					return nil
+				end
+
+				local ret = {
+					[id_key] = key,
+				}
+
+				setmetatable(ret,mt)
+				t[key] = ret
+
+				return ret
+			end
+		})
+	end
+
+end
 
 -- Actor data-collection
 do
@@ -52,10 +170,11 @@ do
 		setmetatable(ret.BattleOpts,{
 			__index = function(self,key)
 				local t =
-					--BattleOptsByID[ret.ID] or
-					--BattleOptsByType[ret.Type] or
+					BattleOptsByID[ret.ID] or
+					BattleOptsByType[ret.Type] or
 					BattleOptsDefaults or
 					{
+						Friend = false,
 						Priority = 0,
 						AttackAllowed = true,
 						DefendOnly = false,
@@ -307,6 +426,14 @@ do
 			self.BattleOpts[k] = nil
 		end
 
+		-- Unset any closures used
+		local t
+		for k,t in pairs(self[closures]) do
+			for k,v in pairs(t) do
+				t[k] = nil
+			end
+		end
+
 		-- Clear the histories
 		History.Clear(self.Motion)
 		History.Clear(self.Target)
@@ -326,11 +453,17 @@ do
 
 	-- Check if the actor is a friend
 	Actor.IsFriend = function(self)
-		do return false end
-
 		-- TODO: Temporary friends (players within <opt> range of owner)
 
-		-- TODO: Friend list (players only! monster IDs and homu IDs change!!)
+		-- Check if actor is on the friend list
+		return self.BattleOpts.Friend
+	end
+
+	-- Set actor as a friend
+	Actor.SetFriend = function(self,bool)
+		-- TODO: Make sure only players are allowed on friend list
+
+		-- TODO: Set RAIL.State.ActorOptions.ByID[self.ID].Friend = true/false
 	end
 
 	-- Check if the actor is ignored
