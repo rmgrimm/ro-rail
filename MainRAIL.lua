@@ -106,8 +106,8 @@ function RAIL.AI(id)
 				-- If the actor that was just updated is a portal
 				if actor.Type == 45 and not terminate then
 					-- Get the block distances between the portal and the owner
-						-- roughly 2.5 tiles from now
-					local inFuture = RAIL.Owner:BlocksTo(-2.5*RAIL.Owner:EstimateMoveSpeed())(actor)
+						-- roughly 1.5 tiles from now
+					local inFuture = RAIL.Owner:BlocksTo(-1.5*RAIL.Owner:EstimateMoveSpeed())(actor)
 						-- and now
 					local now = RAIL.Owner:BlocksTo(actor)
 

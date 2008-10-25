@@ -1,4 +1,5 @@
 -- A few persistent-state options used
+RAIL.Validate.TempFriendRange = {"number",0,0,5}
 RAIL.Validate.DefendFriends = {"boolean",false}
 RAIL.Validate.ActorOptions = {is_subtable=true}
 RAIL.Validate.ActorOptions.Default = {is_subtable=true,
@@ -17,6 +18,18 @@ RAIL.Validate.ActorOptions.ByID = {is_subtable=true}
 
 -- Actor Battle Options
 do
+	-- TODO: Optimize Actor Options...
+	--
+	--	Actor[id].BattleOpts (metatable; checks ByID, ByType, Default)
+	--	ByID checks ByTypes
+	--	ByTypes checks Defaults
+	--	Defaults/ByID/ByTypes all trigger validation of tables
+	--		RAIL.State.ActorOptions
+	--		RAIL.State.ActorOptions.[Defaults/ByID/ByType]
+	--
+	--	Called almost every cycle...
+	--
+
 	-- Defaults
 	do
 		BattleOptsDefaults = { }
@@ -93,7 +106,9 @@ do
 				end
 
 				-- Otherwise, use ByType table
-				return BattleOptsByType[Actors[id_num].Type][key]
+				local t = BattleOptsByType[Actors[id_num].Type]
+					or BattleOptsDefaults
+				return t[key]
 			end
 		}
 
@@ -453,7 +468,15 @@ do
 
 	-- Check if the actor is a friend
 	Actor.IsFriend = function(self)
-		-- TODO: Temporary friends (players within <opt> range of owner)
+		-- Make sure only players are counted as friends
+		if self.ActorType ~= "Player" then
+			return false
+		end
+
+		-- Check for temporary friends (players within <opt> range of owner)
+		if RAIL.Owner:DistanceTo(self) <= RAIL.State.TempFriendRange then
+			return true
+		end
 
 		-- Check if actor is on the friend list
 		return self.BattleOpts.Friend
@@ -461,7 +484,10 @@ do
 
 	-- Set actor as a friend
 	Actor.SetFriend = function(self,bool)
-		-- TODO: Make sure only players are allowed on friend list
+		-- Make sure only players are allowed on friend list
+		if self.ActorType ~= "Player" then
+			return
+		end
 
 		-- TODO: Set RAIL.State.ActorOptions.ByID[self.ID].Friend = true/false
 	end
@@ -492,13 +518,50 @@ do
 	end
 
 	-- Estimate Movement Speed (in milliseconds per cell)
+	local find_non_move = function(v) return v ~= MOTION_MOVE end
+	local find_move = function(v) return v == MOTION_MOVE end
 	Actor.EstimateMoveSpeed = function(self)
-		-- TODO: Detect movement speeds automatically
-		--	(from http://forums.roempire.com/archive/index.php/t-137959.html)
-		--	0.15 sec per cell at regular speed
-		--	0.11 sec per cell w/ agi up
-		--	0.06 sec per cell w/ Lif's emergency avoid
-		return 150
+		-- Don't estimate too often
+		if self.EstimatedMoveSpeed ~= nil and GetTick() - self.EstimatedMoveSpeed[2] < 500 then
+			return self.EstimatedMoveSpeed[1]
+		end
+
+		local move = -1
+		local non_move = 0
+		local time_delta
+		local tile_delta
+
+		repeat
+
+			-- Find the most recent non-move
+			non_move = History.FindMostRecent(self.Motion,find_non_move,move+1) or 0
+
+			-- Find the most recent move that follows this non-move
+			move = History.FindMostRecent(self.Motion,find_move,non_move)
+
+			-- If there was never motion, use default move-speed of 150
+			if move == nil or non_move == move then
+				-- Default move-speed to regular walk
+				--	according to http://forums.roempire.com/archive/index.php/t-137959.html:
+				--		0.15 sec per cell at regular speed
+				--		0.11 sec per cell w/ agi up
+				--		0.06 sec per cell w/ Lif's emergency avoid
+				time_delta = 150
+				tile_delta = 1
+				break
+			end
+
+			-- Determine the time delta
+			time_delta = math.abs(move - non_move)
+
+			-- Determine the distance moved
+			tile_delta = PythagDistance(self.X[non_move],self.Y[non_move],self.X[move],self.Y[move])
+
+		until time_delta > 50 and tile_delta > 0
+
+		-- Return our estimated movement speed
+		self.EstimatedMoveSpeed = { time_delta / tile_delta, GetTick() }
+		return self.EstimatedMoveSpeed[1]
 	end
 
 	--------------------
