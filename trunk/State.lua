@@ -74,164 +74,192 @@ do
 	}
 
 	setmetatable(RAIL.Validate,{
-		__call = function(self,key,value)
-			-- If it's not in our table, then it doesn't need to be validated
-			local validate = self[key]
-			if not validate then
-				return value
+		__call = function(self,data,validate)
+			-- Verify the validation info
+			if not validate or not validate[1] then
+				return data
 			end
 
 			-- Verify the type
-			local t = type(value)
+			local t = type(data)
 			if t ~= validate[1] then
+				-- If it should be a table, return a brand new table
+				if validate[1] == "table" then
+					return {}
+				end
+
 				-- Return default
 				return validate[2]
 			end
 
 			-- Non-numericals are now valid
 			if t ~= "number" then
-				return value
+				return data
 			end
 
 			-- Validate that the number is greater or equal to the minimum
-			if validate[3] and value < validate[3] then
+			if validate[3] and data < validate[3] then
 				-- Below the minimum, so return minimum instead
 				return validate[3]
 			end
 
 			-- Validate that the number is less or equal to the maximum
-			if validate[4] and value > validate[4] then
+			if validate[4] and data > validate[4] then
 				-- Above the maximum, so return maximum instead
 				return validate[4]
 			end
 
 			-- Return the number, it's in range
-			return value
+			return data
 		end,
 	})
 end
 
 -- State persistence
 do
-	-- Private key to keep track of "dirty" (unsaved) state data
-	local dirty = {}
+	-- Is data "dirty" ?
+	local dirty = false
 
-	-- Private key to hold the table of state data
-	local state = {}
+	-- Filename to load/save from
+	local filename
 
-	-- Private key to hold the state filename
-	local filename = {}
+	-- Private keys to data and validation tables
+	local data_t = {}
+	local vali_t = {}
 
-	-- Main interface to state information
-	RAIL.State = {
-		-- Is data "dirty"?
-		[dirty] = false,
+	-- Metatable (built after ProxyTable)
+	local metatable = {}
 
-		-- Persistent data table
-		[state] = {},
+	-- Proxy tables to track "dirty"ness
+	local ProxyTable = function(d,v)
+		local ret = {
+			[data_t] = d,
+			[vali_t] = v,
+		}
 
-		[filename] = "",
+		setmetatable(ret,metatable)
 
-		-- Function to save the data
-		Save = function(self,forced)
-			-- Only save the state if it's changed
-			if not forced and not self[dirty] then
-				return
+		return ret
+	end
+
+	-- Metatable
+	metatable.__index = function(t,key)
+		-- Get the data from proxied table
+		local data = t[data_t][key]
+
+		-- Validate it
+		local valid = t[vali_t][key]
+		local v = RAIL.Validate(data,valid)
+
+		-- Check if the validated data is different
+		if v ~= data then
+			-- Save new data, and set dirty
+			t[data_t][key] = v
+			dirty = true
+		end
+
+		-- Check if it's a table
+		if type(v) == "table" then
+			-- Proxy it
+			return ProxyTable(v,valid)
+		end
+
+		-- Return validated data
+		return v
+	end
+	metatable.__newindex = function(t,key,value)
+		-- Don't do anything if the value stays the same
+		if t[data_t][key] == value then
+			return
+		end
+
+		-- Set dirty
+		dirty = true
+
+		-- Set the value
+		t[data_t][key] = value
+	end
+
+	-- Setup RAIL.State
+	RAIL.State = ProxyTable({},RAIL.Validate)
+
+	-- Save function
+	rawset(RAIL.State,"Save",function(self,forced)
+		-- Only save the state if it's changed
+		if not forced and not dirty then
+			return
+		end
+
+		-- Unset dirty state
+		dirty = false
+
+		-- Save the state to a file
+		local file = io.open(filename,"w")
+		if file ~= nil then
+			file:write(Serialize("rail_state",self[data_t]))
+			file:close()
+		end
+
+		RAIL.Log(3,"Saved state to %s",filename)
+	end)
+
+	local KeepInState = { Load = true, Save = true, [data_t] = true, [vali_t] = true }
+
+	-- Load function
+	rawset(RAIL.State,"Load",function(self,forced)
+		-- Make sure we have a proper filename
+		if not filename then
+			filename = string.format("RAIL_State.%d.lua",RAIL.Owner.ID)
+		end
+
+		-- Do nothing if the file doesn't exist
+		local f,err = loadfile(filename)
+
+		if f == nil then
+			if forced then
+				RAIL.Log(3,"Failed to load state from %s: %s",filename,tostring(err))
 			end
+			return
+		end
 
-			-- Unset dirty state
-			self[dirty] = false
+		-- Run the function
+		f()
 
-			-- Save the state to a file
-			local file = io.open(self[filename],"w")
-			if file ~= nil then
-				file:write(Serialize("rail_state",self[state]))
-				file:close()
-			end
+		-- See if it left us with a workable state
+		if type(rail_state) ~= "table" then
+			-- TODO: Log invalid state?
+			return
+		end
 
-			RAIL.Log(3,"Saved state to %s",self[filename])
-		end,
-		Load = function(self,forced)
-			-- Make sure we have a proper filename
-			if self[filename] == "" then
-				self[filename] = string.format("RAIL_State.%d.lua",RAIL.Owner.ID)
-			end
+		-- Decide if we should load this state
+		if rail_state.update or forced then
+			self[data_t] = rail_state
+			dirty = false
+			RAIL.Log(3,"Loaded state from %s",filename)
 
-			-- Do nothing if the file doesn't exist
-			local f,err = loadfile(self[filename])
+			-- Resave with the update flag off if we need to
+			if self[data_t].update then
+				self[data_t].update = false
 
-			if f == nil then
-				if forced then
-					RAIL.Log(3,"Failed to load state from %s: %s",self[filename],tostring(err))
+				-- Save the state to a file
+				local file = io.open(filename,"w")
+				if file ~= nil then
+					file:write(Serialize("rail_state",self[data_t]))
+					file:close()
 				end
-				return
 			end
 
-			-- Run the function
-			f()
-
-			-- See if it left us with a workable state
-			if type(rail_state) ~= "table" then
-				-- TODO: Log invalid state?
-				return
-			end
-
-			-- Decide if we should load this state
-			if rail_state.update or forced then
-				self[state] = rail_state
-				self[dirty] = false
-				RAIL.Log(3,"Loaded state from %s",self[filename])
-
-				-- Resave with the update flag off if we need to
-				if self[state].update then
-					self[state].update = false
-
-					-- Save the state to a file
-					local file = io.open(self[filename],"w")
-					if file ~= nil then
-						file:write(Serialize("rail_state",self[state]))
-						file:close()
-					end
+			-- Clear any proxied tables in RAIL.State
+			local k,v
+			for k,v in pairs(RAIL.State) do
+				if not KeepInState[k] then
+					RAIL.State[k] = nil
 				end
 			end
+		end
 
-			-- Reset the rail_state object back to normal
-			rail_state = nil
-		end,
-	}
+		-- Reset the rail_state object back to normal
+		rail_state = nil
+	end)
 
-	-- TODO:
-	--	setup some functions to apply proxying metatables to sub-tables within
-	--	RAIL.State[state]
-	--		* - clear them whenever the table reloaded via RAIL.State.Load
-
-	-- Force RAIL.State to act as a proxy to sub state table
-	setmetatable(RAIL.State,{
-		__index = function(t,key)
-			-- Validate the data from our proxied table
-			local v = RAIL.Validate(key,t[state][key])
-
-			-- Check if the validated data is different
-			if v ~= t[state][key] then
-				-- Save new data, and set dirty
-				t[state][key] = v
-				t[dirty] = true
-			end
-
-			-- And return it
-			return t[state][key]
-		end,
-		__newindex = function(t,key,val)
-			-- Don't set to the same value
-			if t[state][key] == val then
-				return
-			end
-
-			-- Set dirty
-			t[dirty] = true
-
-			-- Set the state value
-			t[state][key] = val
-		end,
-	})
 end
