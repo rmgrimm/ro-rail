@@ -19,6 +19,34 @@ do
 		return a[1] + (b[1] - a[1]) / dest_ratio
 	end
 
+	local BinarySearch = function(list,target)
+		-- left is older, right is newer
+		local l,r = list.first,list.last
+		local probe
+		while true do
+			probe = math.floor((l + r) / 2)
+
+			if probe <= l then
+				-- This must be the best one
+				break
+			end
+
+			-- Check the time of the current probe position
+			if target < list[probe][2] then
+				-- Too new
+				r = probe
+			elseif target > list[probe][2] then
+				-- New enough, search for a better one
+				l = probe
+			else
+				-- If it's exact, go ahead and use it
+				return probe,true
+			end
+		end
+
+		return probe,false
+	end
+
 	local History_mt = {
 		__index = function(self,key)
 			local list = self[list_key]
@@ -50,31 +78,9 @@ do
 
 			-- Otherwise, binary search for the closest item that isn't newer
 			do
-				-- left is older, right is newer
-				local l,r = list.first,list.last
-				local probe
-				while true do
-					probe = math.floor((l + r) / 2)
+				local probe,exact = BinarySearch(list,target)
 
-					if probe <= l then
-						-- This must be the best one
-						break
-					end
-
-					-- Check the time of the current probe position
-					if target < list[probe][2] then
-						-- Too new
-						r = probe
-					elseif target > list[probe][2] then
-						-- New enough, search for a better one
-						l = probe
-					else
-						-- If it's exact, go ahead and use it
-						return list[probe][1]
-					end
-				end
-
-				if not self[subtimes_key] then
+				if exact or not self[subtimes_key] then
 					return list[probe][1]
 				end
 
@@ -137,5 +143,48 @@ do
 
 	History.Clear = function(table)
 		table[list_key]:Clear()
+	end
+
+	History.FindMostRecent = function(table,value,search_begin)
+		local list = table[list_key]
+		local v_func
+		if type(value) ~= "function" then
+			v_func = function(v)
+				return v == value
+			end
+		else
+			v_func = value
+		end
+		if type(search_begin) ~= "number" or search_begin < 0 then
+			search_begin = 0
+		end
+
+		local target = GetTick() - search_begin
+
+		if list:Size() < 1 then
+			return nil
+		elseif target < list[list.first][2] then
+			return nil
+		elseif target >= list[list.last][2] then
+			search_begin = list.last
+		else
+			local exact
+			search_begin,exact = BinarySearch(list,target)
+		end
+
+		local i
+		for i=search_begin,list.first,-1 do
+			if v_func(list[i][1]) then
+				return GetTick() - list[i][2]
+			end
+		end
+
+		return nil
+	end
+
+	History.GetConstList = function(table)
+		local ret = { }
+		setmetatable(ret,{__index = table[list_key]})
+		return ret
 	end
 end
