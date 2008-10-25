@@ -71,20 +71,24 @@ end
 do
 	RAIL.Validate = {
 		-- Name = {type, default, numerical min, numerical max }
+		-- Subtable = {is_subtable = true}
 	}
 
 	setmetatable(RAIL.Validate,{
 		__call = function(self,data,validate)
 			-- Verify the validation info
-			if not validate or not validate[1] then
+			if type(validate) ~= "table" or (validate[1] == nil and validate.is_subtable == nil) then
 				return data
 			end
 
 			-- Verify the type
 			local t = type(data)
-			if t ~= validate[1] then
+			if
+				(not validate.is_subtable and t ~= validate[1]) or
+				(validate.is_subtable and t ~= "table")
+			then
 				-- If it should be a table, return a brand new table
-				if validate[1] == "table" then
+				if validate.is_subtable then
 					return {}
 				end
 
