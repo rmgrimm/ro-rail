@@ -3,6 +3,7 @@ require "State.lua"
 
 -- Alphabetical
 require "Const.lua"
+require "DecisionSupport.lua"
 require "Debug.lua"
 require "History.lua"
 require "Table.lua"
@@ -84,11 +85,16 @@ function RAIL.AI(id)
 		RAIL.Self:Update()
 
 		-- Determine if we need to chase our owner
-		if RAIL.Self:BlocksTo(0)(
-			-- 3 tiles ahead, to start moving before off screen
-			RAIL.Owner.X[-3*RAIL.Owner:EstimateMoveSpeed()],
-			RAIL.Owner.Y[-3*RAIL.Owner:EstimateMoveSpeed()]
-		) >= RAIL.State.MaxDistance then
+		if
+			-- Debug toggle for interception
+			(false and RAIL.Owner.Motion[0] == MOTION_MOVE) or
+			-- Regular determination
+			RAIL.Self:BlocksTo(0)(
+				-- Guess ~3 tiles ahead, so homu/merc isn't off screen when finally decides to move
+				RAIL.Owner.X[-3*RAIL.Owner:EstimateMove()],
+				RAIL.Owner.Y[-3*RAIL.Owner:EstimateMove()]
+			) >= RAIL.State.MaxDistance
+		then
 			Target.Chase = RAIL.Owner
 		end
 
@@ -107,12 +113,11 @@ function RAIL.AI(id)
 				if actor.Type == 45 and not terminate then
 					-- Get the block distances between the portal and the owner
 						-- roughly 1.5 tiles from now
-					local inFuture = RAIL.Owner:BlocksTo(-1.5*RAIL.Owner:EstimateMoveSpeed())(actor)
+					local inFuture = RAIL.Owner:BlocksTo(-1.5*RAIL.Owner:EstimateMove())(actor)
 						-- and now
 					local now = RAIL.Owner:BlocksTo(actor)
 
 					if inFuture < 3 and inFuture < now then
-						RAIL.Log(7,"Owner approaching portal; cycle terminating after data collection.")
 						terminate = true
 					end
 				end
@@ -167,6 +172,8 @@ function RAIL.AI(id)
 
 	-- Check if the cycle should terminate early
 	if terminate then
+		RAIL.Log(7,"Owner approaching portal; cycle terminating after data collection.")
+
 		-- Save state data before terminating
 		RAIL.State:Save()
 
@@ -273,21 +280,51 @@ function RAIL.AI(id)
 		end
 
 		-- Move
+		local x,y
 		if Target.Chase ~= nil then
-			local x,y
 
 			if RAIL.IsActor(Target.Chase) then
 				-- Move to actor
-				-- TODO: Predict location
-				x,y = Target.Chase.X[0],Target.Chase.Y[0]
+
+				x,y = CalculateIntercept(Target.Chase)
 			else
 				-- Move to ground
 				x,y = Target.Chase[2],Target.Chase[3]
 			end
 
+			if RAIL.Self:DistanceTo(x,y) > 11 then
+				-- TODO: Break down movement command, so server won't ignore it
+			end
+
+			-- Make sure the move isn't outside MaxDistance
+			local x_d = RAIL.Owner.X[0] - x
+			local y_d = RAIL.Owner.Y[0] - y
+			if x_d > RAIL.State.MaxDistance then
+				x_d = RAIL.State.MaxDistance
+			elseif x_d < -RAIL.State.MaxDistance then
+				x_d = -RAIL.State.MaxDistance
+			end
+			if y_d > RAIL.State.MaxDistance then
+				y_d = RAIL.State.MaxDistance
+			elseif y_d < -RAIL.State.MaxDistance then
+				y_d = -RAIL.State.MaxDistance
+			end
+			x = RAIL.Owner.X[0] - x_d
+			y = RAIL.Owner.Y[0] - y_d
+
 			-- TODO: Alter move such that repeated moves to same location
 			--		aren't ignored
 
+		else
+			-- If moving, then stop.
+			--if RAIL.Self.Motion[0] == MOTION_MOVE then
+			--	x,y = RAIL.Self.X[0], RAIL.Self.Y[0]
+			--end
+
+			-- TODO: Idle movement?
+		end
+
+		if type(x) == "number" and type(y) == "number" then
 			Move(RAIL.Self.ID,x,y)
 		end
 	end

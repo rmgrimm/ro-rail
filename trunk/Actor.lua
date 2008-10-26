@@ -517,51 +517,61 @@ do
 		self.IgnoreTime = ticks
 	end
 
-	-- Estimate Movement Speed (in milliseconds per cell)
+	-- Estimate Movement Speed (in milliseconds per cell) and Direction
 	local find_non_move = function(v) return v ~= MOTION_MOVE end
 	local find_move = function(v) return v == MOTION_MOVE end
-	Actor.EstimateMoveSpeed = function(self)
+	Actor.EstimateMove = function(self)
 		-- Don't estimate too often
-		if self.EstimatedMoveSpeed ~= nil and GetTick() - self.EstimatedMoveSpeed[2] < 500 then
-			return self.EstimatedMoveSpeed[1]
+		if self.EstimatedMove ~= nil and GetTick() - self.EstimatedMove[3] < 250 then
+			return unpack(self.EstimatedMove)
 		end
 
 		local move = -1
 		local non_move = 0
 		local time_delta
 		local tile_delta
+		local tile_angle
 
 		repeat
 
 			-- Find the most recent non-move
-			non_move = History.FindMostRecent(self.Motion,find_non_move,move+1) or 0
+			non_move = History.FindMostRecent(self.Motion,find_non_move,move) or 0
 
 			-- Find the most recent move that follows this non-move
 			move = History.FindMostRecent(self.Motion,find_move,non_move)
 
 			-- If there was never motion, use default move-speed of 150
-			if move == nil or non_move == move then
+			if move == nil or non_move <= move then
 				-- Default move-speed to regular walk
 				--	according to http://forums.roempire.com/archive/index.php/t-137959.html:
 				--		0.15 sec per cell at regular speed
 				--		0.11 sec per cell w/ agi up
 				--		0.06 sec per cell w/ Lif's emergency avoid
+				--
+				--	Those values seem wrong, or are calculated differently...
+				--		~0.21 sec per cell at regular speed
+				--		~0.11 sec per cell with emergency avoid
+				--
 				time_delta = 150
 				tile_delta = 1
+				tile_angle = 0
 				break
 			end
 
-			-- Determine the time delta
-			time_delta = math.abs(move - non_move)
+			-- Determine the time passed
+			time_delta = non_move - move
 
-			-- Determine the distance moved
-			tile_delta = PythagDistance(self.X[non_move],self.Y[non_move],self.X[move],self.Y[move])
+			local nmX,nmY = self.X[non_move],self.Y[non_move]
+			local mX,mY = self.X[move],self.Y[move]
+
+			-- Determine the direction/distance moved
+			tile_angle,tile_delta = GetAngle(mX,mY,nmX,nmY)
 
 		until time_delta > 50 and tile_delta > 0
 
 		-- Return our estimated movement speed
-		self.EstimatedMoveSpeed = { time_delta / tile_delta, GetTick() }
-		return self.EstimatedMoveSpeed[1]
+		self.EstimatedMove = { time_delta / tile_delta, tile_angle, GetTick() }
+		return unpack(self.EstimatedMove)
 	end
 
 	--------------------
