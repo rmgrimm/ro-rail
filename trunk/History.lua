@@ -68,7 +68,7 @@ do
 
 			-- If time more recent than latest history, use it
 			if target >= list[list.last][2] then
-				if list:Size() < 2 then
+				if list:Size() < 2 or not self[subtimes_key] then
 					-- Since size is only 1, we can't calculate
 					return list[list.last][1]
 				end
@@ -146,6 +146,8 @@ do
 	end
 
 	History.FindMostRecent = function(table,value,search_begin)
+		-- TODO: Double-check logic of this function
+		-- TODO: Add comments
 		local list = table[list_key]
 		local v_func
 		if type(value) ~= "function" then
