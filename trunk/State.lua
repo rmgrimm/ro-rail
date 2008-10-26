@@ -53,14 +53,14 @@ do
 		saved[val] = name
 
 		-- Serialize each element
-		ret:Append("{}\n")
+		ret:Append("{}")
 
 		local k,v
 		for k,v in pairs(val) do
 			local field = string.format("%s[%s]",name,BasicSerialize(k))
 
-			Serialize(field,v,saved,ret)
 			ret:Append("\n")
+			Serialize(field,v,saved,ret)
 		end
 
 		return ""
@@ -200,7 +200,7 @@ do
 		-- Save the state to a file
 		local file = io.open(filename,"w")
 		if file ~= nil then
-			file:write(Serialize("rail_state",self[data_t]))
+			file:write(Serialize("rail_state",self[data_t]).."\n")
 			file:close()
 		end
 
