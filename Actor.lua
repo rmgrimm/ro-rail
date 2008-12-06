@@ -231,7 +231,7 @@ do
 			end
 		end
 
-		-- Setup the expiration timeout for 2.5 seconds...
+		-- Set up the expiration timeout for 2.5 seconds...
 		--	(it will be updated in Actor.Update)
 		ret.ExpireTimeout = RAIL.Timeouts:New(2500,false,Actor.Expire,ret)
 
@@ -250,6 +250,15 @@ do
 		-- Log
 		if ID ~= -1 then
 			RAIL.Log(10,"Actor class generated for %s.",tostring(ret))
+			-- Extra data displayed for mercenary AIs
+			if RAIL.Mercenary then
+				RAIL.Log(10,"   --> %s",StringBuffer.New()
+					:Append("V_TYPE="):Append(GetV(V_TYPE,ret.ID)):Append("; ")
+					:Append("V_HOMUNTYPE="):Append(GetV(V_HOMUNTYPE,ret.ID)):Append("; ")
+					:Append("V_MERTYPE="):Append(GetV(V_MERTYPE,ret.ID))
+					:Get()
+				)
+			end
 		end
 
 		return ret
