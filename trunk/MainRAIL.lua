@@ -165,8 +165,8 @@ function RAIL.AI(id)
 			msg = GetResMsg(RAIL.Self.ID)
 		end
 
-		-- Process any command
-		RAIL.Cmd.Process[msg[1]](shift,msg)
+		-- Process any input command
+		RAIL.Cmd.ProcessInput[msg[1]](shift,msg)
 
 	end
 

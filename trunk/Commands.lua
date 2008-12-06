@@ -1,7 +1,7 @@
 do
 	RAIL.Cmd = {
 		Queue = List:New(),
-		Process = {
+		ProcessInput = {
 			-- Nothing
 			[NONE_CMD] = function(shift,msg)
 				-- Do nothing
@@ -43,43 +43,53 @@ do
 				RAIL.Cmd.Queue:PushRight(msg)
 			end,
 
-			-- "alt+t"
+			-- "alt+t" ("ctrl+t" for mercenaries)
 			[FOLLOW_CMD] = function(shift,msg)
 				-- Toggle aggressive mode
 				RAIL.State.Aggressive = not RAIL.State.Aggressive
 			end,
 		},
+		Evaluate = {
+		},
 	}
 
-	setmetatable(RAIL.Cmd.Process,{
+	local UnknownProcessInput = function(shift,msg)
+		-- Initialize a string buffer
+		local str = StringBuffer:New():Append(
+			"Unknown GetMsg() command: %d("
+		)
+
+		-- Add each message argument to the string buffer
+		local msg_i=2
+		while msg[msg_i] ~= nil do
+			-- Keep arguments comma-separated
+			if msg_i ~= 2 then str:Append(", ") end
+
+			-- Format arguments to strings, and quote existing strings
+			local t = type(msg[msg_i])
+			if t == "string" then
+				t = "%q"
+			else
+				t = "%s"
+				msg[msg_i] = tostring(msg[msg_i])
+			end
+
+			str:Append(string.format(t,msg[msg_i]))
+		end
+
+		RAIL.Log(0,str:Append(")"):Get())
+	end
+
+	setmetatable(RAIL.Cmd.ProcessInput,{
 		__index = function(self,cmd_id)
 			-- Any command that wasn't recognized will be logged
-			return function(shift,msg)
-				-- Initialize a string buffer
-				local str = StringBuffer:New():Append(
-					"Unknown GetMsg() command: %d("
-				)
+			return UnknownProcessInput
+		end,
+	})
 
-				-- Add each message argument to the string buffer
-				local msg_i=2
-				while msg[msg_i] ~= nil do
-					-- Keep arguments comma-separated
-					if msg_i ~= 2 then str:Append(", ") end
+	setmetatable(RAIL.Cmd.Evaluate,{
+		__index = function(self,cmd_id)
 
-					-- Format arguments to strings, and quote existing strings
-					local t = type(msg[msg_i])
-					if t == "string" then
-						t = "%q"
-					else
-						t = "%s"
-						msg[msg_i] = tostring(msg[msg_i])
-					end
-
-					str:Append(string.format(t,msg[msg_i]))
-				end
-
-				RAIL.Log(0,str:Append(")"):Get())
-			end
 		end
 	})
 end
