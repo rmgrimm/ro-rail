@@ -971,15 +971,16 @@ do
 			if type(idx) ~= "number" then
 				return self[-1]
 			end
+
 			-- Make sure the actor ID is positive
 			--	(but -1 is a special value)
 			if idx < -1 then
-				idx = -idx
-				-- Check if actor is already in the table
-				local actor = rawget(self,idx)
-				if actor ~= nil then
-					return actor
-				end
+				return self[-idx]
+			end
+
+			-- Ensure the actor is sane
+			if GetV(V_MOTION,idx) == -1 then
+				return self[-1]
 			end
 
 			-- Generate a new actor class
@@ -989,6 +990,7 @@ do
 	})
 
 	-- Create Actors[-1], and disable certain features
+	rawset(Actors,-1,Actor:New(-1))
 	Actors[-1].ExpireTimeout[1] = false
 
 	Actors[-1].Update    = function(self) return self end
