@@ -91,7 +91,7 @@ do
 			-- Don't allow new entries to be created directly
 		end,
 
-		-- For consistency with Util wrappers below
+		-- For consistency with Util wrappers in Actor.lua
 		__call = function(self,key)
 			return self[key]
 		end,
@@ -145,45 +145,67 @@ do
 		table[list_key]:Clear()
 	end
 
+	-- Find the most recent entry in a history that will return true from value
 	History.FindMostRecent = function(table,value,search_begin)
 		-- TODO: Double-check logic of this function
-		-- TODO: Add comments
+
 		local list = table[list_key]
+
+		-- If the list is empty, nothing can be found
+		if list:Size() < 1 then
+			return nil
+		end
+
+		-- Generate (or use) a function while searching
 		local v_func
 		if type(value) ~= "function" then
+			-- Generate a function to check against value
 			v_func = function(v)
 				return v == value
 			end
 		else
+			-- Use the function provided in value
 			v_func = value
 		end
+
+		-- Validate search_begin
 		if type(search_begin) ~= "number" or search_begin < 0 then
+			-- Default at the beginning
 			search_begin = 0
 		end
 
+		-- Determine the target tick count to begin searching from
 		local target = GetTick() - search_begin
 
-		if list:Size() < 1 then
+		-- If the target tick count is smaller than the first entry, nothing will match
+		if target < list[list.first][2] then
 			return nil
-		elseif target < list[list.first][2] then
-			return nil
+
+		-- If the target tick count is greater than the latest entry, begin searching at the most recent entry
 		elseif target >= list[list.last][2] then
 			search_begin = list.last
+
+		-- Otherwise, find the most appropriate list entry to begin searching from
 		else
 			local exact
 			search_begin,exact = BinarySearch(list,target)
 		end
 
+		-- Start from the determined search-begin entry, and iterate until the earliest entry in the list
 		local i
 		for i=search_begin,list.first,-1 do
+			-- Check if the entry in the list matches
 			if v_func(list[i][1]) then
+				-- Return the number of ticks since the most-recent, matching entry
 				return GetTick() - list[i][2]
 			end
 		end
 
+		-- Nothing was found
 		return nil
 	end
 
+	-- Return the list of values stored for this history (read-only)
 	History.GetConstList = function(table)
 		local ret = { }
 		setmetatable(ret,{__index = table[list_key]})
