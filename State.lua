@@ -127,6 +127,9 @@ do
 	-- Filename to load/save from
 	local filename
 
+	-- Alternate filename to load from
+	local alt_filename
+
 	-- Private keys to data and validation tables
 	local data_t = {}
 	local vali_t = {}
@@ -204,7 +207,7 @@ do
 			file:close()
 		end
 
-		RAIL.Log(3,"Saved state to %s",filename)
+		RAIL.Log(3,"Saved state to \"%s\"",filename)
 	end)
 
 	local KeepInState = { Load = true, Save = true, [data_t] = true, [vali_t] = true }
@@ -213,7 +216,16 @@ do
 	rawset(RAIL.State,"Load",function(self,forced)
 		-- Make sure we have a proper filename
 		if not filename then
-			filename = string.format("RAIL_State.%d.lua",RAIL.Owner.ID)
+			local base = string.format("RAIL_State.%d.",RAIL.Owner.ID)
+			local homu = base .. "homu.lua"
+			local merc = base .. "merc.lua"
+			if RAIL.Mercenary then
+				filename = merc
+				alt_filename = homu
+			else
+				filename = homu
+				alt_filename = merc
+			end
 		end
 
 		-- Do nothing if the file doesn't exist
@@ -221,9 +233,21 @@ do
 
 		if f == nil then
 			if forced then
-				RAIL.Log(3,"Failed to load state from %s: %s",filename,tostring(err))
+				RAIL.Log(3,"Failed to load state from \"%s\": %s",filename,tostring(err))
+
+				if RAIL.Mercenary then
+					RAIL.Log(3,"Loading state from homunculus's state file...")
+				else
+					RAIL.Log(3,"Loading state from mercenary's state file...")
+				end
+
+				f,err = loadfile(alt_filename)
+
+				if f == nil then
+					RAIL.Log(3,"Failed to load state from \"%s\": %s",alt_filename,tostring(err))
+					return
+				end
 			end
-			return
 		end
 
 		-- Run the function
