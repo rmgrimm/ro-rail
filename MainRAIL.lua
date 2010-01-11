@@ -23,12 +23,46 @@ function AI(id)
 	RAIL.Owner = Actors[GetV(V_OWNER,id)]
 	RAIL.Self  = Actors[id]
 
+	-- Store the initialization time
+	RAIL.Self.InitTime = GetTick()
+
+	-- Create a bogus Other until homu<->merc communication is established
+	RAIL.Other = RAIL.Self
+
 	-- Get our attack range
 	RAIL.Self.AttackRange = GetV(V_ATTACKRANGE,id)
 
 	-- Get our longest skill range
 	-- TODO
 	RAIL.Self.SkillRange = 0
+
+	-- Track HP and SP
+	do
+		local update = RAIL.Self.Update
+		-- An extended variant of Update(), to track HP and SP values
+		RAIL.Self.Update = function(self)
+			-- First, call the regular update
+			update(self)
+
+			-- The extended tracking information will be useless against other actors
+			if self.ID ~= RAIL.Owner and self.ID ~= RAIL.Self then
+				return self
+			end
+	
+			-- Update the HP and SP tables
+			History.Update(self.HP,GetV(V_HP,self.ID))
+			History.Update(self.SP,GetV(V_SP,self.ID))
+	
+			return self
+		end
+		RAIL.Owner.Update = RAIL.Self.Update
+
+		-- Use the maximum values as default, but don't calculate sub-update values
+		RAIL.Owner.HP = History.New(GetV(V_MAXHP,RAIL.Owner.ID),false)
+		RAIL.Owner.SP = History.New(GetV(V_MAXSP,RAIL.Owner.ID),false)
+		RAIL.Self.HP = History.New(GetV(V_MAXHP,RAIL.Self.ID),false)
+		RAIL.Self.SP = History.New(GetV(V_MAXSP,RAIL.Self.ID),false)
+	end
 
 	-- Never show up as either enemies or friends
 	RAIL.Owner.IsEnemy  = function() return false end
@@ -61,8 +95,8 @@ end
 function RAIL.AI(id)
 	-- Potential targets
 	local Potential = {
-		Attack = {},
 		Skill = {},
+		Attack = {},
 		Chase = {},
 	}
 
@@ -75,14 +109,17 @@ function RAIL.AI(id)
 
 	local Friends = {}
 
-	-- Flag to terminate after data collection
+	-- Flag to terminate processing after data collection
 	local terminate = false
 
 	-- Update actor information
 	do
-		-- Update both owner and self before every other actor
+		-- Update owner, self, and other before every other actor
 		RAIL.Owner:Update()
 		RAIL.Self:Update()
+		if RAIL.Other ~= RAIL.Self then
+			RAIL.Other:Update()
+		end
 
 		-- Determine if we need to chase our owner
 		if
@@ -102,7 +139,7 @@ function RAIL.AI(id)
 		local i,actor
 		for i,actor in ipairs(GetActors()) do
 			-- Don't double-update the owner or self
-			if RAIL.Owner.ID ~= actor and RAIL.Self.ID ~= actor then
+			if RAIL.Owner.ID ~= actor and RAIL.Self.ID ~= actor and RAIL.Other.ID ~= actor then
 				-- Indexing non-existant actors will auto-create them
 				local actor = Actors[actor]
 
@@ -285,7 +322,6 @@ function RAIL.AI(id)
 
 			if RAIL.IsActor(Target.Chase) then
 				-- Move to actor
-
 				x,y = CalculateIntercept(Target.Chase)
 			else
 				-- Move to ground
