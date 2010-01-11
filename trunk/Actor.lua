@@ -45,6 +45,7 @@ do
 		-- Private key to access each type
 		local type_key = {}
 
+		-- Auto-generated subtables will use this metatable
 		local mt = {
 			__index = function(t,key)
 				-- Check the RAIL.State.ActorOptions.ByType table
@@ -65,7 +66,12 @@ do
 			end
 		}
 
-		BattleOptsByType = { }
+		BattleOptsByType = {
+			-- Mercenaries will use default options against actors of unknown type
+			[-2] = BattleOptsDefaults
+		}
+
+		-- Generate subtables for each type requested
 		setmetatable(BattleOptsByType,{
 			__index = function(t,key)
 				-- Make sure there are options for it
@@ -157,11 +163,22 @@ do
 		end,
 
 		__index = Actor,
-		__tostring = function(self)
+	}
+
+	if not RAIL.Mercenary then
+		-- Homunculi will log the type of actor generated
+		Actor_mt.__tostring = function(self)
 			return string.format("%s #%d [Loc:(%d,%d), Type:%d]",
 				self.ActorType, self.ID, self.X[0], self.Y[0], self.Type)
-		end,
-	}
+		end
+	else
+		-- Mercenaries are unable to distinguish type; don't log type
+		Actor_mt.__tostring = function(self)
+			return string.format("%s #%d [Loc:(%d,%d)]",
+				self.ActorType, self.ID, self.X[0], self.Y[0])
+		end
+	end
+
 
 	-- Private key for keeping closures
 	local closures = {}
@@ -251,13 +268,19 @@ do
 		if ID ~= -1 then
 			RAIL.Log(10,"Actor class generated for %s.",tostring(ret))
 			-- Extra data displayed for mercenary AIs
-			if RAIL.Mercenary then
-				RAIL.Log(10,"   --> %s",StringBuffer.New()
-					:Append("V_TYPE="):Append(GetV(V_TYPE,ret.ID)):Append("; ")
-					:Append("V_HOMUNTYPE="):Append(GetV(V_HOMUNTYPE,ret.ID)):Append("; ")
-					:Append("V_MERTYPE="):Append(GetV(V_MERTYPE,ret.ID))
-					:Get()
-				)
+			if true and RAIL.Mercenary then
+				-- Mercenaries should log extra information for Actors and NPCs
+				if ret.ActorType == "Actor" or ret.ActorType == "NPC" then
+					RAIL.Log(10,"   --> %s",StringBuffer.New()
+						--:Append("V_TYPE="):Append(GetV(V_TYPE,ret.ID)):Append("; ")
+						--:Append("V_HOMUNTYPE="):Append(GetV(V_HOMUNTYPE,ret.ID)):Append("; ")
+						--:Append("V_MERTYPE="):Append(GetV(V_MERTYPE,ret.ID)):Append("; ")
+						:Append("V_MOTION="):Append(GetV(V_MOTION,ret.ID)):Append("; ")
+						:Append("V_TARGET="):Append(GetV(V_TARGET,ret.ID)):Append("; ")
+						:Append("IsMonster="):Append(IsMonster(ret.ID)):Append("; ")
+						:Get()
+					)
+				end
 			end
 		end
 
@@ -268,86 +291,100 @@ do
 	local ret_false = function() return false end
 
 	-- A "private" function to initialize new actor types
-	Actor[actor_key] = function(self)
-		-- Set the new type
-		self[actor_key] = GetV(V_HOMUNTYPE,self.ID)
-		self.Type = self[actor_key]
+	do
+		local setActorType = function(actor,ActorType,PossibleEnemy,FullUpdate)
+			-- Set Actor Type
+			actor.ActorType = ActorType
 
-		-- Check the type for sanity
-		if (self.ID < 100000 or self.ID > 110000000) and
-			LIF <= self.Type and self.Type <= VANILMIRTH_H2
-		then
-			self.Type = self.Type + 6000
+			-- If not a possible enemy, replace IsEnemy with a false-return function
+			if not PossibleEnemy then
+				actor.IsEnemy = ret_false
+			else
+				if rawget(actor,"IsEnemy") == ret_false then
+					rawset(actor,"IsEnemy",nil)
+				end
+			end
+
+			-- Track position, motion, etc...
+			actor.FullUpdate = FullUpdate
 		end
 
-		-- Initialize differently based upon type
-		if self.Type == -1 then
-			self.ActorType = "Unknown"
+		if not RAIL.Mercenary then
+			-- Homunculi are able to determine monster type based on V_HOMUNTYPE
+			Actor[actor_key] = function(self)
+				-- Set the new type
+				self[actor_key] = GetV(V_HOMUNTYPE,self.ID)
+				self.Type = self[actor_key]
 
-			-- Unknown types are never enemies
-			self.IsEnemy = ret_false
+				-- Check the type for sanity
+				if (self.ID < 100000 or self.ID > 110000000) and
+					LIF <= self.Type and self.Type <= VANILMIRTH_H2
+				then
+					self.Type = self.Type + 6000
+				end
 
-			-- Track information on unknowns anyway
-			self.FullUpdate = true
+				-- Initialize differently based upon type
+				if self.Type == -1 then
+					-- Unknowns are never enemies, but track data
+					setActorType(self,"Unknown",false,true)
 
-		-- Portals
-		elseif self.Type == 45 then
-			self.ActorType = "Portal"
+				-- Portals
+				elseif self.Type == 45 then
+					-- Portals are never enemies and shouldn't be tracked
+					setActorType(self,"Portal",false,false)
 
-			-- Portals are enemies? Hah! Never!
-			self.IsEnemy = ret_false
+				-- Player Jobs
+				elseif (0 <= self.Type and self.Type <= 25) or
+					(161 <= self.Type and self.Type <= 181) or
+					(4001 <= self.Type and self.Type <= 4049)
+				then
+					-- Players are potential enemies and should be tracked
+					setActorType(self,"Player",true,true)
 
-			-- Don't track position, motion, etc...
-			self.FullUpdate = false
+				-- NPCs (non-player jobs that are below 1000)
+				elseif self.Type < 1000 then
+					-- NPCs are never enemies and shouldn't be tracked
+					setActorType(self,"NPC",false,false)
 
-		-- Player Jobs
-		elseif (0 <= self.Type and self.Type <= 25) or
-			(161 <= self.Type and self.Type <= 181) or
-			(4001 <= self.Type and self.Type <= 4049)
-		then
-			self.ActorType = "Player"
-
-			-- Allow the actor to be an enemy if it was previous blocked
-			if rawget(self,"IsEnemy") == ret_false then
-				rawset(self,"IsEnemy",nil)
+				-- All other types
+				else
+					-- All other actors are probably monsters or homunculi
+					setActorType(self,"Actor",true,true)
+				end
 			end
-
-			-- Track all the data about them
-			self.FullUpdate = true
-
-		-- NPCs (non-player jobs that are below 1000)
-		elseif self.Type < 1000 then
-			self.ActorType = "NPC"
-
-			-- NPCs aren't enemies
-			self.IsEnemy = ret_false
-
-			-- And they don't do much either
-			self.FullUpdate = false
-
-		-- All other types
 		else
-			self.ActorType = "Actor"
+			-- Specialized type determination for Mercenaries
+			Actor[actor_key] = function(self,notnpc)
+				-- Unable to distinguish types, so use other methods to detemine type
+				self[actor_key] = -2
+				self.Type = -2
 
-			-- Allow the actor to be an enemy if it was previous blocked
-			if rawget(self,"IsEnemy") == ret_false then
-				rawset(self,"IsEnemy",nil)
+				-- Find players based on ID
+				if self.ID >= 100000 and self.ID <= 110000000 then
+					-- Likely a player
+					setActorType(self,"Player",true,true)
+
+				-- NPCs and Portals stand still and are never monsters
+				elseif not notnpc and
+					IsMonster(self.ID) == 0 and
+					GetV(V_MOTION,self.ID) == MOTION_STAND and
+					GetV(V_TARGET,self.ID) == 0
+				then
+					-- Likely an NPC
+					setActorType(self,"NPC",false,false)
+
+				-- All other types
+				else
+					setActorType(self,"Actor",true,true)
+				end
 			end
-
-			-- Track all the data about them
-			self.FullUpdate = true
 		end
 	end
 
 	-- Update information about the actor
 	Actor.Update = function(self)
-		-- Don't update the fail-actor
-		if self.ID == -1 then
-			return self
-		end
-
 		-- Check for a type change
-		if GetV(V_HOMUNTYPE,self.ID) ~= self[actor_key] then
+		if not RAIL.Mercenary and GetV(V_HOMUNTYPE,self.ID) ~= self[actor_key] then
 			-- Pre-log
 			local str = tostring(self)
 
@@ -356,6 +393,12 @@ do
 
 			-- Log
 			RAIL.Log(10,"%s changed type to %s.",str,tostring(self))
+		elseif self.ActorType == "NPC" and GetV(V_MOTION,self.ID) ~= MOTION_STAND then
+			-- Call the private type changing function
+			Actor[actor_key](self,true)
+
+			-- Log
+			RAIL.Log(10,"Incorrectly identified %s as an NPC; fixed.",tostring(self))
 		end
 
 		-- Update the expiration timeout
@@ -428,6 +471,15 @@ do
 	-- Track when other actors target this one
 	local targeted_time = {}
 	Actor.TargetedBy = function(self,actor)
+		-- If something targets an NPC, it isn't an NPC
+		if RAIL.Mercenary and self.ActorType == "NPC" then
+			-- Call the private type changing function
+			Actor[actor_key](self,true)
+
+			-- Log
+			RAIL.Log(10,"Incorrectly identified %s as an NPC; fixed.",tostring(self))
+		end
+
 		-- Use a table to make looping through and counting it faster
 		--	* to determine if an actor is targeting this one, use Actors[id].Target[0] == self.ID
 		if math.abs((self.TargetOf[targeted_time] or 0) - GetTick()) > 50 then
@@ -917,9 +969,20 @@ do
 	setmetatable(Actors,{
 		__index = function(self,idx)
 			if type(idx) ~= "number" then
-				return Actors[-1]
+				return self[-1]
+			end
+			-- Make sure the actor ID is positive
+			--	(but -1 is a special value)
+			if idx < -1 then
+				idx = -idx
+				-- Check if actor is already in the table
+				local actor = rawget(self,idx)
+				if actor ~= nil then
+					return actor
+				end
 			end
 
+			-- Generate a new actor class
 			rawset(self,idx,Actor:New(idx))
 			return self[idx]
 		end
@@ -928,6 +991,7 @@ do
 	-- Create Actors[-1], and disable certain features
 	Actors[-1].ExpireTimeout[1] = false
 
+	Actors[-1].Update    = function(self) return self end
 	Actors[-1].IsEnemy   = function() return false end
 	Actors[-1].IsFriend  = function() return false end
 	Actors[-1].IsIgnored = function() return true end
