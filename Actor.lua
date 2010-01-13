@@ -194,7 +194,7 @@ do
 		ret.Hide = false		-- hidden?
 		ret.LastUpdate = -1		-- GetTick() of last :Update() call
 		ret.FullUpdate = false		-- Track position, motion, target, etc?
-		ret.TargetOf = { }		-- Other Actors that are targeting this one
+		ret.TargetOf = Table:New()	-- Other Actors that are targeting this one
 		ret.IgnoreTime = -1		-- Actor isn't currently ignored
 		ret.BattleOpts = { }		-- Battle options
 
@@ -626,7 +626,7 @@ do
 			local mX,mY = self.X[move],self.Y[move]
 
 			-- Determine the direction/distance moved
-			tile_angle,tile_delta = GetAngle(mX,mY,nmX,nmY)
+			tile_angle,tile_delta = GetAngle(nmX,nmY,mX,mY)
 
 		until time_delta > 50 and tile_delta > 0
 
