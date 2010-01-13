@@ -5,8 +5,10 @@
 do
 	Table = { }
 
+	-- Private key to track the number of entries in the table
 	local key_n = {}
 
+	-- Metatable to make tables inherit from Table
 	local metatable = {
 		__index = Table,
 	}
@@ -43,7 +45,6 @@ do
 		-- Check if we're reducing the size
 		if size < len then
 			-- Remove all elements after size
-			local i
 			for i=len,size+1,-1 do
 				t[i]=nil
 			end
