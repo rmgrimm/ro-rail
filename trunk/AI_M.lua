@@ -9,6 +9,30 @@ if not RAIL then
 	RAIL = {}
 end
 
+-- Ensure all RO-supplied requirements are available
+do
+	if not TraceAI then
+		TraceAI = function(str)
+			-- Output to the console
+			print(str);
+		end
+	end
+	if not GetV then
+		GetV = function(v,id)
+			return -1
+		end
+		TraceAI("GetV() not supplied, can't initialize properly.")
+		RAIL.CantRun = true
+	end
+	if not GetTick then
+		GetTick = function()
+			return -1
+		end
+		TraceAI("GetTick() not supplied, can't initialize properly.")
+		RAIL.CantRun = true
+	end
+end
+
 -- Now auto-detect where RAIL is located
 do
 	local req = require
@@ -40,7 +64,7 @@ do
 	-- If all else failed, make sure the RO client doesn't crash
 	else
 		TraceAI("RAIL failed to locate script directory.")
-		RAIL.NoScripts = true
+		RAIL.CantRun = true
 		AI = function() end
 	end
 
@@ -53,8 +77,8 @@ do
 	end
 end
 
--- Only continue if autodetection worked
-if not RAIL.NoScripts then
+-- Only continue if autodetection worked and all required API is available
+if not RAIL.CantRun then
 	-- The only difference between AI_M.lua and AI.lua is this following line
 	RAIL.Mercenary = true
 	require "MainRAIL.lua"
