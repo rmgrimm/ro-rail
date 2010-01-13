@@ -16,7 +16,6 @@ require "Commands.lua"	-- depends on Table.lua
 
 -- State validation options
 RAIL.Validate.MaxDistance = {"number", 14, 3, 14}
-RAIL.Validate.Aggressive = {"boolean", false}
 
 function AI(id)
 	-- Get Owner and Self
@@ -40,7 +39,7 @@ function AI(id)
 	do
 		local update = RAIL.Self.Update
 		-- An extended variant of Update(), to track HP and SP values
-		RAIL.Self.Update = function(self)
+		RAIL.Owner.Update = function(self)
 			-- First, call the regular update
 			update(self)
 
@@ -52,10 +51,10 @@ function AI(id)
 			-- Update the HP and SP tables
 			History.Update(self.HP,GetV(V_HP,self.ID))
 			History.Update(self.SP,GetV(V_SP,self.ID))
-	
+
 			return self
 		end
-		RAIL.Owner.Update = RAIL.Self.Update
+		RAIL.Self.Update = RAIL.Self.Update
 
 		-- Use the maximum values as default, but don't calculate sub-update values
 		RAIL.Owner.HP = History.New(GetV(V_MAXHP,RAIL.Owner.ID),false)
@@ -162,19 +161,26 @@ function RAIL.AI(id)
 				-- If we're chasing owner, we won't be doing anything else
 				if Target.Chase ~= RAIL.Owner then
 
-					if actor:IsEnemy() then
+					if actor:IsEnemy() and actor:IsAllowed() and not actor:IsIgnored() then
 						local dist = RAIL.Self:DistanceTo(actor)
 
-						-- Is the actor in range of attack?
-						if dist <= RAIL.Self.AttackRange then
+						-- Check if the actor is in range of attack, and attacks are allowed
+						if
+							dist <= RAIL.Self.AttackRange and
+							actor.BattleOpts.AttackAllowed
+						then
 							Potential.Attack[actor.ID] = actor
 						end
 
-						-- Is the actor in range of skills?
-						if dist <= RAIL.Self.SkillRange then
+						-- Check if the actor is in range of skills, and skills are allowed
+						if
+							dist <= RAIL.Self.SkillRange and
+							actor.BattleOpts.SkillsAllowed
+						then
 							Potential.Skill[actor.ID] = actor
 						end
 
+						-- Add the actor to the chase list
 						Potential.Chase[actor.ID] = actor
 					end
 
@@ -279,12 +285,15 @@ function RAIL.AI(id)
 
 		-- Attack
 		if Target.Attack == nil and Target.Chase ~= RAIL.Owner then
-			-- TODO: Find highest priority monster that is within attack range
+			-- Use routines from DecisionSupport.lua to determine the best actor
+			Target.Attack = RAIL.SelectTarget.Attack(Potential.Attack)
 		end
 
 		-- Move
 		if Target.Chase == nil then
-			-- TODO: Find highest priority monster to move toward
+			-- Find highest priority monster to move toward
+			Target.Chase = RAIL.SelectTarget.Chase(Potential.Chase)
+
 			-- TODO: Make sure to stay outside of range of all kited monsters
 		end
 	end
@@ -322,7 +331,7 @@ function RAIL.AI(id)
 
 			if RAIL.IsActor(Target.Chase) then
 				-- Move to actor
-				x,y = CalculateIntercept(Target.Chase)
+				x,y = RAIL.CalculateIntercept(Target.Chase)
 			else
 				-- Move to ground
 				x,y = Target.Chase[2],Target.Chase[3]
