@@ -47,6 +47,11 @@ do
 			[FOLLOW_CMD] = function(shift,msg)
 				-- Toggle aggressive mode
 				RAIL.State.Aggressive = not RAIL.State.Aggressive
+
+				-- Log it
+				local key = "ALT+T"
+				if RAIL.Mercenary then key = "CTRL+T" end
+				RAIL.Log(1,"<%s> RAIL.State.Agressive = %s",key,tostring(RAIL.State.Aggressive))
 			end,
 		},
 		Evaluate = {

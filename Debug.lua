@@ -4,6 +4,7 @@ RAIL.Validate.ProfileMark = {"number",20000,2000,nil}
 
 -- Log Levels:
 --
+--	 1 - User commands
 --	 2 - Actor ignore
 --	 3 - State load/save
 --	 5 - Performance data
