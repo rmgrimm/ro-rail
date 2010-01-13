@@ -673,7 +673,7 @@ do
 			end
 
 			-- Determine if it's not targeting another enemy
-			if not targ:IsEnemey() then
+			if not targ:IsEnemy() then
 
 				-- Determine if the target has been updated recently
 				if math.abs(targ.LastUpdate - GetTick()) < 50 then
