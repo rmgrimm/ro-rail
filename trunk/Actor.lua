@@ -1,6 +1,5 @@
 -- A few persistent-state options used
 RAIL.Validate.TempFriendRange = {"number",-1,-1,5}
-RAIL.Validate.DefendFriends = {"boolean",false}
 RAIL.Validate.UseMobID = {"boolean",false}
 
 -- Actor options
