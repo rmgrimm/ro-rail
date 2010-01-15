@@ -21,15 +21,22 @@ do
 		GetV = function(v,id)
 			return -1
 		end
-		TraceAI("GetV() not supplied, can't initialize properly.")
-		RAIL.CantRun = true
+		TraceAI("GetV() not supplied, undefined behavior may occur.")
+		--RAIL.CantRun = true
 	end
 	if not GetTick then
 		GetTick = function()
 			return -1
 		end
-		TraceAI("GetTick() not supplied, can't initialize properly.")
-		RAIL.CantRun = true
+		TraceAI("GetTick() not supplied, undefined behavior may occur.")
+		--RAIL.CantRun = true
+	end
+	if not IsMonster then
+		IsMonster = function()
+			return 0
+		end
+		TraceAI("IsMonster() not supplied, undefined behavior may occur.")
+		--RAIL.CantRun = true
 	end
 end
 
