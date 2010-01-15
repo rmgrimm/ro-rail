@@ -2,6 +2,9 @@
 RAIL.Validate.AcquireWhileLocked = {"boolean",false}
 RAIL.Validate.Aggressive = {"boolean",false}
 RAIL.Validate.AssistOwner = {"boolean",false}
+RAIL.Validate.AssistOther = {"boolean",false}
+RAIL.Validate.DefendWhilePassive = {"boolean",true}
+RAIL.Validate.DefendWhileAggro = {"boolean",true}
 RAIL.Validate.InterceptAlgorithm = {"string","normal"}
 
 -- Interception Routines
@@ -127,7 +130,7 @@ do
 	-- The metatable to run subtables
 	local st_metatable = {
 		__index = Table,
-		__call = function(self,potentials)
+		__call = function(self,potentials,friends)
 			-- Count the number of potential targets
 			local n=0
 			for i in potentials do
@@ -137,13 +140,21 @@ do
 			-- Sieve the potential list through each of the targeting functions, until 1 or fewer targets are left
 			for i,f in ipairs(self) do
 				-- Check to see if any potentials are left
-				if n < 0 then
+				if n < 1 then
 					return nil
 				end
 
 				-- Call the function
 				if type(f) == "function" then
-					potentials,n = f(potentials,n)
+					local sieveType = "Unknown"
+					if self == RAIL.SelectTarget.Attack then
+						sieveType = "Attack"
+					elseif self == RAIL.SelectTarget.Chase then
+						sieveType = "Chase"
+					end
+					RAIL.Log(90,"Before Sieve #%d: sieve=\"%s\"; n=%d",i,sieveType,n)
+					potentials,n = f(potentials,n,friends)
+					RAIL.Log(90,"After  Sieve #%d: sieve=\"%s\"; n=%d",i,sieveType,n)
 				end
 			end
 
@@ -169,43 +180,147 @@ do
 		-- Assist owner as first priority
 		RAIL.SelectTarget.Attack:Append(function(potentials,n)
 			-- Check if we can assist our owner
-			local owner_target = RAIL.Owner.Target[0]
-			if RAIL.State.AssistOwner and potentials[owner_target] ~= nil then
-				return { [owner_target.ID] = owner_target },1
+			if
+				RAIL.Owner.Motion[0] == MOTION_ATTACK
+			then
+				local owner_target = RAIL.Owner.Target[0]
+				if RAIL.State.AssistOwner and potentials[owner_target] ~= nil then
+					return { [owner_target.ID] = owner_target },1
+				end
 			end
-	
+
 			-- Don't modify the potential targets
-			return potentials,n
-		end)
-	
-		-- Defend owner
-		RAIL.SelectTarget.Attack:Append(function(potentials,n)
-			-- TODO: this
 			return potentials,n
 		end)
 	
 		-- Assist owner's merc/homu
 		RAIL.SelectTarget.Attack:Append(function(potentials,n)
 			-- Check if we can assist the other (merc or homun)
-			if RAIL.Other ~= RAIL.Self then
+			if
+				RAIL.Other ~= RAIL.Self and
+				RAIL.Other.Motion[0] == MOTION_ATTACK
+			then
 				local other_target = RAIL.Other.Target[0]
 				if RAIL.State.AssistOther and potenitals[other_target] ~= nil then
 					return { [other_target.ID] = other_target },1
 				end
 			end
-	
+
 			-- Don't modify the potential targets
 			return potentials,n
 		end)
+
+		-- Defend owner, other, and friends
+		do
+			local prioritization = function(defend_actors,defend_n,defend_prio,actors,n,prio)
+				-- Make sure something is attacking this actor
+				if n < 1 then
+					return defend_actors,defend_n,defend_prio
+				end
+
+				-- Check if this actor reaches the prioritization threshold
+				if n >= prio then
+					-- Check the priority against the existing defense priority
+					if
+						prio > defend_prio or
+						(prio == defend_prio and n > defend_n)
+					then
+						-- Reset the defense list
+						defend_actors = Table.New():Append(actors)
+						defend_prio = prio
+						defend_n = n
+					elseif prio == defend_priority and n == defend_n then
+						-- Add to the defense list
+						defend_actors:Append(actors)
+					end
+				else
+					-- Check if anything else was prioritized
+					if defend_prio == 0 then
+						-- Nothing was, add actor to the list
+						defend_actors:Append(actors)
+					end
+				end
+
+				return defend_actors,defend_n,defend_prio
+			end
+
+			RAIL.SelectTarget.Attack:Append(function(potentials,n,friends)
+				if not RAIL.State.Aggressive then
+					-- If not aggressive, and not defending while passive, don't modify the list
+					if not RAIL.State.DefendWhilePassive then
+						return potentials,n
+					end
+				else
+					-- If aggressive, and not prioritizing defense, don't modify the list
+					if not RAIL.State.DefendWhileAggro then
+						return potentials,n
+					end
+				end
 	
-		-- Defend friends and other
-		RAIL.SelectTarget.Attack:Append(function(potentials,n)
-			-- Check if we should defend friends
+				local owner_n = RAIL.Owner.TargetOf:GetN()
+				local self_n = RAIL.Self.TargetOf:GetN()
 	
-			-- TODO: this
-			return potentials,n
-		end)
+				-- Check for the highest number of actors attacking friends/other
+				local friends_n,friends_actors = 0,Table.New()
+				do
+					-- First, set other as the actor
+					if RAIL.Self ~= RAIL.Other then
+						friends_n = RAIL.Other.TargetOf:GetN()
+						friends_actors:Append(RAIL.Other)
+					end
 	
+					for id,actor in friends do
+						local n = actor.TargetOf:GetN()
+	
+						if n > friends_n then
+							friends_actors = Table.New()
+							friends_actors:Append(actor)
+							friends_n = n
+						elseif n == friends_n then
+							friends_actors:Append(actor)
+						end
+					end
+				end
+	
+				-- Check if any actor is being attacked
+				if owner_n == 0 and self_n == 0 and friends_n == 0 then
+					-- Don't modify the list if defense isn't needed
+					return potentials,n
+				end
+
+				-- Keep a list of the actors that will be defended
+				local defend_actors = Table.New()
+				local defend_n = 0
+				local defend_prio = 0
+
+				-- Check to see if we should defend ourself
+				-- TODO: make a state option for priority (PrioritizeSelfDefense,PrioritizeOwnerDefense,PrioritizeFriendDefense)
+				defend_actors,defend_n,defend_prio =
+					prioritization(defend_actors,defend_n,defend_prio,RAIL.Self,self_n,5)
+
+				-- Check to see if we should defend our owner
+				defend_actors,defend_n,defend_prio =
+					prioritization(defend_actors,defend_n,defend_prio,RAIL.Owner,owner_n,1)
+
+				-- Check to see if we should defend our friends
+				defend_actors,defend_n,defend_prio =
+					prioritization(defend_actors,defend_n,defend_prio,friends_actors,friends_n,4)
+
+				-- Modify the return list
+				local ret,ret_n = {},0
+				for id,defend_actor in ipairs(defend_actors) do
+					for id,actor in ipairs(defend_actor.TargetOf) do
+						if potentials[actor.ID] ~= nil then
+							ret[actor.ID] = actor
+							ret_n = ret_n + 1
+						end
+					end
+				end
+
+				return ret,ret_n
+			end)
+		end
+
 		-- Sieve out monsters that would be Kill Stolen
 		RAIL.SelectTarget.Attack:Append(function(potentials,n)
 			local ret,ret_n = {},0
@@ -218,16 +333,21 @@ do
 			return ret,ret_n
 		end)
 	
-		-- If not aggressive, sieve out monsters that aren't targeting self, other, or owner
-		RAIL.SelectTarget.Attack:Append(function(potentials,n)
+		-- If not aggressive, sieve out monsters that aren't targeting self, other, owner, or a friend
+		RAIL.SelectTarget.Attack:Append(function(potentials,n,friends)
 			-- If aggressive, don't modify the list
 			if RAIL.State.Aggressive then
 				return potentials,n
 			end
-	
+
 			for id,actor in potentials do
 				local target = actor.Target[0]
-				if target ~= RAIL.Owner and target ~= RAIL.Self and target ~= RAIL.Other then
+				if
+					target ~= RAIL.Owner.ID and
+					target ~= RAIL.Self.ID and
+					target ~= RAIL.Other.ID and
+					friends[target] == nil
+				then
 					potentials[id] = nil
 					n = n - 1
 				end
