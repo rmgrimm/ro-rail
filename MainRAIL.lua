@@ -15,8 +15,9 @@ require "Commands.lua"		-- depends on Table.lua
 require "DecisionSupport.lua"	-- depends on Table.lua
 
 -- State validation options
+RAIL.Validate.DefendFriends = {"boolean",false}
+RAIL.Validate.FollowDistance = {"number", 7, 3, 14}
 RAIL.Validate.MaxDistance = {"number", 14, 3, 14}
-RAIL.Validate.FollowDistance = {"number", 4, 3, 14}
 
 function AI(id)
 	-- Get Owner and Self
