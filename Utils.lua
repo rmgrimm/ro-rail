@@ -13,8 +13,23 @@ do
 		if x_delta > y_delta then
 			return x_delta
 		end
-	
+
 		return y_delta
+	end
+end
+
+-- Number functions
+do
+	-- Round a number up or down based on the decimal
+	function RoundNumber(n)
+		local floor = math.floor(n)
+		n = n - floor
+
+		if n >= 0.5 then
+			return floor + 1
+		else
+			return floor
+		end
 	end
 end
 
@@ -58,53 +73,53 @@ do
 	end
 
 	-- Check to see if an angle is within X radians of a second
-	function CompareAngle(angle1,angle2,radians)
+	function CompareAngle(angle1,angle2,degrees)
 		local bottom,top
 	
 		-- Get the modulus remainder of both angles
 		angle1 = math.mod(angle1,360)
 		angle2 = math.mod(angle2,360)
 	
-		-- Check if radians is positive or negative
-		if radians > 0 then
-			-- Check if adding radians to angle1 would throw it past 359
-			if angle1 + radians >= 360 then
+		-- Check if degrees is positive or negative
+		if degrees > 0 then
+			-- Check if adding degrees to angle1 would throw it past 359
+			if angle1 + degrees >= 360 then
 				-- Make a second check
-				if CompareAngle(0,angle2,math.mod(angle1 + radians,360)) then
+				if CompareAngle(0,angle2,math.mod(angle1 + degrees,360)) then
 					-- Found it already
 					return true
 				end
 	
-				-- Reduce radians below 360
-				radians = radians - math.mod(angle1 + radians,360) - 1
+				-- Reduce degrees below 360
+				degrees = degrees - math.mod(angle1 + degrees,360) - 1
 			end
 	
 			-- Set the bottom and the top
 			bottom = angle1
-			top = angle1 + radians
+			top = angle1 + degrees
 	
-		elseif radians < 0 then
-			-- Invert the radians, to make later stuff easier to read
-			radians = -radians
+		elseif degrees < 0 then
+			-- Invert the degrees, to make later stuff easier to read
+			degrees = -degrees
 	
-			-- Check if subtracting radians would throw it under 0
-			if angle1 - radians < 0 then
+			-- Check if subtracting degrees would throw it under 0
+			if angle1 - degrees < 0 then
 				-- Make a second check
-				if CompareAngle(360 + angle1 - radians,angle2,math.abs(angle1 - radians) - 1) then
+				if CompareAngle(360 + angle1 - degrees,angle2,math.abs(angle1 - degrees) - 1) then
 					-- Found it already
 					return true
 				end
 	
-				-- Increase the radians above -1
-				radians = radians + math.abs(angle1 - radians)
+				-- Increase the degrees above -1
+				degrees = degrees + math.abs(angle1 - degrees)
 			end
 	
 			-- Set the bottom
-			bottom = angle1 - radians
+			bottom = angle1 - degrees
 			top = angle1
 	
 		else
-			-- If radians is 0, then check if the angles are the same
+			-- If degrees is 0, then check if the angles are the same
 			if angle1 == angle2 then
 				-- They check out as the same
 				return true
