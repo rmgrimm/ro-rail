@@ -133,9 +133,9 @@ function RAIL.AI(id)
 			(false and RAIL.Owner.Motion[0] == MOTION_MOVE) or
 			-- Regular determination
 			RAIL.Self:BlocksTo(0)(
-				-- Guess ~3 tiles ahead, so homu/merc isn't off screen when finally decides to move
-				RAIL.Owner.X[-3*RAIL.Owner:EstimateMove()],
-				RAIL.Owner.Y[-3*RAIL.Owner:EstimateMove()]
+				-- Guess ~5 tiles ahead, so homu/merc isn't off screen when finally decides to move
+				RAIL.Owner.X[-5*RAIL.Owner:EstimateMove()],
+				RAIL.Owner.Y[-5*RAIL.Owner:EstimateMove()]
 			) >= RAIL.State.MaxDistance
 		then
 			Target.Chase = RAIL.Owner
