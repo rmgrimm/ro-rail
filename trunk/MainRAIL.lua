@@ -3,7 +3,6 @@ require "State.lua"
 
 -- Alphabetical
 require "Const.lua"
-require "DecisionSupport.lua"
 require "Debug.lua"
 require "History.lua"
 require "Table.lua"
@@ -11,8 +10,9 @@ require "Timeout.lua"
 require "Utils.lua"
 
 -- Load-time Dependency
-require "Actor.lua"	-- depends on History.lua
-require "Commands.lua"	-- depends on Table.lua
+require "Actor.lua"		-- depends on History.lua
+require "Commands.lua"		-- depends on Table.lua
+require "DecisionSupport.lua"	-- depends on Table.lua
 
 -- State validation options
 RAIL.Validate.MaxDistance = {"number", 14, 3, 14}
@@ -29,7 +29,7 @@ function AI(id)
 	RAIL.Other = RAIL.Self
 
 	-- Get our attack range
-	RAIL.Self.AttackRange = GetV(V_ATTACKRANGE,id)
+	RAIL.Self.AttackRange = GetV(V_ATTACKRANGE,id) - 1
 
 	-- Get our longest skill range
 	-- TODO
@@ -90,6 +90,13 @@ function AI(id)
 	AI = ProfilingHook("RAIL.AI",RAIL.AI,5)
 	AI(id)
 end
+
+-- Targeting histories
+RAIL.TargetHistory = {
+	Skill = History.New(-1,false),
+	Attack = History.New(-1,false),
+	Chase = History.New(-1,false),
+}
 
 function RAIL.AI(id)
 	-- Potential targets
@@ -293,8 +300,25 @@ function RAIL.AI(id)
 		if Target.Chase == nil then
 			-- Find highest priority monster to move toward
 			Target.Chase = RAIL.SelectTarget.Chase(Potential.Chase)
+		end
+	end
 
-			-- TODO: Make sure to stay outside of range of all kited monsters
+	-- Record the targets
+	do
+		-- TODO: Skill
+
+		-- Attack
+		if Target.Attack ~= nil then
+			History.Update(RAIL.TargetHistory.Attack,Target.Attack.ID)
+		else
+			History.Update(RAIL.TargetHistory.Attack,-1)
+		end
+
+		-- Chase
+		if Target.Chase ~= nil then
+			History.Update(RAIL.TargetHistory.Chase,Target.Chase.ID)
+		else
+			History.Update(RAIL.TargetHistory.Chase,-1)
 		end
 	end
 
@@ -322,6 +346,7 @@ function RAIL.AI(id)
 
 		-- Attack
 		if Target.Attack ~= nil then
+			-- Send the attack
 			Target.Attack:Attack()
 		end
 
@@ -332,15 +357,33 @@ function RAIL.AI(id)
 			if RAIL.IsActor(Target.Chase) then
 				-- Move to actor
 				x,y = RAIL.CalculateIntercept(Target.Chase)
+
+				-- Check if it's an enemy (likely chasing to attack it)
+				if Target.Chase:IsEnemy() then
+					local angle,dist = RAIL.Self:AngleTo(x,y)
+
+					-- Check if the enemy is outside of attack range
+					-- TODO: check skill ranges
+					if dist > RAIL.Self.AttackRange then
+						-- Replot a new target move
+						x,y = RAIL.Self:AnglePlot(angle,dist - RAIL.Self.AttackRange + 1)
+					end
+				end
 			else
 				-- Move to ground
 				x,y = Target.Chase[2],Target.Chase[3]
 			end
 
-			if RAIL.Self:DistanceTo(x,y) > 11 then
-				-- TODO: Break down movement command, so server won't ignore it
-			end
+		else
+			-- If moving, then stop.
+			--if RAIL.Self.Motion[0] == MOTION_MOVE then
+			--	x,y = RAIL.Self.X[0], RAIL.Self.Y[0]
+			--end
 
+			-- TODO: Idle movement?
+		end
+
+		if type(x) == "number" and type(y) == "number" then
 			-- Make sure the move isn't outside MaxDistance
 			local x_d = RAIL.Owner.X[0] - x
 			local y_d = RAIL.Owner.Y[0] - y
@@ -357,19 +400,21 @@ function RAIL.AI(id)
 			x = RAIL.Owner.X[0] - x_d
 			y = RAIL.Owner.Y[0] - y_d
 
+			-- Make sure the target coords are short enough that the server won't ignore them
+			local angle,dist = RAIL.Self:AngleTo(x,y)
+			if dist > 11 then
+				-- Plot a shorter distance in the same direction
+				x,y = RAIL.Self:AnglePlot(angle,dist / 2)
+			end
+
+			-- Make the numbers nice and round
+			x = RoundNumber(x)
+			y = RoundNumber(y)
+
 			-- TODO: Alter move such that repeated moves to same location
 			--		aren't ignored
 
-		else
-			-- If moving, then stop.
-			--if RAIL.Self.Motion[0] == MOTION_MOVE then
-			--	x,y = RAIL.Self.X[0], RAIL.Self.Y[0]
-			--end
-
-			-- TODO: Idle movement?
-		end
-
-		if type(x) == "number" and type(y) == "number" then
+			-- Send the move
 			Move(RAIL.Self.ID,x,y)
 		end
 	end
