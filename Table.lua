@@ -102,6 +102,12 @@ do
 
 		return t
 	end
+
+	-- Add an element to the end of a table
+	function Table.Append(t,item)
+		-- Just the same as insert without specifying position
+		return Table.Insert(t,item,nil)
+	end
 	
 	-- Remove an element from a table
 	function Table.Remove(t,pos,num)
