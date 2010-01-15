@@ -302,13 +302,13 @@ function RAIL.AI(id)
 		-- Attack
 		if Target.Attack == nil and Target.Chase ~= RAIL.Owner then
 			-- Use routines from DecisionSupport.lua to determine the best actor
-			Target.Attack = RAIL.SelectTarget.Attack(Potential.Attack)
+			Target.Attack = RAIL.SelectTarget.Attack(Potential.Attack,Friends)
 		end
 
 		-- Move
 		if Target.Chase == nil then
 			-- Find highest priority monster to move toward
-			Target.Chase = RAIL.SelectTarget.Chase(Potential.Chase)
+			Target.Chase = RAIL.SelectTarget.Chase(Potential.Chase,Friends)
 		end
 	end
 
