@@ -16,6 +16,7 @@ require "DecisionSupport.lua"	-- depends on Table.lua
 
 -- State validation options
 RAIL.Validate.MaxDistance = {"number", 14, 3, 14}
+RAIL.Validate.FollowDistance = {"number", 4, 3, 14}
 
 function AI(id)
 	-- Get Owner and Self
@@ -136,7 +137,15 @@ function RAIL.AI(id)
 				-- Guess ~5 tiles ahead, so homu/merc isn't off screen when finally decides to move
 				RAIL.Owner.X[-5*RAIL.Owner:EstimateMove()],
 				RAIL.Owner.Y[-5*RAIL.Owner:EstimateMove()]
-			) >= RAIL.State.MaxDistance
+			) >= RAIL.State.MaxDistance or
+
+			-- Continue following
+			(RAIL.TargetHistory.Chase[0] == RAIL.Owner.ID and
+			RAIL.Self:BlocksTo(0)(
+				-- Guess ~3 tiles ahead when already following
+				RAIL.Owner.X[-3*RAIL.Owner:EstimateMove()],
+				RAIL.Owner.Y[-3*RAIL.Owner:EstimateMove()]
+			) >= RAIL.State.FollowDistance)
 		then
 			Target.Chase = RAIL.Owner
 		end
@@ -173,7 +182,7 @@ function RAIL.AI(id)
 
 						-- Check if the actor is in range of attack, and attacks are allowed
 						if
-							dist <= RAIL.Self.AttackRange and
+							dist <= RAIL.Self.AttackRange+1 and
 							actor.BattleOpts.AttackAllowed
 						then
 							Potential.Attack[actor.ID] = actor

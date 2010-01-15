@@ -328,23 +328,6 @@ do
 			RAIL.SelectTarget.Chase:Append(RAIL.SelectTarget.Attack[i])
 		end
 
-		-- Check to see if the previous target is still in this list
-		--[[ DISABLED
-		RAIL.SelectTarget.Chase:Append(function(potentials,n)
-			-- [0] will return the most recent (since this decision cycle hasn't processed yet
-			local id = RAIL.TargetHistory.Chase[0]
-
-			-- Check if a target was acquired, and is in the list
-			if id ~= -1 and potentials[id] ~= nil then
-				-- Use the previous target
-				return { [id] = potentials[id] },1
-			end
-
-			-- If not in the list, don't modify the list
-			return potentials,n
-		end)
-		--]]
-
 		-- Remove actors that are already in range
 		RAIL.SelectTarget.Chase:Append(function(potentials,n)
 			for id,actor in potentials do
@@ -387,6 +370,21 @@ do
 			end
 
 			return ret,ret_n
+		end)
+
+		-- Check to see if the previous target is still in this list
+		RAIL.SelectTarget.Chase:Append(function(potentials,n)
+			-- [0] will return the most recent (since this decision cycle hasn't processed yet
+			local id = RAIL.TargetHistory.Chase[0]
+
+			-- Check if a target was acquired, and is in the list
+			if id ~= -1 and potentials[id] ~= nil then
+				-- Use the previous target
+				return { [id] = potentials[id] },1
+			end
+
+			-- If not in the list, don't modify the list
+			return potentials,n
 		end)
 	end
 end
