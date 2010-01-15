@@ -232,23 +232,23 @@ do
 		local f,err = loadfile(filename)
 
 		if f == nil then
-			RAIL.Log(3,"Failed to load state from \"%s\": %s",filename,tostring(err))
-
 			if forced then
+				RAIL.Log(3,"Failed to load state from \"%s\": %s",filename,tostring(err))
+
 				if RAIL.Mercenary then
 					RAIL.Log(3,"Loading state from homunculus's state file...")
 				else
 					RAIL.Log(3,"Loading state from mercenary's state file...")
 				end
-	
+
 				f,err = loadfile(alt_filename)
 
 				if f == nil then
 					RAIL.Log(3,"Failed to load state from \"%s\": %s",alt_filename,tostring(err))
+					return
 				end
-			end
-
-			if f == nil then
+			else
+				-- Can't load, and not forced
 				return
 			end
 		end
