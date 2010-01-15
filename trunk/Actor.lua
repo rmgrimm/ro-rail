@@ -271,7 +271,7 @@ do
 		if ID ~= -1 then
 			RAIL.Log(10,"Actor class generated for %s.",tostring(ret))
 			-- Extra data displayed for mercenary AIs
-			if true and RAIL.Mercenary then
+			if false and RAIL.Mercenary then
 				-- Mercenaries should log extra information for Actors and NPCs
 				if ret.ActorType == "Actor" or ret.ActorType == "NPC" then
 					RAIL.Log(10,"   --> %s",StringBuffer.New()
