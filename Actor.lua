@@ -1,6 +1,9 @@
 -- A few persistent-state options used
 RAIL.Validate.TempFriendRange = {"number",0,0,5}
 RAIL.Validate.DefendFriends = {"boolean",false}
+RAIL.Validate.UseMobID = {"boolean",false}
+
+-- Actor options
 RAIL.Validate.ActorOptions = {is_subtable=true}
 RAIL.Validate.ActorOptions.Default = {is_subtable=true,
 	Friend = {"boolean",false},
@@ -163,22 +166,22 @@ do
 		end,
 
 		__index = Actor,
+
+		-- When tostring() is called on Actors, we want sensible output
+		__tostring = function(self)
+			local buf = StringBuffer.New()
+				:Append(self.ActorType):Append(" #"):Append(self.ID)
+				:Append(" [Loc:(")
+					:Append(self.X[0]):Append(","):Append(self.Y[0])
+				:Append(")")
+
+			if not RAIL.Mercenary or RAIL.State.UseMobID then
+				buf:Append(", Type:"):Append(self.Type)
+			end
+
+			return buf:Append("]"):Get()
+		end
 	}
-
-	if not RAIL.Mercenary then
-		-- Homunculi will log the type of actor generated
-		Actor_mt.__tostring = function(self)
-			return string.format("%s #%d [Loc:(%d,%d), Type:%d]",
-				self.ActorType, self.ID, self.X[0], self.Y[0], self.Type)
-		end
-	else
-		-- Mercenaries are unable to distinguish type; don't log type
-		Actor_mt.__tostring = function(self)
-			return string.format("%s #%d [Loc:(%d,%d)]",
-				self.ActorType, self.ID, self.X[0], self.Y[0])
-		end
-	end
-
 
 	-- Private key for keeping closures
 	local closures = {}
@@ -275,9 +278,9 @@ do
 						--:Append("V_TYPE="):Append(GetV(V_TYPE,ret.ID)):Append("; ")
 						--:Append("V_HOMUNTYPE="):Append(GetV(V_HOMUNTYPE,ret.ID)):Append("; ")
 						--:Append("V_MERTYPE="):Append(GetV(V_MERTYPE,ret.ID)):Append("; ")
-						:Append("V_MOTION="):Append(GetV(V_MOTION,ret.ID)):Append("; ")
-						:Append("V_TARGET="):Append(GetV(V_TARGET,ret.ID)):Append("; ")
-						:Append("IsMonster="):Append(IsMonster(ret.ID)):Append("; ")
+						--:Append("V_MOTION="):Append(GetV(V_MOTION,ret.ID)):Append("; ")
+						--:Append("V_TARGET="):Append(GetV(V_TARGET,ret.ID)):Append("; ")
+						--:Append("IsMonster="):Append(IsMonster(ret.ID)):Append("; ")
 						:Get()
 					)
 				end
@@ -292,6 +295,7 @@ do
 
 	-- A "private" function to initialize new actor types
 	do
+		-- A helper function to reduce redundancy of the hidden Actor[actor_key] functions
 		local setActorType = function(actor,ActorType,PossibleEnemy,FullUpdate)
 			-- Set Actor Type
 			actor.ActorType = ActorType
@@ -309,52 +313,83 @@ do
 			actor.FullUpdate = FullUpdate
 		end
 
+		-- A function to get the type of monster
+		local get_type
 		if not RAIL.Mercenary then
-			-- Homunculi are able to determine monster type based on V_HOMUNTYPE
-			Actor[actor_key] = function(self)
-				-- Set the new type
-				self[actor_key] = GetV(V_HOMUNTYPE,self.ID)
-				self.Type = self[actor_key]
+			-- Homunculi are fairly simple
+			get_type = function(id)
+				local type = GetV(V_HOMUNTYPE,id)
 
-				-- Check the type for sanity
-				if (self.ID < 100000 or self.ID > 110000000) and
-					LIF <= self.Type and self.Type <= VANILMIRTH_H2
-				then
-					self.Type = self.Type + 6000
+				if RAIL.State.UseMobID then
+					-- TODO: Save into a MobID.lua file
 				end
 
-				-- Initialize differently based upon type
-				if self.Type == -1 then
-					-- Unknowns are never enemies, but track data
-					setActorType(self,"Unknown",false,true)
-
-				-- Portals
-				elseif self.Type == 45 then
-					-- Portals are never enemies and shouldn't be tracked
-					setActorType(self,"Portal",false,false)
-
-				-- Player Jobs
-				elseif (0 <= self.Type and self.Type <= 25) or
-					(161 <= self.Type and self.Type <= 181) or
-					(4001 <= self.Type and self.Type <= 4049)
-				then
-					-- Players are potential enemies and should be tracked
-					setActorType(self,"Player",true,true)
-
-				-- NPCs (non-player jobs that are below 1000)
-				elseif self.Type < 1000 then
-					-- NPCs are never enemies and shouldn't be tracked
-					setActorType(self,"NPC",false,false)
-
-				-- All other types
-				else
-					-- All other actors are probably monsters or homunculi
-					setActorType(self,"Actor",true,true)
-				end
+				return type
 			end
 		else
+			-- Mercenaries require the use of a Mob ID file
+			get_type = function(id)
+				-- TODO: Use MobID.lua
+
+				-- In case it's not known, use -2
+				return -2
+			end
+		end
+
+		-- Default function is able to distinguish monster types
+		Actor[actor_key] = function(self)
+			-- Set the new type
+			self[actor_key] = get_type(self.ID)
+			self.Type = self[actor_key]
+
+			-- Check the type for sanity
+			if (self.ID < 100000 or self.ID > 110000000) and
+				LIF <= self.Type and self.Type <= VANILMIRTH_H2
+			then
+				self.Type = self.Type + 6000
+			end
+
+			-- Initialize differently based upon type
+			if self.Type == -1 then
+				-- Unknowns are never enemies, but track data
+				setActorType(self,"Unknown",false,true)
+
+			-- Portals
+			elseif self.Type == 45 then
+				-- Portals are never enemies and shouldn't be tracked
+				setActorType(self,"Portal",false,false)
+
+			-- Player Jobs
+			elseif (0 <= self.Type and self.Type <= 25) or
+				(161 <= self.Type and self.Type <= 181) or
+				(4001 <= self.Type and self.Type <= 4049)
+			then
+				-- Players are potential enemies and should be tracked
+				setActorType(self,"Player",true,true)
+
+			-- NPCs (non-player jobs that are below 1000)
+			elseif self.Type < 1000 then
+				-- NPCs are never enemies and shouldn't be tracked
+				setActorType(self,"NPC",false,false)
+
+			-- All other types
+			else
+				-- All other actors are probably monsters or homunculi
+				setActorType(self,"Actor",true,true)
+			end
+		end
+
+		-- Mercenaries require special handling
+		if RAIL.Mercenary then
+			local homun_changeType = Actor[actor_key]
+
 			-- Specialized type determination for Mercenaries
 			Actor[actor_key] = function(self,notnpc)
+				-- Check if we're using a MobID file
+				if RAIL.State.UseMobID and get_type(self.ID) ~= -2 then
+					return homun_changeType(self)
+				end
+
 				-- Unable to distinguish types, so use other methods to detemine type
 				self[actor_key] = -2
 				self.Type = -2
@@ -393,7 +428,7 @@ do
 
 			-- Log
 			RAIL.Log(10,"%s changed type to %s.",str,tostring(self))
-		elseif self.ActorType == "NPC" and GetV(V_MOTION,self.ID) ~= MOTION_STAND then
+		elseif self.Type == -2 and self.ActorType == "NPC" and GetV(V_MOTION,self.ID) ~= MOTION_STAND then
 			-- Call the private type changing function
 			Actor[actor_key](self,true)
 
@@ -472,7 +507,7 @@ do
 	local targeted_time = {}
 	Actor.TargetedBy = function(self,actor)
 		-- If something targets an NPC, it isn't an NPC
-		if RAIL.Mercenary and self.ActorType == "NPC" then
+		if RAIL.Mercenary and self.Type == -2 and self.ActorType == "NPC" then
 			-- Call the private type changing function
 			Actor[actor_key](self,true)
 
@@ -550,7 +585,16 @@ do
 			return
 		end
 
-		-- TODO: Set RAIL.State.ActorOptions.ByID[self.ID].Friend = true/false
+		-- Check if there is already an ByID field for this actor
+		if not RAIL.State.ActorOptions.ByID[self.ID] then
+			-- No table exists for this actor, create it
+			RAIL.State.ActorOptions.ByID[self.ID] = {
+				["Friend"] = bool
+			}
+		else
+			-- Table exists, update the friend section
+			RAIL.State.ActorOptions.ByID[self.ID].Friend = bool
+		end
 	end
 
 	-- Check if the actor is ignored
@@ -702,6 +746,7 @@ do
 			end
 		end
 
+		-- Check if the monster is probably part of a mob-train
 		-- TODO: Moving
 
 		-- Default is not kill-steal
