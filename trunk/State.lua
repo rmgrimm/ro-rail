@@ -231,22 +231,20 @@ do
 		-- Do nothing if the file doesn't exist
 		local f,err = loadfile(filename)
 
-		if f == nil then
-			if forced then
-				RAIL.Log(3,"Failed to load state from \"%s\": %s",filename,tostring(err))
+		if f == nil or forced then
+			RAIL.Log(3,"Failed to load state from \"%s\": %s",filename,tostring(err))
 
-				if RAIL.Mercenary then
-					RAIL.Log(3,"Loading state from homunculus's state file...")
-				else
-					RAIL.Log(3,"Loading state from mercenary's state file...")
-				end
+			if RAIL.Mercenary then
+				RAIL.Log(3,"Loading state from homunculus's state file...")
+			else
+				RAIL.Log(3,"Loading state from mercenary's state file...")
+			end
 
-				f,err = loadfile(alt_filename)
+			f,err = loadfile(alt_filename)
 
-				if f == nil then
-					RAIL.Log(3,"Failed to load state from \"%s\": %s",alt_filename,tostring(err))
-					return
-				end
+			if f == nil then
+				RAIL.Log(3,"Failed to load state from \"%s\": %s",alt_filename,tostring(err))
+				return
 			end
 		end
 
