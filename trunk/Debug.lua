@@ -1,5 +1,5 @@
 -- State validation
-RAIL.Validate.DebugLevel = {"number",100,nil,10}
+RAIL.Validate.DebugLevel = {"number",10,nil,99}
 RAIL.Validate.ProfileMark = {"number",20000,2000,nil}
 
 -- Log Levels:
