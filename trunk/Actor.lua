@@ -1,5 +1,5 @@
 -- A few persistent-state options used
-RAIL.Validate.TempFriendRange = {"number",0,0,5}
+RAIL.Validate.TempFriendRange = {"number",-1,-1,5}
 RAIL.Validate.DefendFriends = {"boolean",false}
 RAIL.Validate.UseMobID = {"boolean",false}
 
@@ -246,8 +246,8 @@ do
 			if x == 0 and y == 0 then
 				ret.Hide = true
 			else
-				History.Update(ret.X,x)
-				History.Update(ret.Y,y)
+				History.Update(ret.X,RoundNumber(x))
+				History.Update(ret.Y,RoundNumber(y))
 			end
 		end
 
@@ -469,6 +469,10 @@ do
 					self.Hide = true
 				end
 			else
+				-- Make sure the X,Y integers are even
+				x = RoundNumber(x)
+				y = RoundNumber(y)
+
 				if self.Hide then
 					-- Log it
 					self.Hide = false
@@ -498,6 +502,11 @@ do
 		else
 			-- Can't target, so it should be targeting nothing
 			History.Update(self.Target,-1)
+		end
+
+		-- Clear the targeted by table if it's old
+		if math.abs((self.TargetOf[targeted_time] or 0) - GetTick()) > 50 then
+			self.TargetOf = Table:New()
 		end
 
 		return self
@@ -616,7 +625,6 @@ do
 			ticks = 1000
 		end
 
-		-- TODO: Log
 		RAIL.Log(2,"%s ignored for %d milliseconds.",tostring(self),ticks)
 
 		self.IgnoreTime = ticks
