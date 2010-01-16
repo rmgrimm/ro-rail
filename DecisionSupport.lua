@@ -152,9 +152,9 @@ do
 					elseif self == RAIL.SelectTarget.Chase then
 						sieveType = "Chase"
 					end
-					RAIL.Log(90,"Before Sieve #%d: sieve=\"%s\"; n=%d",i,sieveType,n)
+					RAIL.Log(90,"Before Sieve #%d: sieve=%q; n=%d",i,sieveType,n)
 					potentials,n = f(potentials,n,friends)
-					RAIL.Log(90,"After  Sieve #%d: sieve=\"%s\"; n=%d",i,sieveType,n)
+					RAIL.Log(90,"After  Sieve #%d: sieve=%q; n=%d",i,sieveType,n)
 				end
 			end
 
