@@ -34,13 +34,19 @@ do
 			-- Actor-targeted skill
 			[SKILL_OBJECT_CMD] = function(shift,msg)
 				-- Add to queue
-				RAIL.Cmd.Queue:PushRight(msg)
+				--RAIL.Cmd.Queue:PushRight(msg)
+
+				-- Until skills are implemented properly, just pass the skill along to the server
+				SkillObject(RAIL.Self.ID,msg[2],msg[3],msg[4])
 			end,
 
 			-- Ground-targeted skill
 			[SKILL_AREA_CMD] = function(shift,msg)
 				-- Add to queue
-				RAIL.Cmd.Queue:PushRight(msg)
+				--RAIL.Cmd.Queue:PushRight(msg)
+
+				-- Until skills are implemented properly, just pass the skill along to the server
+				SkillGround(RAIL.Self.ID,msg[2],msg[3],msg[4],msg[5])
 			end,
 
 			-- "alt+t" ("ctrl+t" for mercenaries)
