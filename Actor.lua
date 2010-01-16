@@ -677,7 +677,7 @@ do
 			local mX,mY = self.X[move],self.Y[move]
 
 			-- Determine the direction/distance moved
-			tile_angle,tile_delta = GetAngle(nmX,nmY,mX,mY)
+			tile_angle,tile_delta = GetAngle(mX,mY,nmX,nmY)
 
 		until time_delta > 50 and tile_delta > 0
 
