@@ -182,6 +182,7 @@ do
 			-- Check if we can assist our owner
 			if
 				RAIL.Owner.Motion[0] == MOTION_ATTACK
+				-- TODO: Check if there was an attack in the past second or so
 			then
 				local owner_target = RAIL.Owner.Target[0]
 				if RAIL.State.AssistOwner and potentials[owner_target] ~= nil then

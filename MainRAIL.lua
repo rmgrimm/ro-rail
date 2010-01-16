@@ -356,6 +356,9 @@ function RAIL.AI(id)
 
 		-- Attack
 		if Target.Attack ~= nil then
+			-- Log it
+			RAIL.Log(60,"Attacking %s",tostring(Target.Attack))
+
 			-- Send the attack
 			Target.Attack:Attack()
 		end
@@ -423,6 +426,9 @@ function RAIL.AI(id)
 
 			-- TODO: Alter move such that repeated moves to same location
 			--		aren't ignored
+
+			-- Log it
+			RAIL.Log(85,"Moving to (%d,%d)",x,y)
 
 			-- Send the move
 			Move(RAIL.Self.ID,x,y)
