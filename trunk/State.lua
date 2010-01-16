@@ -207,7 +207,7 @@ do
 			file:close()
 		end
 
-		RAIL.Log(3,"Saved state to \"%s\"",filename)
+		RAIL.Log(3,"Saved state to %q",filename)
 	end)
 
 	local KeepInState = { Load = true, Save = true, [data_t] = true, [vali_t] = true }
@@ -233,7 +233,7 @@ do
 
 		if f == nil then
 			if forced then
-				RAIL.Log(3,"Failed to load state from \"%s\": %s",filename,tostring(err))
+				RAIL.Log(3,"Failed to load state from %q: %s",filename,tostring(err))
 
 				if RAIL.Mercenary then
 					RAIL.Log(3,"Loading state from homunculus's state file...")
@@ -244,7 +244,7 @@ do
 				f,err = loadfile(alt_filename)
 
 				if f == nil then
-					RAIL.Log(3,"Failed to load state from \"%s\": %s",alt_filename,tostring(err))
+					RAIL.Log(3,"Failed to load state from %q: %s",alt_filename,tostring(err))
 					return
 				end
 			else
