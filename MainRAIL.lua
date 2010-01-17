@@ -13,6 +13,7 @@ require "Utils.lua"
 require "Actor.lua"		-- depends on History.lua
 require "Commands.lua"		-- depends on Table.lua
 require "DecisionSupport.lua"	-- depends on Table.lua
+require "Skills.lua"		-- depends on Table.lua
 
 -- State validation options
 RAIL.Validate.DefendFriends = {"boolean",false}
@@ -303,13 +304,13 @@ function RAIL.AI(id)
 		-- Attack
 		if Target.Attack == nil and Target.Chase ~= RAIL.Owner then
 			-- Use routines from DecisionSupport.lua to determine the best actor
-			Target.Attack = RAIL.SelectTarget.Attack(Potential.Attack,Friends)
+			Target.Attack = SelectTarget.Attack(Potential.Attack,Friends)
 		end
 
 		-- Move
 		if Target.Chase == nil then
 			-- Find highest priority monster to move toward
-			Target.Chase = RAIL.SelectTarget.Chase(Potential.Chase,Friends)
+			Target.Chase = SelectTarget.Chase(Potential.Chase,Friends)
 		end
 	end
 
@@ -369,7 +370,7 @@ function RAIL.AI(id)
 
 			if RAIL.IsActor(Target.Chase) then
 				-- Move to actor
-				x,y = RAIL.CalculateIntercept(Target.Chase)
+				x,y = CalculateIntercept(Target.Chase)
 
 				-- Check if it's an enemy (likely chasing to attack it)
 				if Target.Chase:IsEnemy() then

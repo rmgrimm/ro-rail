@@ -9,7 +9,7 @@ RAIL.Validate.InterceptAlgorithm = {"string","normal"}
 
 -- Interception Routines
 do
-	RAIL.CalculateIntercept = {
+	CalculateIntercept = {
 		-- Routine with no interception algorithm
 		none = function(target)
 			return target.X[0],target.Y[0]
@@ -97,7 +97,7 @@ do
 		end,
 	}
 
-	setmetatable(RAIL.CalculateIntercept,{
+	setmetatable(CalculateIntercept,{
 		__call = function(t,target)
 			-- Verify input
 			if not RAIL.IsActor(target) then
@@ -125,7 +125,7 @@ end
 -- Target Selection Routines
 do
 	-- Base table
-	RAIL.SelectTarget = { }
+	SelectTarget = { }
 
 	-- The metatable to run subtables
 	local st_metatable = {
@@ -147,9 +147,9 @@ do
 				-- Call the function
 				if type(f) == "function" then
 					local sieveType = "Unknown"
-					if self == RAIL.SelectTarget.Attack then
+					if self == SelectTarget.Attack then
 						sieveType = "Attack"
-					elseif self == RAIL.SelectTarget.Chase then
+					elseif self == SelectTarget.Chase then
 						sieveType = "Chase"
 					end
 					RAIL.Log(90,"Before Sieve #%d: sieve=%q; n=%d",i,sieveType,n)
@@ -174,11 +174,11 @@ do
 
 	-- Physical attack targeting
 	do
-		RAIL.SelectTarget.Attack = Table.New()
-		setmetatable(RAIL.SelectTarget.Attack,st_metatable)
+		SelectTarget.Attack = Table.New()
+		setmetatable(SelectTarget.Attack,st_metatable)
 	
 		-- Assist owner as first priority
-		RAIL.SelectTarget.Attack:Append(function(potentials,n)
+		SelectTarget.Attack:Append(function(potentials,n)
 			-- Check if we can assist our owner
 			if
 				RAIL.Owner.Motion[0] == MOTION_ATTACK
@@ -195,7 +195,7 @@ do
 		end)
 	
 		-- Assist owner's merc/homu
-		RAIL.SelectTarget.Attack:Append(function(potentials,n)
+		SelectTarget.Attack:Append(function(potentials,n)
 			-- Check if we can assist the other (merc or homun)
 			if
 				RAIL.Other ~= RAIL.Self and
@@ -245,7 +245,7 @@ do
 				return defend_actors,defend_n,defend_prio
 			end
 
-			RAIL.SelectTarget.Attack:Append(function(potentials,n,friends)
+			SelectTarget.Attack:Append(function(potentials,n,friends)
 				if not RAIL.State.Aggressive then
 					-- If not aggressive, and not defending while passive, don't modify the list
 					if not RAIL.State.DefendWhilePassive then
@@ -323,7 +323,7 @@ do
 		end
 
 		-- Sieve out monsters that would be Kill Stolen
-		RAIL.SelectTarget.Attack:Append(function(potentials,n)
+		SelectTarget.Attack:Append(function(potentials,n)
 			local ret,ret_n = {},0
 			for id,actor in potentials do
 				if not actor:WouldKillSteal() then
@@ -335,7 +335,7 @@ do
 		end)
 	
 		-- If not aggressive, sieve out monsters that aren't targeting self, other, owner, or a friend
-		RAIL.SelectTarget.Attack:Append(function(potentials,n,friends)
+		SelectTarget.Attack:Append(function(potentials,n,friends)
 			-- If aggressive, don't modify the list
 			if RAIL.State.Aggressive then
 				return potentials,n
@@ -357,7 +357,7 @@ do
 		end)
 	
 		-- Select the highest priority set of monsters
-		RAIL.SelectTarget.Attack:Append(function(potentials,n)
+		SelectTarget.Attack:Append(function(potentials,n)
 			local ret,ret_n,ret_priority = {},0,0
 	
 			for id,actor in potentials do
@@ -382,7 +382,7 @@ do
 		end)
 	
 		-- Check to see if the previous target is still in this list
-		RAIL.SelectTarget.Attack:Append(function(potentials,n)
+		SelectTarget.Attack:Append(function(potentials,n)
 			-- See if we should "lock" targets
 			if RAIL.State.AcquireWhileLocked then
 				return potentials,n
@@ -404,11 +404,11 @@ do
 
 	-- Chase targeting
 	do
-		RAIL.SelectTarget.Chase = Table.New()
-		setmetatable(RAIL.SelectTarget.Chase,st_metatable)
+		SelectTarget.Chase = Table.New()
+		setmetatable(SelectTarget.Chase,st_metatable)
 
 		-- First, ensure we won't move outside of RAIL.State.MaxDistance
-		RAIL.SelectTarget.Chase:Append(function(potentials,n)
+		SelectTarget.Chase:Append(function(potentials,n)
 			-- MaxDistance is in block tiles, but attack range is in pythagorean distance...
 			local max_dist = RAIL.State.MaxDistance
 
@@ -445,12 +445,12 @@ do
 
 		-- Then, chase targeting is mostly the same as attack targeting
 		--	Note: Still copy the attack-target locking (GetN() - 1)
-		for i=1,RAIL.SelectTarget.Attack:GetN() do
-			RAIL.SelectTarget.Chase:Append(RAIL.SelectTarget.Attack[i])
+		for i=1,SelectTarget.Attack:GetN() do
+			SelectTarget.Chase:Append(SelectTarget.Attack[i])
 		end
 
 		-- Remove actors that are already in range
-		RAIL.SelectTarget.Chase:Append(function(potentials,n)
+		SelectTarget.Chase:Append(function(potentials,n)
 			for id,actor in potentials do
 				-- Calculate distance to the actor
 				local dist = RAIL.Self:DistanceTo(actor)
@@ -468,7 +468,7 @@ do
 		end)
 
 		-- Find the closest actors
-		RAIL.SelectTarget.Chase:Append(function(potentials,n)
+		SelectTarget.Chase:Append(function(potentials,n)
 			local ret,ret_n,ret_dist = {},0,RAIL.State.MaxDistance+1
 
 			for id,actor in potentials do
@@ -494,7 +494,7 @@ do
 		end)
 
 		-- Check to see if the previous target is still in this list
-		RAIL.SelectTarget.Chase:Append(function(potentials,n)
+		SelectTarget.Chase:Append(function(potentials,n)
 			-- [0] will return the most recent (since this decision cycle hasn't processed yet
 			local id = RAIL.TargetHistory.Chase[0]
 
