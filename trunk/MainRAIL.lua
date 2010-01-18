@@ -172,7 +172,7 @@ function RAIL.AI(id)
 		-- Determine if we can use an attack skill this cycle
 		if RAIL.Self.Skills.Attack and RAIL.TargetHistory.Skill.ReadyTime <= GetTick() then
 			-- Check if we have the SP for it
-			if RAIL.Self.SP[0] >= RAIL.Self.Skills.Attack.SPCost then
+			if RAIL.Self.Skills.Attack.SPCost < RAIL.Self.SP[0] then
 				-- Have SP for highest level
 				max_skill_level = RAIL.Self.Skills.Attack.Level
 
