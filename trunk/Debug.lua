@@ -1,21 +1,29 @@
 -- State validation
-RAIL.Validate.DebugLevel = {"number",10,nil,99}
+RAIL.Validate.DebugLevel = {"number",50,nil,99}
 RAIL.Validate.ProfileMark = {"number",20000,2000,nil}
 
 -- Log Levels:
 --
+--	 0 - Errors / critical information
 --	 1 - User commands
---	 2 - Actor ignore
 --	 3 - State load/save
---	 5 - Performance data
 --	 7 - Cycle operation change
---	10 - Actor creation; actor expiration; actor-type Change
+--	20 - Actor ignore
+--	40 - Actor creation/expiration; actor type-change
+--	50 - RAIL.AI Performance logging
+--	55 - MobID save/load
+--	60 - Skill commands (sent to server)
+--	70 - Attack commands (sent to server)
+--	85 - Move commands (sent to server)
+--	90 - TODO: Actor data tracking
+--	95 - Targeting sieves
+--	98 - TODO: Performance logging; all calls
 --
 --
 
 -- Logging
 do
-	-- Function to validate the Log formatting
+	-- Function to validate the input to string.format
 	local function format(base,...)
 		-- Find all places that a % operator shows up
 		local arg_i = 1
@@ -69,13 +77,51 @@ do
 		return str:Append(")"):Get()
 	end
 
+	-- Function to format using {arg1}, {arg2}, ..., {argn} instead of %d %s %q
+	local function formatT(base,...)
+		local front = nil
+		local back = 0
+		local buf = StringBuffer.New()
+		while true do
+			-- Save the position of the back
+			local prev = back
+
+			-- Find the next match
+			front,back = string.find(base,"{%d+}",back)
+
+			-- Check for no match
+			if front == nil then
+				-- Append the rest of the string to the buffer
+				buf:Append(string.sub(base,prev+1))
+
+				-- Return the buffer
+				return buf:Get()
+			end
+
+			-- Copy data to the string buffer
+			buf:Append(string.sub(base,prev+1,front-1))
+
+			-- Get the argument number
+			local n = tonumber(string.sub(base,front+1,back-1))
+
+			-- Append the argument to the string buffer
+			buf:Append(arg[n])
+		end
+	end
+
+	-- Generalized log function
 	local antidup = ""
-	RAIL.Log = function(level,text,...)
+	local function log(func,t,level,text,...)
 		if tonumber(level) > RAIL.State.DebugLevel then
 			return
 		end
 
-		local str = format(text,unpack(arg))
+		if t and false then
+			local translate_table = {}
+			text = translate_table[text]
+		end
+
+		local str = func(text,unpack(arg))
 
 		-- Check for a duplicate
 		if str == antidup then
@@ -90,6 +136,15 @@ do
 		end
 
 		antidup = str
+	end
+
+	-- Old-style logging
+	RAIL.Log = function(level,text,...)
+		return log(format,false,level,text,unpack(arg))
+	end
+	-- New-style logging; translatable
+	RAIL.LogT = function(level,text,...)
+		return log(formatT,true,level,text,unpack(arg))
 	end
 end
 
@@ -123,14 +178,14 @@ do
 
 			-- Output the data if enough time has passed
 			if self.last_output + RAIL.State.ProfileMark < GetTick() then
-				RAIL.Log(self.level,string.format(
-					" -- %s mark (%dms since last; %dms longest; %dms avg cycle; %dms avg between) -- ",
+				RAIL.LogT(self.level,
+					" -- {1} mark ({2}ms since last; {3}ms longest; {4}ms avg cycle; {5}ms avg between) -- ",
 					self.name,
 					GetTick() - self.last_output,
 					self.TicksLongest,
-					self.TicksSpent / self.CyclesRun,
-					self.TicksBetween / self.CyclesRun
-				))
+					RoundNumber(self.TicksSpent / self.CyclesRun),
+					RoundNumber(self.TicksBetween / self.CyclesRun)
+				)
 
 				self.TicksLongest = 0
 				self.TicksSpent = 0
