@@ -13,7 +13,7 @@ RAIL.Validate.ActorOptions.Default = {is_subtable=true,
 	MinSkillLevel = {"number",1,1,10},
 	MaxSkillLevel = {"number",5,1,10},
 	TicksBetweenSkills = {"number",0,0},
-	MaxCastsAgainst = {"number",0,0},
+	MaxCastsAgainst = {"number",2,-1},
 }
 RAIL.Validate.ActorOptions.ByType = {is_subtable=true}
 RAIL.Validate.ActorOptions.ByID = {is_subtable=true}
@@ -268,12 +268,12 @@ do
 
 		-- Log
 		if ID ~= -1 then
-			RAIL.Log(10,"Actor class generated for %s.",tostring(ret))
+			RAIL.LogT(40,"Actor class generated for {1}.",ret)
 			-- Extra data displayed for mercenary AIs
 			if false and RAIL.Mercenary then
 				-- Mercenaries should log extra information for Actors and NPCs
 				if ret.ActorType == "Actor" or ret.ActorType == "NPC" then
-					RAIL.Log(10,"   --> %s",StringBuffer.New()
+					RAIL.LogT(40,"   --> {1}",StringBuffer.New()
 						--:Append("V_TYPE="):Append(GetV(V_TYPE,ret.ID)):Append("; ")
 						--:Append("V_HOMUNTYPE="):Append(GetV(V_HOMUNTYPE,ret.ID)):Append("; ")
 						--:Append("V_MERTYPE="):Append(GetV(V_MERTYPE,ret.ID)):Append("; ")
@@ -319,8 +319,10 @@ do
 			get_type = function(id)
 				local type = GetV(V_HOMUNTYPE,id)
 
-				if RAIL.State.UseMobID then
-					-- TODO: Save into a MobID.lua file
+				-- Check to update the Mob ID file
+				if RAIL.State.UseMobID and MobID[id] ~= type then
+					MobID[id] = type
+					MobID:Update()
 				end
 
 				return type
@@ -328,9 +330,19 @@ do
 		else
 			-- Mercenaries require the use of a Mob ID file
 			get_type = function(id)
-				-- TODO: Use MobID.lua
+				if RAIL.State.UseMobID then
+					-- Check for an existing MobID entry
+					if MobID[id] == nil then
+						-- Try to reload the MobID file
+						MobID:Update()
+					end
 
-				-- In case it's not known, use -2
+					-- Use the MobID, or -2 if it's still not known
+					return MobID[id] or -2
+
+				end
+
+				-- Use -2 if UseMobID is deactivated
 				return -2
 			end
 		end
@@ -426,13 +438,13 @@ do
 			Actor[actor_key](self)
 
 			-- Log
-			RAIL.Log(10,"%s changed type to %s.",str,tostring(self))
+			RAIL.LogT(40,"{1} changed type to {2}.",str,tostring(self))
 		elseif self.Type == -2 and self.ActorType == "NPC" and GetV(V_MOTION,self.ID) ~= MOTION_STAND then
 			-- Call the private type changing function
 			Actor[actor_key](self,true)
 
 			-- Log
-			RAIL.Log(10,"Incorrectly identified %s as an NPC; fixed.",tostring(self))
+			RAIL.LogT(40,"Incorrectly identified {1} as an NPC; fixed.",self)
 		end
 
 		-- Update the expiration timeout
@@ -520,7 +532,7 @@ do
 			Actor[actor_key](self,true)
 
 			-- Log
-			RAIL.Log(10,"Incorrectly identified %s as an NPC; fixed.",tostring(self))
+			RAIL.LogT(40,"Incorrectly identified {1} as an NPC; fixed.",self)
 		end
 
 		-- Use a table to make looping through and counting it faster
@@ -537,7 +549,7 @@ do
 	-- Clear out memory
 	Actor.Expire = function(self)
 		-- Log
-		RAIL.Log(10,"Clearing history for %s due to timeout.",tostring(self))
+		RAIL.LogT(40,"Clearing history for {1} due to timeout.",self)
 
 		-- Unset any per-actor battle options
 		local k,v
@@ -567,7 +579,28 @@ do
 
 	-- Check if the actor is an enemy (monster/pvp-player)
 	Actor.IsEnemy = function(self)
-		return IsMonster(self.ID) == 1
+		-- Check if it's a monster
+		if IsMonster(self.ID) ~= 1 then
+			return false
+		end
+
+		-- Check if it should be defended against only
+		if self.BattleOpts.DefendOnly then
+			-- Check if its target is owner, self, other, or a friend
+			local target = Actors[self.Target[0]]
+			if
+				target ~= RAIL.Owner and
+				target ~= RAIL.Self and
+				target ~= RAIL.Other and
+				not target:IsFriend()
+			then
+				-- Not attacking a friendly, so not an enemy
+				return false
+			end
+		end
+
+		-- Default to true
+		return true
 	end
 
 	-- Check if the actor is a friend
@@ -620,11 +653,11 @@ do
 
 		-- Use default ticks if needed
 		if type(ticks) ~= "number" then
-			-- TODO: This
+			-- TODO: default ignore time as option
 			ticks = 1000
 		end
 
-		RAIL.Log(2,"%s ignored for %d milliseconds.",tostring(self),ticks)
+		RAIL.LogT(20,"{1} ignored for {2} milliseconds.",self,ticks)
 
 		self.IgnoreTime = ticks
 	end
@@ -690,10 +723,28 @@ do
 	-- Battle Options --
 	--------------------
 
-	-- RAIL allowed to kill monster?
-	Actor.IsAllowed = function(self)
+	-- RAIL allowed to attack monster?
+	Actor.IsAttackAllowed = function(self)
 		-- Determine if the monster is allowed at all
-		return self.BattleOpts.AttackAllowed or self.BattleOpts.SkillsAllowed
+		return self.BattleOpts.AttackAllowed
+	end
+
+	-- RAIL allowed to cast against monster?
+	Actor.IsSkillAllowed = function(self)
+		-- Check if skills are allowed
+		if not self.BattleOpts.SkillsAllowed then
+			return false
+		end
+
+		-- Check if we've reached max cast count
+		if
+			(self.BattleOpts.CastsAgainst or 0) >= self.BattleOpts.MaxCastsAgainst and
+			self.BattleOpts.MaxCastsAgainst >= 0
+		then
+			return false
+		end
+
+		return true
 	end
 
 	-- Determine if attacking this actor would be kill-stealing
@@ -1002,12 +1053,12 @@ do
 		-- After sending an attack, this actor can never be kill-stealed (until Actor.Expire)
 		self.BattleOpts.FreeForAll = true
 	end
-	Actor.SkillObject = function(self,level,skill_id)
+	Actor.SkillObject = function(self,skill)
 		-- Send the skill
-		SkillObject(RAIL.Self.ID,level,skill_id,self.ID)
+		skill:Cast(self.ID)
 
 		-- Increment skill counter
-		self.BattleOpts.SkillsAgainst = (self.BattleOpts.SkillsAgainst or 0) + 1
+		self.BattleOpts.CastsAgainst = (self.BattleOpts.CastsAgainst or 0) + 1
 
 		-- And never see it as kill-stealing
 		self.BattleOpts.FreeForAll = true
