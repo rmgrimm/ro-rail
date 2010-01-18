@@ -57,6 +57,12 @@ do
 				return self[default_key]
 			end
 
+			-- Check if we want the most recent
+			if key == 0 then
+				-- Return the most recent
+				return list[list.last][1]
+			end
+
 			-- How many milliseconds into the past?
 			--	negative indexes will "predict" future values
 			local target = GetTick() - key
