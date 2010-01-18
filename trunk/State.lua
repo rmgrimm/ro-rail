@@ -67,6 +67,58 @@ do
 	end
 end
 
+-- State protection
+do
+	ProtectedEnvironment = function()
+		-- Create a table for the environment
+		local env = {
+			-- Environment
+			getfenv = RAIL._G.getfenv,
+			setfenv = RAIL._G.setfenv,
+
+			-- The ^ operator function
+			__pow = RAIL._G.__pow,
+
+			-- Lua loading
+			loadfile = RAIL._G.loadfile,
+
+			-- Ragnarok API
+			TraceAI = RAIL._G.TraceAI,
+			MoveToOwner = RAIL._G.MoveToOwner,
+			Move = RAIL._G.Move,
+			Attack = RAIL._G.Attack,
+			GetV = RAIL._G.GetV,
+			GetActors = RAIL._G.GetActors,
+			GetTick = RAIL._G.GetTick,
+			GetMsg = RAIL._G.GetMsg,
+			GetResMsg = RAIL._G.GetResMsg,
+			SkillObject = RAIL._G.SkillObject,
+			SkillGround = RAIL._G.SkillGround,
+			IsMonster = RAIL._G.IsMonster,
+		}
+
+		-- Create a new require function so setfenv on the original function won't result in strange behavior
+		local private_key = {}
+		env[private_key] = {}
+		env.require = function(file)
+			local _G = getfenv(0)
+			if _G[private_key][file] then
+				return
+			end
+
+			local f = loadfile(file)
+			if f then
+				_G[private_key][file] = true
+				f()
+			end
+		end
+		setfenv(env.require,env)
+
+		-- return the environment
+		return env
+	end
+end
+
 -- Config validation
 do
 	RAIL.Validate = {
@@ -253,10 +305,17 @@ do
 			end
 		end
 
+		-- Generate a clean state for loading the config
+		local f_G = ProtectedEnvironment()
+
+		-- Set the environment that the function will run in; protect RAIL from config-file code
+		setfenv(f,f_G)
+
 		-- Run the function
 		f()
 
 		-- See if it left us with a workable state
+		local rail_state = f_G.rail_state
 		if type(rail_state) ~= "table" then
 			-- TODO: Log invalid state?
 			return
@@ -288,9 +347,89 @@ do
 				end
 			end
 		end
-
-		-- Reset the rail_state object back to normal
-		rail_state = nil
 	end)
+end
 
+-- MobID
+do
+	-- Mob ID file
+	RAIL.Validate.MobIDFile = {"string","./AI/USER_AI/Mob_ID.lua"}
+
+	-- Update-time private key
+	local priv_key = {}
+
+	-- Default MobID table
+	MobID = {
+		[priv_key] = 0,
+	}
+
+	if RAIL.Mercenary then
+		-- Mercenaries load the Mob ID file
+		MobID.Update = function(self)
+			-- Check if it's too soon to update
+			if math.abs(self[priv_key] - GetTick()) < 100 then
+				return
+			end
+
+			-- Try to load the MobID file into a function
+			local f,err = loadfile(RAIL.State.MobIDFile)
+	
+			if not f then
+				RAIL.Log(55,"MobID file %q failed to load: %s",RAIL.State.MobIDFile,err)
+				return
+			end
+	
+			-- Protect RAIL from any unwanted code
+			local env = ProtectedEnvironment()
+			setfenv(f,env)
+	
+			-- Run the MobID function
+			f()
+	
+			-- Check for the creation of a MobID table
+			if type(f.MobID) ~= "table" then
+				RAIL.Log(55,"MobID file %q failed to load MobID table.",RAIL.State.MobIDFile)
+				return
+			end
+
+			-- Log it
+			RAIL.Log(55,"MobID table loaded from %q.",RAIL.State.MobIDFile)
+
+			-- Add RAIL's MobID update function
+			f.MobID.Update = self.Update
+
+			-- Set the update time
+			f.MobID[priv_key] = GetTick()
+
+			-- Save it as our own MobID
+			MobID = f.MobID
+		end
+	else
+		-- And homunculi save the MobID file
+		MobID.Update = function(self)
+			-- Check if it's too soon to update
+			if math.abs(self[priv_key] - GetTick()) < 100 then
+				return
+			end
+
+			-- Temporarily remove the update function
+			local update = self.Update
+			self.Update = nil
+	
+			-- Save the state to a file
+			local file = io.open(RAIL.State.MobIDFile,"w")
+			if file ~= nil then
+				file:write(Serialize("MobID",self).."\n")
+				file:close()
+			end
+	
+			RAIL.Log(55,"MobID table saved to %q.",RAIL.State.MobIDFile)
+	
+			-- Restore the save and load functions
+			self.Update = update
+
+			-- Set the update time
+			self[priv_key] = GetTick()
+		end
+	end
 end
