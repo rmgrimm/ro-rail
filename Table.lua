@@ -125,7 +125,7 @@ do
 	
 		-- Shift everythign forward
 		local i
-		for i=pos,t.n-num do
+		for i=pos,t[key_n]-num do
 			t[i]=t[i+num]
 			t[i+num]=nil
 		end
