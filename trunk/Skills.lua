@@ -1,6 +1,6 @@
 -- Skill Database
 do
-	Skills = {
+	AllSkills = {
 	-- Homunculus Skills
 		-- Lif
 		[8001] = {
@@ -20,7 +20,6 @@ do
 		[8003] = {
 			Name = "Brain Surgery",
 			MaxLevel = 5,
-			Unusable = true,
 		},
 		[8004] = {
 			Name = "Mental Charge",
@@ -46,7 +45,6 @@ do
 		},
 		[8007] = {
 			Name = "Adamantium Skin",
-			Unusable = true,
 			MaxLevel = 5,
 		},
 		[8008] = {
@@ -66,6 +64,7 @@ do
 		[8009] = {
 			Name = "Moonlight",
 			CastFunction = "actor",
+			Range = function() return 500 end,
 			MaxLevel = 5,
 			SPCost = function(level) return 4 * level end,
 		},
@@ -105,6 +104,7 @@ do
 		[8013] = {
 			Name = "Caprice",
 			CastFunction = "actor",
+			Range = function() return 500 end,
 			MaxLevel = 5,
 			SPCost = function(level) return 20 + level*2 end,
 			CastDelay = function(level) return level * 700 end,
@@ -118,7 +118,6 @@ do
 		[8015] = {
 			Name = "Instruction Change",
 			MaxLevel = 5,
-			Unusable = true,
 		},
 		[8016] = {
 			Name = "Self-Destruction",
@@ -183,6 +182,7 @@ do
 			CastFunction = "actor",
 			MaxLevel = 10,
 			SPCost = 12,
+			CastDelay = 0.5 * 1000,
 		},
 		[8208] = {
 			Name = "Arrow Shower",
@@ -317,6 +317,7 @@ do
 		[8224] = {
 			Name = "Sight",
 			CastFunction = "self",
+			Range = function() return 3 end,
 			MaxLevel = 1,
 			SPCost = 10,
 			Duration = 10 * 1000,
@@ -381,9 +382,8 @@ do
 		},
 		[8233] = {
 			Name = "Berserk",
-			-- Auto-provoke self; not Frenzy
+			-- Auto-provoke self; not Frenzy; passive
 			MaxLevel = 1,
-			Unusable = true,
 		},
 		[8234] = {
 			Name = "Decrease AGI",
@@ -432,13 +432,15 @@ do
 	-- Standard cast functions
 	local CastFunctions = {
 		["self"] = function(self)
-			-- TODO: Log the skill usage
+			-- Log the skill usage.
+			RAIL.LogT(60,"Casting {1}.",self.Name)
 
 			-- Use the skill
 			SkillObject(RAIL.Self.ID,self.Level,self.ID,RAIL.Self.ID)
 		end,
 		["actor"] = function(self,actor)
-			-- TODO: Log the skill usage against actor
+			-- Log the skill usage against actor
+			RAIL.LogT(60,"Casting {1} against {2}.",self.Name,Actors[actor])
 
 			-- Use the skill
 			SkillObject(RAIL.Self.ID,self.Level,self.ID,actor)
@@ -446,11 +448,11 @@ do
 		["ground"] = function(self,x,y)
 			-- Ensure we've got coordinates
 			if RAIL.IsActor(x) then
-				-- TODO: Log the skill usage against ground
+				RAIL.LogT(60,"Casting {1} against {2}.",self.Name,x)
 				y = x.Y[0]
 				x = x.X[0]
 			else
-				-- TODO: Log the skill usage against ground
+				RAIL.LogT(60,"Casting {1} on ({2},{3}).",self.Name,x,y)
 			end
 
 			-- Use the skill
@@ -467,26 +469,33 @@ do
 		return 0
 	end
 
+	local function_or_string = function(f,table,default)
+		if type(f) == "function" then
+			return f
+		elseif type(f) == "string" and table[f] then
+			return table[f]
+		else
+			return default
+		end
+	end
+
 	-- Build a RAIL-usable skill table
 	do
-		local Skills_rebuild = { }
-		for id,parameters in Skills do
+		local AllSkills_rebuild = { }
+		for id,parameters in AllSkills do
 			-- Create a skill table
 			local skill = {
 				Name = parameters.Name,
 			}
 
-			-- Select the cast function
-			local cast_func
-			if type(parameters.CastFunction) == "function" then
-				cast_func = parameters.CastFunction
-			elseif type(parameters.CastFunction) == "string" then
-				cast_func = CastFunctions[parameters.CastFunction]
-			else
-				cast_func = function(self)
-					-- TODO: Log this
-				end
-			end
+			-- Select the cast, usable, and range functions
+			local cast_func = function_or_string(parameters.CastFunction,CastFunctions,function(self,...)
+				-- TODO: Log
+			end)
+			local range_func = function_or_string(parameters.Range,{},function(self)
+				-- Use GetV to determine the range
+				return GetV(V_SKILLATTACKRANGE,RAIL.Self.ID,self.ID)
+			end)
 
 			-- Build the skill-level tables
 			for i=1,parameters.MaxLevel do
@@ -501,6 +510,7 @@ do
 					ID = id,
 					Level = i,
 					Cast = cast_func,
+					GetRange = range_func,
 					SPCost = function_or_number(parameters.SPCost,i),
 					CastTime = function_or_number(parameters.CastTime,i),
 					CastDelay = function_or_number(parameters.CastDelay,i),
@@ -519,11 +529,160 @@ do
 			})
 
 			-- Add the skill to the skill-table rebuild
-			Skills_rebuild[id] = skill
+			AllSkills_rebuild[id] = skill
 		end
 
 		-- Replace the skills table
-		Skills = Skills_rebuild
+		AllSkills = AllSkills_rebuild
+	end
+end
+
+-- Skill Mappings
+do
+	if RAIL.Mercenary then
+		function GetSkillList(id)
+			if id == ARCHER01 then
+				return {
+					Attack = AllSkills[8207][2],	-- double strafe
+					-- AllSkills[8233],		-- berserk
+				}
+			elseif id == ARCHER02 then
+				return {
+					MobAttack = AllSkills[8208][2],	-- arrow shower
+					Reveal = AllSkills[8224][1],	-- sight
+				}
+			elseif id == ARCHER03 then
+				return {
+					Pushback = AllSkills[8214][1],	-- arrow repel
+					Buff = AllSkills[8223][2],	-- weapon quicken
+				}
+			elseif id == ARCHER04 then
+				return {
+					Buff = AllSkills[8222][1],	-- magnificat
+					AllSkills[8237][1],		-- sense
+					Recover = AllSkills[8227][1],	-- tender
+				}
+			elseif id == ARCHER05 then
+				return {
+					Attack = AllSkills[8207][5],	-- double strafe
+					AllSkills[8213][1],		-- remove trap
+					Provoke = AllSkills[8232][1],	-- provoke
+				}
+			elseif id == ARCHER06 then
+				return {
+					Attack = AllSkills[8207][7],	-- double strafe
+					Pushback = AllSkills[8209][3],	-- skid trap
+					Debuff = AllSkills[8234][1],	-- decrease agi
+				}
+			elseif id == ARCHER07 then
+				return {
+				}
+			elseif id == ARCHER08 then
+				return {
+				}
+			elseif id == ARCHER09 then
+				return {
+				}
+			elseif id == ARCHER10 then
+				return {
+				}
+			elseif id == LANCER01 then
+				return {
+				}
+			elseif id == LANCER02 then
+				return {
+				}
+			elseif id == LANCER03 then
+				return {
+				}
+			elseif id == LANCER04 then
+				return {
+				}
+			elseif id == LANCER05 then
+				return {
+				}
+			elseif id == LANCER06 then
+				return {
+				}
+			elseif id == LANCER07 then
+				return {
+				}
+			elseif id == LANCER08 then
+				return {
+				}
+			elseif id == LANCER09 then
+				return {
+				}
+			elseif id == LANCER10 then
+				return {
+				}
+			elseif id == SWORDMAN01 then
+				return {
+				}
+			elseif id == SWORDMAN02 then
+				return {
+				}
+			elseif id == SWORDMAN03 then
+				return {
+				}
+			elseif id == SWORDMAN04 then
+				return {
+				}
+			elseif id == SWORDMAN05 then
+				return {
+				}
+			elseif id == SWORDMAN06 then
+				return {
+				}
+			elseif id == SWORDMAN07 then
+				return {
+				}
+			elseif id == SWORDMAN08 then
+				return {
+				}
+			elseif id == SWORDMAN09 then
+				return {
+				}
+			elseif id == SWORDMAN10 then
+				return {
+				}
+			end
+
+			return {}
+		end
+	else
+		function GetSkillList(id)
+			if id == LIF or id == LIF2 or id == LIF_H or id == LIF_H2 then
+				return {
+					Heal = AllSkills[8001],		-- healing hands
+					Buff = AllSkills[8002],		-- urgent escape
+					--AllSkills[8003],		-- brain surgery
+					AllSkills[8004],		-- mental charge
+				}
+			elseif id == AMISTR or id == AMISTR2 or id == AMISTR_H or id == AMISTR_H2 then
+				return {
+					Defense = AllSkills[8005],	-- castling
+					Buff = AllSkills[8006],		-- amistr bulwark
+					--AllSkills[8007],		-- adamantium skin
+					AllSkills[8008],		-- blood lust
+				}
+			elseif id == FILIR or id == FILIR2 or id == FILIR_H or id == FILIR_H2 then
+				return {
+					Attack = AllSkills[8009],	-- moonlight
+					Buff = AllSkills[8010],		-- flitting
+					AllSkills[8011],		-- accelerated flight
+					AllSkills[8012],		-- sbr 44
+				}
+			elseif id == VANILMIRTH or id == VANILMIRTH2 or id == VANILMIRTH_H or id == VANILMIRTH_H2 then
+				return {
+					Attack = AllSkills[8013],	-- caprice
+					Heal = AllSkills[8014],		-- chaotic blessings
+					--AllSkills[8015],		-- instruction change
+					AllSkills[8016],		-- self destruct
+				}
+			end
+			return {}
+		end
 	end
 end
 
