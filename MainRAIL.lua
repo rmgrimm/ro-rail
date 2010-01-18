@@ -57,7 +57,7 @@ function AI(id)
 
 			return self
 		end
-		RAIL.Self.Update = RAIL.Self.Update
+		RAIL.Self.Update = RAIL.Owner.Update
 
 		-- Use the maximum values as default, but don't calculate sub-update values
 		RAIL.Owner.HP = History.New(GetV(V_MAXHP,RAIL.Owner.ID),false)
