@@ -182,7 +182,7 @@ do
 			CastFunction = "actor",
 			MaxLevel = 10,
 			SPCost = 12,
-			CastDelay = 0.5 * 1000,
+			CastDelay = 0.2 * 1000,
 		},
 		[8208] = {
 			Name = "Arrow Shower",
@@ -227,6 +227,8 @@ do
 			CastFunction = "actor",
 			MaxLevel = 1,
 			SPCost = 15,
+			CastTime = 1.5 * 1000,
+			CastDelay = 0.2 * 1000,
 		},
 		[8215] = {
 			Name = "Focused Arrow Strike",
@@ -553,7 +555,8 @@ do
 				}
 			elseif id == ARCHER03 then
 				return {
-					Pushback = AllSkills[8214][1],	-- arrow repel
+					Attack = AllSkills[8214][1],	-- arrow repel
+					Pushback = AllSkills[8214][1],	-- arrow repel (skill duplicated; serves multiple purposes)
 					Buff = AllSkills[8223][2],	-- weapon quicken
 				}
 			elseif id == ARCHER04 then
