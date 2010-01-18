@@ -1,5 +1,4 @@
 -- Validation options
-RAIL.Validate.AcquireWhileLocked = {"boolean",false}
 RAIL.Validate.Aggressive = {"boolean",false}
 RAIL.Validate.AssistOwner = {"boolean",false}
 RAIL.Validate.AssistOther = {"boolean",false}
@@ -152,9 +151,9 @@ do
 					elseif self == SelectTarget.Chase then
 						sieveType = "Chase"
 					end
-					RAIL.Log(90,"Before Sieve #%d: sieve=%q; n=%d",i,sieveType,n)
+					RAIL.Log(95,"Before Sieve #%d: sieve=%q; n=%d",i,sieveType,n)
 					potentials,n = f(potentials,n,friends)
-					RAIL.Log(90,"After  Sieve #%d: sieve=%q; n=%d",i,sieveType,n)
+					RAIL.Log(95,"After  Sieve #%d: sieve=%q; n=%d",i,sieveType,n)
 				end
 			end
 
@@ -383,13 +382,8 @@ do
 	
 		-- Check to see if the previous target is still in this list
 		SelectTarget.Attack:Append(function(potentials,n)
-			-- See if we should "lock" targets
-			if RAIL.State.AcquireWhileLocked then
-				return potentials,n
-			end
-
 			-- [0] will return the most recent (since this decision cycle hasn't processed yet
-			local id = RAIL.TargetHistory.Attack[0]
+			local id = RAIL.TargetHistory.Attack
 
 			-- Check if a target was acquired, and is in the list
 			if id ~= -1 and potentials[id] ~= nil then
@@ -399,6 +393,32 @@ do
 
 			-- It's not, so don't modify the potential list
 			return potentials,n
+		end)
+
+		-- Find the closest actors
+		SelectTarget.Attack:Append(function(potentials,n)
+			local ret,ret_n,ret_dist = {},0,RAIL.State.MaxDistance+1
+
+			for id,actor in potentials do
+				-- Calculate the distance to the actor
+				local dist = RAIL.Self:DistanceTo(actor)
+
+				-- Check if the actor is closer than previously checked ones
+				if dist < ret_dist then
+					-- Create a new return list
+					ret = { [id] = actor }
+					ret_n = 1
+					ret_dist = dist
+
+				-- Check if the actor is just as close
+				elseif dist == ret_dist then
+					-- Add the actor to the list
+					ret[id] = actor
+					ret_n = ret_n + 1
+				end
+			end
+
+			return ret,ret_n
 		end)
 	end
 
@@ -444,59 +464,20 @@ do
 		end)
 
 		-- Then, chase targeting is mostly the same as attack targeting
-		--	Note: Still copy the attack-target locking (GetN() - 1)
-		for i=1,SelectTarget.Attack:GetN() do
-			SelectTarget.Chase:Append(SelectTarget.Attack[i])
+		--	Note: Don't copy the attack-target locking
+		do
+			local max = SelectTarget.Attack:GetN()
+			for i=1,SelectTarget.Attack:GetN() do
+				if i ~= max-1 then
+					SelectTarget.Chase:Append(SelectTarget.Attack[i])
+				end
+			end
 		end
-
-		-- Remove actors that are already in range
-		SelectTarget.Chase:Append(function(potentials,n)
-			for id,actor in potentials do
-				-- Calculate distance to the actor
-				local dist = RAIL.Self:DistanceTo(actor)
-
-				-- Check if the actor is in range
-				--	TODO: Check skill range
-				if dist-1 < RAIL.Self.AttackRange then
-					-- Remove it
-					potentials[id] = nil
-					n = n - 1
-				end
-			end
-
-			return potentials,n
-		end)
-
-		-- Find the closest actors
-		SelectTarget.Chase:Append(function(potentials,n)
-			local ret,ret_n,ret_dist = {},0,RAIL.State.MaxDistance+1
-
-			for id,actor in potentials do
-				-- Calculate the distance to the actor
-				local dist = RAIL.Self:DistanceTo(actor)
-
-				-- Check if the actor is closer than previously checked ones
-				if dist < ret_dist then
-					-- Create a new return list
-					ret = { [id] = actor }
-					ret_n = 1
-					ret_dist = dist
-
-				-- Check if the actor is just as close
-				elseif dist == ret_dist then
-					-- Add the actor to the list
-					ret[id] = actor
-					ret_n = ret_n + 1
-				end
-			end
-
-			return ret,ret_n
-		end)
 
 		-- Check to see if the previous target is still in this list
 		SelectTarget.Chase:Append(function(potentials,n)
 			-- [0] will return the most recent (since this decision cycle hasn't processed yet
-			local id = RAIL.TargetHistory.Chase[0]
+			local id = RAIL.TargetHistory.Chase
 
 			-- Check if a target was acquired, and is in the list
 			if id ~= -1 and potentials[id] ~= nil then
@@ -507,5 +488,20 @@ do
 			-- If not in the list, don't modify the list
 			return potentials,n
 		end)
+	end
+
+	-- Attack Skill targeting
+	do
+		SelectTarget.Skill = {}
+		SelectTarget.Skill.Attack = Table.New()
+		setmetatable(SelectTarget.Skill.Attack,st_metatable)
+
+		-- Copy everything from attack
+		for i=1,SelectTarget.Attack:GetN() do
+			SelectTarget.Skill.Attack:Append(SelectTarget.Attack[i])
+		end
+
+		-- But remove the target locking
+		SelectTarget.Skill.Attack:Remove(SelectTarget.Skill.Attack:GetN()-1)
 	end
 end
