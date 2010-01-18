@@ -282,18 +282,20 @@ do
 
 		-- Do nothing if the file doesn't exist
 		local f,err = loadfile(filename)
+		local from_alt = false
 
 		if f == nil then
 			if forced then
 				RAIL.Log(3,"Failed to load state from %q: %s",filename,tostring(err))
 
 				if RAIL.Mercenary then
-					RAIL.Log(3,"Loading state from homunculus's state file...")
+					RAIL.LogT(3,"Loading state from homunculus's state file.")
 				else
-					RAIL.Log(3,"Loading state from mercenary's state file...")
+					RAIL.LogT(3,"Loading state from mercenary's state file.")
 				end
 
 				f,err = loadfile(alt_filename)
+				from_alt = true
 
 				if f == nil then
 					RAIL.Log(3,"Failed to load state from %q: %s",alt_filename,tostring(err))
@@ -325,7 +327,11 @@ do
 		if rail_state.update or forced then
 			self[data_t] = rail_state
 			dirty = false
-			RAIL.Log(3,"Loaded state from %s",filename)
+			if from_alt then
+				RAIL.Log(3,"Loaded state from %q.",alt_filename)
+			else
+				RAIL.Log(3,"Loaded state from %q.",filename)
+			end
 
 			-- Resave with the update flag off if we need to
 			if self[data_t].update then
