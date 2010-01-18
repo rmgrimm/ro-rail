@@ -33,20 +33,26 @@ do
 
 			-- Actor-targeted skill
 			[SKILL_OBJECT_CMD] = function(shift,msg)
+				-- Get the skill and level to be used
+				local skill = AllSkills[msg[3]][msg[2]]
+
 				-- Add to queue
-				--RAIL.Cmd.Queue:PushRight(msg)
+				--RAIL.Cmd.Queue:PushRight(skill)
 
 				-- Until skills are implemented properly, just pass the skill along to the server
-				SkillObject(RAIL.Self.ID,msg[2],msg[3],msg[4])
+				Actors[msg[4]]:SkillObject(skill)
 			end,
 
 			-- Ground-targeted skill
 			[SKILL_AREA_CMD] = function(shift,msg)
+				-- Get the skill and level to be used
+				local skill = AllSkills[msg[3]][msg[2]]
+
 				-- Add to queue
 				--RAIL.Cmd.Queue:PushRight(msg)
 
 				-- Until skills are implemented properly, just pass the skill along to the server
-				SkillGround(RAIL.Self.ID,msg[2],msg[3],msg[4],msg[5])
+				skill:Cast(msg[4],msg[5])
 			end,
 
 			-- "alt+t" ("ctrl+t" for mercenaries)
@@ -66,9 +72,7 @@ do
 
 	local UnknownProcessInput = function(shift,msg)
 		-- Initialize a string buffer
-		local str = StringBuffer:New():Append(
-			"Unknown GetMsg() command: %d("
-		)
+		local str = StringBuffer:New():Append("Unknown GetMsg() command: %d(")
 
 		-- Add each message argument to the string buffer
 		local msg_i=2
