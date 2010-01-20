@@ -207,7 +207,13 @@ do
 		local data = t[data_t][key]
 
 		-- Validate it
-		local valid = t[vali_t][key]
+		local valid = rawget(t,vali_t)
+		if valid ~= nil then
+			valid = valid[key]
+		else
+			-- No validating for this
+			return data
+		end
 		local v = RAIL.Validate(data,valid)
 
 		-- Check if the validated data is different
