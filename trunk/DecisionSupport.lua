@@ -357,7 +357,7 @@ do
 	
 		-- Select the highest priority set of monsters
 		SelectTarget.Attack:Append(function(potentials,n)
-			local ret,ret_n,ret_priority = {},0,0
+			local ret,ret_n,ret_priority = {},0,-10000
 	
 			for id,actor in potentials do
 				-- Check this actors priority against the existing list
@@ -446,7 +446,7 @@ do
 						-- Leave the actor in the list
 					else
 						-- Plot a point that will be closer to the owner
-						local x,y = RAIL.Owner:AnglePlot(angle,dist - RAIL.Self.AttackRange)
+						local x,y = RAIL.Owner:AnglePlot(angle,dist - RAIL.Self.AttackRange + 1)
 
 						-- Check if this point would be inside MaxDistance
 						if RAIL.Owner:BlocksTo(x,y) < max_dist then
