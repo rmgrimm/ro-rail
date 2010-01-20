@@ -6,14 +6,14 @@ RAIL.Validate.UseMobID = {"boolean",false}
 RAIL.Validate.ActorOptions = {is_subtable=true}
 RAIL.Validate.ActorOptions.Default = {is_subtable=true,
 	Friend = {"boolean",false},
-	Priority = {"number",0},
+	Priority = {"number",0},		-- higher number, higher priority; eg, 10 is higher than 1
 	AttackAllowed = {"boolean",true},
 	DefendOnly = {"boolean",false},
 	SkillsAllowed = {"boolean",false},
 	MinSkillLevel = {"number",1,1,10},
 	MaxSkillLevel = {"number",5,1,10},
 	TicksBetweenSkills = {"number",0,0},
-	MaxCastsAgainst = {"number",2,-1},
+	MaxCastsAgainst = {"number",2,-1},	-- -1 is unlimited
 }
 RAIL.Validate.ActorOptions.ByType = {is_subtable=true}
 RAIL.Validate.ActorOptions.ByID = {is_subtable=true}
@@ -59,8 +59,7 @@ do
 
 				-- Use value from ByType table if non-nil
 				if ByType[type_num][key] ~= nil then
-					-- TODO: Validation
-					return ByType[type_num][key]
+					return RAIL.Validate(ByType[type_num][key],RAIL.Validate.ActorOptions.Default[key])
 				end
 
 				-- Otherwise, use default
@@ -109,8 +108,7 @@ do
 
 				-- Use value from ByID table if non-nil
 				if ByID[id_num][key] ~= nil then
-					-- TODO: Validation
-					return ByID[id_num][key]
+					return RAIL.Validate(ByType[type_num][key],RAIL.Validate.ActorOptions.Default[key])
 				end
 
 				-- Otherwise, use ByType table
