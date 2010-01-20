@@ -16,8 +16,14 @@ do
 		-- Check if the timeout should fire
 		local delta = GetTick() - (self[2]+self[3])
 		if delta >= 0 then
+			-- Add delta as the last argument to the callback
+			if not self[6].delta then
+				self[6].delta = Table.GetN(self[6]) + 1
+			end
+			self[6][self[6].delta] = delta
+
 			-- Fire the callback
-			self[5](self[6],delta)
+			self[5](unpack(self[6]))
 
 			if not self[4] then
 				-- Not repeating, so set the active element to false
@@ -31,8 +37,8 @@ do
 		return self
 	end
 
-	RAIL.Timeouts.New = function(self,duration,repeating,callback,callback_arg)
-		local ret = { true, GetTick(), duration, repeating, callback, callback_arg }
+	RAIL.Timeouts.New = function(self,duration,repeating,callback,...)
+		local ret = { true, GetTick(), duration, repeating, callback, arg }
 		setmetatable(ret,metatable)
 
 		self:Insert(ret)

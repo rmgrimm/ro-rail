@@ -72,6 +72,10 @@ function AI(id)
 	RAIL.Self.IsEnemy   = function() return false end
 	RAIL.Self.IsFriend  = function() return false end
 
+	-- Save some processing power on later cycles
+	RAIL.Owner.ExpireTimeout[1] = false
+	RAIL.Self.ExpireTimeout[1] = false
+
 	if RAIL.Mercenary then
 		RAIL.Self.AI_Type = GetV(V_MERTYPE,id)
 	else
@@ -104,6 +108,11 @@ RAIL.TargetHistory = {
 	},
 	Attack = -1,
 	Chase = -1,
+	Move = {
+		DanceTarget = -1,
+		X = -1,
+		Y = -1,
+	},
 }
 
 function RAIL.AI(id)
@@ -159,6 +168,7 @@ function RAIL.AI(id)
 	
 				-- Continue following
 				(RAIL.TargetHistory.Chase == RAIL.Owner.ID and
+				RAIL.Owner.Motion[0] == MOTION_MOVE and
 				RAIL.Self:BlocksTo(0)(
 					-- Guess some tiles ahead when already following
 					RAIL.Owner.X[fol_estim],
@@ -469,7 +479,30 @@ function RAIL.AI(id)
 				x,y = Target.Chase[2],Target.Chase[3]
 			end
 
+		elseif Target.Attack ~= nil then
+		--[[ Disabled; not working as intended
+			-- Use "dance step" while attacking
+			local target = RAIL.Owner
+			if
+				Target.Attack.ID ~= RAIL.TargetHistory.Move.DanceTarget or
+				RAIL.Self:DistanceTo(Target.Attack) + 1 > RAIL.Self.AttackRange
+			then
+				target = Target.Attack
+			end
+
+			-- Get the angle and distance to the target
+			local angle,dist = RAIL.Self:AngleTo(target)
+
+			RAIL.LogT(0,"dance step target = {1}; angle = {2}; dist = {3}",target,angle,dist)
+
+			-- Move one tile closer to the target
+			x,y = RAIL.Self:AnglePlot(angle, dist - 1)
+
+			-- Save the dance step target
+			RAIL.TargetHistory.Move.DanceTarget = target.ID
+		--]]
 		else
+
 			-- If moving, then stop.
 			--if RAIL.Self.Motion[0] == MOTION_MOVE then
 			--	x,y = RAIL.Self.X[0], RAIL.Self.Y[0]
@@ -509,14 +542,29 @@ function RAIL.AI(id)
 			x = RoundNumber(x)
 			y = RoundNumber(y)
 
-			-- TODO: Alter move such that repeated moves to same location
-			--		aren't ignored
+			-- Check if we tried to move here last cycle
+			if x == RAIL.TargetHistory.Move.X and y == RAIL.TargetHistory.Move.Y then
+				-- TODO: Alter move such that repeated moves to same location
+				--		aren't ignored
+			end
 
-			-- Log it
-			RAIL.LogT(85,"Moving to ({1},{2}).",x,y)
+			-- Check if the move would be a duplicate
+			if
+				x ~= RAIL.TargetHistory.Move.X or
+				y ~= RAIL.TargetHistory.Move.Y or
+				Target.Attack ~= nil or
+				Target.Skill ~= nil
+			then
+				-- Log it
+				RAIL.LogT(85,"Moving to ({1},{2}).",x,y)
+	
+				-- Send the move
+				Move(RAIL.Self.ID,x,y)
 
-			-- Send the move
-			Move(RAIL.Self.ID,x,y)
+				-- Save the move history
+				RAIL.TargetHistory.Move.X = x
+				RAIL.TargetHistory.Move.Y = y
+			end
 		end
 	end
 end
