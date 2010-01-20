@@ -41,13 +41,13 @@ do
 	end
 
 	RAIL.Timeouts.Iterate = function(self)
-		local i,k = 1,1
-		for i=1,self:GetN()-1,1 do
+		local k = 0
+		for i=1,self:GetN() do
 			-- Update the timeout, then check if it's still active
 			if self[i]:Update()[1] == true then
 				-- Since it's still active, keep it in the table
-				self[k] = self[i]
 				k = k + 1
+				self[k] = self[i]
 			end
 		end
 
