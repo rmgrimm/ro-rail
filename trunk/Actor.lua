@@ -13,7 +13,7 @@ RAIL.Validate.ActorOptions.Default = {is_subtable=true,
 	MinSkillLevel = {"number",1,1,10},
 	MaxSkillLevel = {"number",5,1,10},
 	TicksBetweenSkills = {"number",0,0},
-	MaxCastsAgainst = {"number",2,-1},	-- -1 is unlimited
+	MaxCastsAgainst = {"number",-1,-1},	-- -1 is unlimited
 }
 RAIL.Validate.ActorOptions.ByType = {is_subtable=true}
 RAIL.Validate.ActorOptions.ByID = {is_subtable=true}
@@ -58,8 +58,19 @@ do
 				end
 
 				-- Use value from ByType table if non-nil
-				if ByType[type_num][key] ~= nil then
-					return RAIL.Validate(ByType[type_num][key],RAIL.Validate.ActorOptions.Default[key])
+				local value = ByType[type_num][key]
+				if value ~= nil then
+					local validated = RAIL.Validate(value,RAIL.Validate.ActorOptions.Default[key])
+
+					-- Check to see if it was changed during validation
+					if value ~= validated then
+						-- Save the updated version
+						ByType[id_num][key] = validated
+
+						-- TODO: set dirty flag
+					end
+
+					return validated
 				end
 
 				-- Otherwise, use default
@@ -107,8 +118,19 @@ do
 				end
 
 				-- Use value from ByID table if non-nil
-				if ByID[id_num][key] ~= nil then
-					return RAIL.Validate(ByType[type_num][key],RAIL.Validate.ActorOptions.Default[key])
+				local value = ByID[id_num][key]
+				if value ~= nil then
+					local validated = RAIL.Validate(value,RAIL.Validate.ActorOptions.Default[key])
+
+					-- Check to see if it was changed during validation
+					if value ~= validated then
+						-- Save the updated version
+						ByID[id_num][key] = validated
+
+						-- TODO: set dirty flag
+					end
+
+					return validated
 				end
 
 				-- Otherwise, use ByType table
