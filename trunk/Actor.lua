@@ -5,6 +5,7 @@ RAIL.Validate.UseMobID = {"boolean",false}
 -- Actor options
 RAIL.Validate.ActorOptions = {is_subtable=true}
 RAIL.Validate.ActorOptions.Default = {is_subtable=true,
+	Name = {"string","unknown"},
 	Friend = {"boolean",false},
 	Priority = {"number",0},		-- higher number, higher priority; eg, 10 is higher than 1
 	AttackAllowed = {"boolean",true},
@@ -17,6 +18,12 @@ RAIL.Validate.ActorOptions.Default = {is_subtable=true,
 }
 RAIL.Validate.ActorOptions.ByType = {is_subtable=true}
 RAIL.Validate.ActorOptions.ByID = {is_subtable=true}
+
+-- Max homunculus skill level is 5
+if not RAIL.Mercenary then
+	RAIL.Validate.ActorOptions.Default.MinSkillLevel[4] = 5
+	RAIL.Validate.ActorOptions.Default.MaxSkillLevel[4] = 5
+end
 
 -- Actor Battle Options
 do
@@ -198,6 +205,10 @@ do
 				buf:Append(", Type:"):Append(self.Type)
 			end
 
+			if self.BattleOpts.Name ~= BattleOptsDefaults.Name then
+				buf:Append(", Name:"):Append(self.BattleOpts.Name)
+			end
+
 			return buf:Append("]"):Get()
 		end
 	}
@@ -272,7 +283,7 @@ do
 
 		-- Set up the expiration timeout for 2.5 seconds...
 		--	(it will be updated in Actor.Update)
-		ret.ExpireTimeout = RAIL.Timeouts:New(2500,false,Actor.Expire,ret)
+		ret.ExpireTimeout = RAIL.Timeouts:New(2500,false,Actor.Expire,ret,"timeout")
 
 		ret[closures] = {
 			DistanceTo = {},
@@ -449,6 +460,15 @@ do
 
 	-- Update information about the actor
 	Actor.Update = function(self)
+		-- Check if the actor is dead
+		if self.Motion[0] == MOTION_DEAD then
+			-- If the actor is still active, cause it to expire
+			if self.ExpireTimeout[1] then
+				self:Expire("death")
+			end
+			return self
+		end
+
 		-- Check for a type change
 		if not RAIL.Mercenary and GetV(V_HOMUNTYPE,self.ID) ~= self[actor_key] then
 			-- Pre-log
@@ -514,7 +534,7 @@ do
 		end
 
 		-- Check if the actor is able to have a target
-		if self.Motion[0] ~= MOTION_DEAD and self.Motion[0] ~= MOTION_SIT then
+		if self.Motion[0] ~= MOTION_SIT then
 			-- Get the current target
 			local targ = GetV(V_TARGET,self.ID)
 
@@ -567,9 +587,9 @@ do
 	end
 
 	-- Clear out memory
-	Actor.Expire = function(self)
+	Actor.Expire = function(self,reason)
 		-- Log
-		RAIL.LogT(40,"Clearing history for {1} due to timeout.",self)
+		RAIL.LogT(40,"Clearing history for {1} due to {2}.",self,reason)
 
 		-- Unset any per-actor battle options
 		local k,v
@@ -590,6 +610,9 @@ do
 		History.Clear(self.Target)
 		History.Clear(self.X)
 		History.Clear(self.Y)
+
+		-- Disable the timeout
+		self.ExpireTimeout[1] = false
 	end
 
 	-------------
@@ -621,6 +644,11 @@ do
 
 		-- Check if the monster is dead
 		if self.Motion[0] == MOTION_DEAD then
+			return false
+		end
+
+		-- Check if the monster is in a sane location
+		if self.X[0] == -1 or self.Y[0] == -1 then
 			return false
 		end
 
