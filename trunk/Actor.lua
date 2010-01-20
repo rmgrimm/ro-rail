@@ -619,6 +619,11 @@ do
 			end
 		end
 
+		-- Check if the monster is dead
+		if self.Motion[0] == MOTION_DEAD then
+			return false
+		end
+
 		-- Default to true
 		return true
 	end
@@ -745,14 +750,14 @@ do
 
 	-- RAIL allowed to attack monster?
 	Actor.IsAttackAllowed = function(self)
-		-- Determine if the monster is allowed at all
-		return self.BattleOpts.AttackAllowed
+		-- Determine if we are allowed to attack the monster
+		return self:IsEnemy() and self.BattleOpts.AttackAllowed
 	end
 
 	-- RAIL allowed to cast against monster?
 	Actor.IsSkillAllowed = function(self)
 		-- Check if skills are allowed
-		if not self.BattleOpts.SkillsAllowed then
+		if not self:IsEnemy() or not self.BattleOpts.SkillsAllowed then
 			return false
 		end
 

@@ -22,7 +22,7 @@ require "Skills.lua"		-- depends on Table.lua
 RAIL.Validate.AcquireWhileLocked = {"boolean",false}
 RAIL.Validate.DefendFriends = {"boolean",false}
 RAIL.Validate.FollowDistance = {"number", 7, 3, 14}
-RAIL.Validate.MaxDistance = {"number", 14, 3, 14}
+RAIL.Validate.MaxDistance = {"number", 13, 3, 14}
 
 function AI(id)
 	-- Get Owner and Self
@@ -155,7 +155,7 @@ function RAIL.AI(id)
 					-- Guess some tiles ahead, so homu/merc isn't off screen when finally decides to move
 					RAIL.Owner.X[max_estim],
 					RAIL.Owner.Y[max_estim]
-				) >= RAIL.State.MaxDistance or
+				) > RAIL.State.MaxDistance or
 	
 				-- Continue following
 				(RAIL.TargetHistory.Chase == RAIL.Owner.ID and
@@ -163,7 +163,7 @@ function RAIL.AI(id)
 					-- Guess some tiles ahead when already following
 					RAIL.Owner.X[fol_estim],
 					RAIL.Owner.Y[fol_estim]
-				) >= RAIL.State.FollowDistance)
+				) > RAIL.State.FollowDistance)
 			then
 				Target.Chase = RAIL.Owner
 			end
@@ -480,8 +480,10 @@ function RAIL.AI(id)
 
 		if type(x) == "number" and type(y) == "number" then
 			-- Make sure the move isn't outside MaxDistance
-			local x_d = RAIL.Owner.X[0] - x
-			local y_d = RAIL.Owner.Y[0] - y
+			local owner_estim = (-1 * math.ceil(RAIL.State.MaxDistance / 4) + (-2))
+				* RAIL.Owner:EstimateMove()
+			local x_d = RAIL.Owner.X[owner_estim] - x
+			local y_d = RAIL.Owner.Y[owner_estim] - y
 			if x_d > RAIL.State.MaxDistance then
 				x_d = RAIL.State.MaxDistance
 			elseif x_d < -RAIL.State.MaxDistance then
@@ -492,15 +494,16 @@ function RAIL.AI(id)
 			elseif y_d < -RAIL.State.MaxDistance then
 				y_d = -RAIL.State.MaxDistance
 			end
-			x = RAIL.Owner.X[0] - x_d
-			y = RAIL.Owner.Y[0] - y_d
+			x = RAIL.Owner.X[owner_estim] - x_d
+			y = RAIL.Owner.Y[owner_estim] - y_d
 
 			-- Make sure the target coords are short enough that the server won't ignore them
 			local angle,dist = RAIL.Self:AngleTo(x,y)
-			if dist > 11 then
-				-- Plot a shorter distance in the same direction
-				x,y = RAIL.Self:AnglePlot(angle,dist / 2)
+			while dist > 10 do
+				dist = dist / 2
 			end
+			-- Plot a shorter distance in the same direction
+			x,y = RAIL.Self:AnglePlot(angle,dist)
 
 			-- Make the numbers nice and round
 			x = RoundNumber(x)
