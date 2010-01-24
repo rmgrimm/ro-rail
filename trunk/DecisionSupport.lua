@@ -229,6 +229,7 @@ do
 
 		-- Defend owner, other, and friends
 		do
+			-- Prioritization support function
 			local prioritization = function(defend_actors,defend_n,defend_prio,actors,n,prio)
 				-- Make sure something is attacking this actor
 				if n < 1 then
@@ -261,6 +262,23 @@ do
 				return defend_actors,defend_n,defend_prio
 			end
 
+			-- Target counting support function
+			local getN = function(actor,potentials)
+				-- Get the number of targets attacking actor
+				local n = actor.TargetOf:GetN()
+
+				-- Ensure that at least one is in the potentials list
+				for i=1,n do
+					if potentials[actor.TargetOf[i]] then
+						-- One of actor's attackers is in the potentials list, return N
+						return n
+					end
+				end
+
+				-- Nothing in actor's TargetOf list is attackable, return 0
+				return 0
+			end
+
 			SelectTarget.Attack:Append(function(potentials,n,friends,protected)
 				if not RAIL.State.Aggressive then
 					-- If not aggressive, and not defending while passive, don't modify the list
@@ -274,20 +292,20 @@ do
 					end
 				end
 	
-				local owner_n = RAIL.Owner.TargetOf:GetN()
-				local self_n = RAIL.Self.TargetOf:GetN()
+				local owner_n = getN(RAIL.Owner,potentials)
+				local self_n = getN(RAIL.Self,potentials)
 	
 				-- Check for the highest number of actors attacking friends/other
 				local friends_n,friends_actors = 0,Table.New()
 				do
 					-- First, set other as the actor
 					if RAIL.Self ~= RAIL.Other then
-						friends_n = RAIL.Other.TargetOf:GetN()
+						friends_n = getN(RAIL.Other,potentials)
 						friends_actors:Append(RAIL.Other)
 					end
 	
 					for id,actor in friends do
-						local n = actor.TargetOf:GetN()
+						local n = getN(actor,potentials)
 	
 						if n > friends_n then
 							friends_actors = Table.New()
@@ -357,7 +375,7 @@ do
 		SelectTarget.Attack:Append(function(potentials,n,friends,protected)
 			-- If aggressive, don't modify the list
 			if RAIL.State.Aggressive then
-				return potentials,n
+				return potentials,n,protected
 			end
 
 			-- Count the number of protected
@@ -371,7 +389,7 @@ do
 		end)
 
 		-- Select the highest priority set of monsters
-		SelectTarget.Attack:Append(function(potentials,n)
+		SelectTarget.Attack:Append(function(potentials,n,protected)
 			local ret,ret_n,ret_priority = {},0,-10000
 	
 			for id,actor in potentials do
