@@ -179,13 +179,11 @@ do
 		-- Assist owner as first priority
 		SelectTarget.Attack:Append(function(potentials,n)
 			-- Check if we can assist our owner
-			if
-				RAIL.Owner.Motion[0] == MOTION_ATTACK
-				-- TODO: Check if there was an attack in the past second or so
-			then
+			--	(check if owner has attacked in the last second or so)
+			if History.FindMostRecent(RAIL.Owner.Motion,MOTION_ATTACK, 1250) <= 1000 then
 				local owner_target = RAIL.Owner.Target[0]
 				if RAIL.State.AssistOwner and potentials[owner_target] ~= nil then
-					return { [owner_target.ID] = owner_target },1
+					return { [owner_target] = Actors[owner_target] },1
 				end
 			end
 
@@ -198,11 +196,12 @@ do
 			-- Check if we can assist the other (merc or homun)
 			if
 				RAIL.Other ~= RAIL.Self and
+				-- TODO: Setup a mechanism to communicate target and attack status
 				RAIL.Other.Motion[0] == MOTION_ATTACK
 			then
 				local other_target = RAIL.Other.Target[0]
-				if RAIL.State.AssistOther and potenitals[other_target] ~= nil then
-					return { [other_target.ID] = other_target },1
+				if RAIL.State.AssistOther and potentials[other_target] ~= nil then
+					return { [other_target] = Actors[other_target] },1
 				end
 			end
 
@@ -362,7 +361,7 @@ do
 			for id,actor in potentials do
 				-- Check this actors priority against the existing list
 				local priority = actor.BattleOpts.Priority
-	
+
 				-- If priority matches, add this actor to the list
 				if priority == ret_priority then
 					ret[id] = actor
@@ -382,7 +381,6 @@ do
 	
 		-- Check to see if the previous target is still in this list
 		SelectTarget.Attack:Append(function(potentials,n)
-			-- [0] will return the most recent (since this decision cycle hasn't processed yet
 			local id = RAIL.TargetHistory.Attack
 
 			-- Check if a target was acquired, and is in the list
@@ -467,7 +465,7 @@ do
 		--	Note: Don't copy the attack-target locking
 		do
 			local max = SelectTarget.Attack:GetN()
-			for i=1,SelectTarget.Attack:GetN() do
+			for i=1,max do
 				if i ~= max-1 then
 					SelectTarget.Chase:Append(SelectTarget.Attack[i])
 				end
@@ -476,7 +474,6 @@ do
 
 		-- Check to see if the previous target is still in this list
 		SelectTarget.Chase:Append(function(potentials,n)
-			-- [0] will return the most recent (since this decision cycle hasn't processed yet
 			local id = RAIL.TargetHistory.Chase
 
 			-- Check if a target was acquired, and is in the list

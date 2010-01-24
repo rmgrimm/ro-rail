@@ -8,6 +8,7 @@ require "State.lua"
 require "Const.lua"
 require "Debug.lua"
 require "History.lua"
+require "SkillSupport.lua"
 require "Table.lua"
 require "Timeout.lua"
 require "Utils.lua"
@@ -50,7 +51,7 @@ function AI(id)
 			if self.ID ~= RAIL.Owner and self.ID ~= RAIL.Self then
 				return self
 			end
-	
+
 			-- Update the HP and SP tables
 			History.Update(self.HP,GetV(V_HP,self.ID))
 			History.Update(self.SP,GetV(V_SP,self.ID))
@@ -101,11 +102,7 @@ end
 
 -- Targeting histories
 RAIL.TargetHistory = {
-	Skill = {
-		UseTime = 0,
-		ReadyTime = 0,
-		Target = -1,
-	},
+	Skill = -1,
 	Attack = -1,
 	Chase = -1,
 	Move = {
@@ -118,7 +115,16 @@ RAIL.TargetHistory = {
 function RAIL.AI(id)
 	-- Potential targets
 	local Potential = {
-		Skill = {},
+		Skill = {
+			Attack = {
+				Level = 0,
+				Actors = {},
+			},
+			MobAttack = {
+				Level = 0,
+				Mobs = Table.New()
+			},
+		},
 		Attack = {},
 		Chase = {},
 	}
@@ -135,9 +141,6 @@ function RAIL.AI(id)
 	-- Flag to terminate processing after data collection
 	local terminate = nil
 
-	-- Max attack skill level that we can use
-	local max_skill_level = 0
-
 	-- Update actor information
 	do
 		-- Update owner, self, and other before every other actor
@@ -147,61 +150,68 @@ function RAIL.AI(id)
 			RAIL.Other:Update()
 		end
 
-		-- Determine if we need to chase our owner
-		do
-			-- Owner-chase estimation is based on max distance
-			local max_estim = (-1 * math.ceil(RAIL.State.MaxDistance / 4) + (-2))
-				* RAIL.Owner:EstimateMove()
-			local fol_estim = (-1 * math.ceil(RAIL.State.FollowDistance / 4))
-				* RAIL.Owner:EstimateMove()
+		-- Update skill state
+		RAIL.SkillState:Update()
 
-			if
-				-- Debug toggle for interception
-				(false and RAIL.Owner.Motion[0] == MOTION_MOVE) or
-
-				-- Regular determination
-				RAIL.Self:BlocksTo(0)(
-					-- Guess some tiles ahead, so homu/merc isn't off screen when finally decides to move
-					RAIL.Owner.X[max_estim],
-					RAIL.Owner.Y[max_estim]
-				) > RAIL.State.MaxDistance or
-	
-				-- Continue following
-				(RAIL.TargetHistory.Chase == RAIL.Owner.ID and
-				RAIL.Owner.Motion[0] == MOTION_MOVE and
-				RAIL.Self:BlocksTo(0)(
-					-- Guess some tiles ahead when already following
-					RAIL.Owner.X[fol_estim],
-					RAIL.Owner.Y[fol_estim]
-				) > RAIL.State.FollowDistance)
-			then
-				Target.Chase = RAIL.Owner
-			end
+		-- Check if action is impossible due to casting time
+		if RAIL.SkillState:Get() == RAIL.SkillState.Enum.CASTING then
+			-- Terminate due to skill state
+			terminate = RAIL.SkillState
 		end
 
-		-- Determine if we can use an attack skill this cycle
-		if RAIL.Self.Skills.Attack and RAIL.TargetHistory.Skill.ReadyTime <= GetTick() then
-			-- Check if we have the SP for it
-			if RAIL.Self.Skills.Attack.SPCost < RAIL.Self.SP[0] then
-				-- Have SP for highest level
-				max_skill_level = RAIL.Self.Skills.Attack.Level
+		-- Check if we're terminating this round
+		if not terminate then
 
-			-- Check if the skill level is selectable
-			elseif RAIL.Self.Skills.Attack[1] then
-				-- Find the highest level that the skill is usable on
-				for i=1,10 do
-					-- This level doesn't exist
-					if RAIL.Self.Skills.Attack[i] == nil then
-						break
-					end
+			-- Determine if we need to chase our owner
+			do
+				-- Owner-chase estimation is based on max distance
+				local max_estim = (-1 * math.ceil(RAIL.State.MaxDistance / 4) + (-2))
+					* RAIL.Owner:EstimateMove()
+				local fol_estim = (-1 * math.ceil(RAIL.State.FollowDistance / 4))
+					* RAIL.Owner:EstimateMove()
 
-					-- See if we have SP for this level's cost
-					if RAIL.Self.Skills.Attack[i].SPCost < RAIL.Self.SP[0] then
-						max_skill_level = i
-					end
+				if
+					-- Make sure setting the chase would be worthwhile
+					terminate == nil and (
+
+					-- Debug toggle for interception debugging
+					(false and RAIL.Owner.Motion[0] == MOTION_MOVE) or
+
+					-- Regular determination
+					RAIL.Self:BlocksTo(0)(
+						-- Guess some tiles ahead, so homu/merc isn't off screen when finally decides to move
+						RAIL.Owner.X[max_estim],
+						RAIL.Owner.Y[max_estim]
+					) > RAIL.State.MaxDistance or
+
+					-- Continue following
+					(RAIL.TargetHistory.Chase == RAIL.Owner.ID and
+					RAIL.Owner.Motion[0] == MOTION_MOVE and
+					RAIL.Self:BlocksTo(0)(
+						-- Guess some tiles ahead when already following
+						RAIL.Owner.X[fol_estim],
+						RAIL.Owner.Y[fol_estim]
+					) > RAIL.State.FollowDistance)
+				) then
+					Target.Chase = RAIL.Owner
 				end
 			end
-		end
+
+			-- Determine if we should scan for potential skill targets this cycle
+			if RAIL.SkillState:Get() == RAIL.SkillState.Enum.READY then
+				-- Check if we have a direct attack skill to use
+				if RAIL.Self.Skills.Attack then
+					Potential.Skill.Attack.Level =
+						FindSkillLevel(RAIL.Self.SP[0],RAIL.Self.Skills.Attack)
+				end
+
+				-- Check if we have a mob attack skill to use
+				if RAIL.Self.Skills.MobAttack then
+					Potential.Skill.MobAttack.Level =
+						FindSkillLevel(RAIL.Self.SP[0],RAIL.Self.Skills.MobAttack)
+				end
+			end
+		end -- not terminate
 
 		-- Update all the on-screen actors
 		local i,actor
@@ -214,65 +224,67 @@ function RAIL.AI(id)
 				-- Update the information about it
 				actor:Update()
 
-				-- If the actor that was just updated is a portal
-				if actor.Type == 45 and not terminate then
-					-- Get the block distances between the portal and the owner
-						-- roughly 1.5 tiles from now
-					local inFuture = RAIL.Owner:BlocksTo(-1.5*RAIL.Owner:EstimateMove())(actor)
-						-- and now
-					local now = RAIL.Owner:BlocksTo(actor)
-
-					if inFuture < 3 and inFuture < now then
-						terminate = actor
+				-- Make sure we aren't just collecting data this round
+				if not terminate then
+					-- If the actor that was just updated is a portal
+					if actor.Type == 45 then
+						-- Get the block distances between the portal and the owner
+							-- roughly 1.5 tiles from now
+						local inFuture = RAIL.Owner:BlocksTo(-1.5*RAIL.Owner:EstimateMove())(actor)
+							-- and now
+						local now = RAIL.Owner:BlocksTo(actor)
+	
+						if inFuture < 3 and inFuture < now then
+							terminate = actor
+						end
 					end
-				end
 
-				-- If we're chasing owner, we won't be doing anything else
-				if Target.Chase ~= RAIL.Owner then
+					-- If we're chasing owner, we won't be doing anything else
+					if Target.Chase ~= RAIL.Owner then
 
-					-- Make sure we're not ignoring the actor
-					if not actor:IsIgnored() then
+						-- Make sure we're not ignoring the actor
+						if not actor:IsIgnored() then
 
-						-- Check if the actor is an enemy
-						if actor:IsEnemy() then
-							local dist = RAIL.Self:DistanceTo(actor)
+							-- Check if the actor is an enemy
+							if actor:IsEnemy() then
+								local dist = RAIL.Self:DistanceTo(actor)
 
-							-- Check if physical attacks are allowed against the enemy
-							if actor:IsAttackAllowed() then
-								-- If it's in range, add it to the potential attack list
-								if dist <= RAIL.Self.AttackRange then
-									Potential.Attack[actor.ID] = actor
-								else
-									-- Otherwise, add it to the potential chase list
-									Potential.Chase[actor.ID] = actor
+								-- Check if physical attacks are allowed against the enemy
+								if actor:IsAttackAllowed() then
+									-- If it's in range, add it to the potential attack list
+									if dist <= RAIL.Self.AttackRange then
+										Potential.Attack[actor.ID] = actor
+									else
+										-- Otherwise, add it to the potential chase list
+										Potential.Chase[actor.ID] = actor
+									end
+								end
+
+								-- Check if attack skills are allowed against the enemy
+								if actor:IsSkillAllowed(Potential.Skill.Attack.Level) then
+									-- If it's in range, add it to the potential skill list
+									if dist <= RAIL.Self.Skills.Attack:GetRange() then
+										Potential.Skill.Attack.Actors[actor.ID] = actor
+									else
+										-- Otherwise, add it to the potential chase list
+										Potential.Chase[actor.ID] = actor
+									end
+								end
+
+								-- Check if mob skills are allowed against the enemy
+								if actor:IsSkillAllowed(Potential.Skill.MobAttack.Level) then
+									-- Find a mob to add to, or create a new one
 								end
 							end
 
-							if
-								-- Check if we have magic attacks
-								max_skill_level >= actor.BattleOpts.MinSkillLevel and
-								-- And skills are allowed
-								actor:IsSkillAllowed() and
-								-- And a skill would be ready against this monster
-								RAIL.TargetHistory.Skill.ReadyTime + actor.BattleOpts.TicksBetweenSkills <= GetTick()
-							then
-								-- If it's in range, add it to the potential skill list
-								if dist <= RAIL.Self.Skills.Attack:GetRange() then
-									Potential.Skill[actor.ID] = actor
-								else
-									-- Otherwise, add it to the potential chase list
-									Potential.Chase[actor.ID] = actor
-								end
+							-- Keep track of friends
+							if actor:IsFriend() then
+								Friends[actor.ID] = actor
 							end
-						end
-
-						-- Keep track of friends
-						if actor:IsFriend() then
-							Friends[actor.ID] = actor
-						end
-
-					end -- not actor:IsIgnored()
-				end -- Target.Chase ~= RAIL.Owner
+	
+						end -- not actor:IsIgnored()
+					end -- Target.Chase ~= RAIL.Owner
+				end -- not terminate
 			end -- RAIL.Owner.ID ~= actor
 		end -- i,actor in ipairs(GetActor())
 	end
@@ -299,10 +311,17 @@ function RAIL.AI(id)
 
 	-- Check if the cycle should terminate early
 	if terminate then
-		RAIL.LogT(7,"Owner approaching {1}; cycle terminating after data collection.",terminate)
+		-- Check if it's due to a portal
+		if RAIL.IsActor(terminate) then
+			RAIL.LogT(7,"Owner approaching {1}; cycle terminating after data collection.",terminate)
+	
+			-- Save state data before terminating
+			RAIL.State:Save()
 
-		-- Save state data before terminating
-		RAIL.State:Save()
+		-- Check if its due to skill state
+		elseif terminate == RAIL.SkillState then
+			RAIL.LogT(7,"Unable to act due to skill casting time; cycle terminating after data collection.")
+		end
 
 		-- Terminate this cycle early
 		return
@@ -310,72 +329,104 @@ function RAIL.AI(id)
 
 	-- Pre-decision cmd queue evaluation
 	do
-		while RAIL.Cmd.Queue:Size() > 0 do
-			local msg = RAIL.Cmd.Queue[RAIL.Cmd.Queue.first]
+		-- Don't process commands if we're chasing owner
+		if Target.Chase ~= RAIL.Owner then
+			-- Loop as long as there are commands to process (or break commands that follow)
+			while RAIL.Cmd.Queue:Size() > 0 do
+				local msg = RAIL.Cmd.Queue[RAIL.Cmd.Queue.first]
 
-			if msg[1] == MOVE_CMD then
-				-- Check for a couple states that would invalidate the move
-				if
-					-- Move would be out of range
-					RAIL.Owner:BlocksTo(msg[2],msg[3]) > RAIL.State.MaxDistance or
-					-- Already arrived
-					RAIL.Self:DistanceTo(msg[2],msg[3]) < 1
-				then
-					-- Remove this command
-					RAIL.Cmd.Queue:PopLeft()
-				else
-					-- Set this command, unless chasing owner
-					if Target.Chase ~= RAIL.Owner then
-						Target.Chase = msg
-					end
-					break
-				end
-
-			elseif msg[1] == ATTACK_OBJECT_CMD then
-				-- Check for valid actor
-				local actor = Actors[msg[2]]
-				if math.abs(GetTick() - actor.LastUpdate) > 100 or
-					actor.Motion[0] == MOTION_DEAD
-				then
-					-- Invalid actor
-					RAIL.Cmd.Queue:PopLeft()
-				else
-					-- If close enough, attack the monster
-					if RAIL.Self:DistanceTo(actor) <= RAIL.Self.AttackRange then
-						Target.Attack = actor
+				-- TODO: Shift following commands to Commands.lua's Evaluate table
+	
+				if msg[1] == MOVE_CMD then
+					-- Check for a couple states that would invalidate the move
+					if
+						-- TODO: If a move is out of range, move to the closest spot that is in range
+						-- Move would be out of range
+						RAIL.Owner:BlocksTo(msg[2],msg[3]) > RAIL.State.MaxDistance or
+						-- Already arrived
+						RAIL.Self:DistanceTo(msg[2],msg[3]) < 1
+					then
+						-- Remove this command
+						RAIL.Cmd.Queue:PopLeft()
 					else
-						-- Otherwise, chase the monster
-						Target.Chase = actor
+						-- Set this command
+						Target.Chase = msg
+						break
 					end
+	
+				elseif msg[1] == ATTACK_OBJECT_CMD then
+					-- Check for valid, active actor
+					local actor = Actors[msg[2]]
+					if not actor.Active then
+						-- Invalid actor
+						RAIL.Cmd.Queue:PopLeft()
+					else
+						-- If close enough, attack the monster
+						if RAIL.Self:DistanceTo(actor) <= RAIL.Self.AttackRange then
+							Target.Attack = actor
+						else
+							-- Otherwise, chase the monster
+							Target.Chase = actor
+						end
 
-					break
-				end
-			else
-				-- Skill commands are only thing left over
-				if Target.Skill == nil then
-					Target.Skill = msg
+						break
+					end
 				else
-					break
+					-- Skill commands are only thing left over
+					if RAIL.SkillState:Get() == RAIL.SkillState.Enum.READY then
+						-- Check if the target is still valid
+						if
+							-- Check for valid actor target
+							-- TODO: Check that actor is within range
+							(msg[4] == nil and not Actors[msg[3]].Active) or
+
+							-- Or valid ground target
+							-- TODO: Check that ground target is within range
+							(msg[4] ~= nil and false) or
+
+							-- Or if the skill should have been used
+							msg.CmdUsed
+						then
+							-- Remove the command
+							RAIL.Cmd.Queue:PopLeft()
+						else
+							-- Set the skill target
+							Target.Skill = { msg[2], msg[3], msg[4] }
+
+							-- Set a flag that the skill has been used
+							msg.CmdUsed = true
+
+							break
+						end
+					else
+						break
+					end
 				end
-			end
-		end
-	end
+			end -- while loop
+		end -- Target.Chase ~= RAIL.Owner
+	end -- do
 
 	-- Decision Making
 	do
 		-- Skill
 		if Target.Skill == nil and Target.Chase ~= RAIL.Owner then
-			local skill = RAIL.Self.Skills.Attack
-			local target = SelectTarget.Skill.Attack(Potential.Skill,Friends)
-			if target ~= nil then
-				-- Check if the level is selectable
-				if skill[1] then
-					-- Determine the level of the skill to use
-					skill = skill[math.min(target.BattleOpts.MaxSkillLevel,max_skill_level)]
-				end
+			-- TODO: Decide between attack, mob attack, buff, and defense skills
+			if true then
+				local skill = RAIL.Self.Skills.Attack
+				local target = SelectTarget.Skill.Attack(Potential.Skill.Attack.Actors,Friends)
+				if target ~= nil then
+					-- Check if the level is selectable
+					if skill[1] then
+						-- Get the skill level hint from actor.IsSkillAllowed
+						local dummy,level = target:IsSkillAllowed(Potential.Skill.Attack.Level)
 
-				-- Set the skill target
-				Target.Skill = { skill, target }
+						-- Set the skill level to use
+						skill = skill[level]
+					end
+
+					-- Set the skill target
+					Target.Skill = { skill, target }
+				end
 			end
 		end
 
@@ -399,18 +450,17 @@ function RAIL.AI(id)
 
 	-- Record the targets
 	do
-		-- TODO: Skill
 		-- Skill
+		-- TODO: Decide if recording skill targets is useful
 		if Target.Skill ~= nil then
-			-- TODO: check for interrupted skills
 			local skill = Target.Skill[1]
-			RAIL.TargetHistory.Skill.UseTime = GetTick()
-			RAIL.TargetHistory.Skill.ReadyTime = GetTick() + skill.CastTime + skill.CastDelay
 			if RAIL.IsActor(Target.Skill[2]) then
-				RAIL.TargetHistory.Skill.Target = Target.Skill[2]
+				RAIL.TargetHistory.Skill = Target.Skill[2]
 			else
-				RAIL.TargetHistory.Skill.Target = -1
+				RAIL.TargetHistory.Skill = -1
 			end
+		else
+			-- If skill target is nil, don't set target to -1
 		end
 
 		-- Attack

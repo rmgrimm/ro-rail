@@ -223,6 +223,7 @@ do
 
 		ret.ActorType = "Actor"
 		ret.ID = ID
+		ret.Active = false		-- false = expired; true = active
 		ret.Type = -1			-- "fixed" type (homus don't overlap players)
 		ret.Hide = false		-- hidden?
 		ret.LastUpdate = -1		-- GetTick() of last :Update() call
@@ -469,6 +470,9 @@ do
 			return self
 		end
 
+		-- The actor is active unless it expires
+		self.Active = true
+
 		-- Check for a type change
 		if not RAIL.Mercenary and GetV(V_HOMUNTYPE,self.ID) ~= self[actor_key] then
 			-- Pre-log
@@ -613,6 +617,9 @@ do
 
 		-- Disable the timeout
 		self.ExpireTimeout[1] = false
+
+		-- Disable the active flag
+		self.Active = false
 	end
 
 	-------------
@@ -783,9 +790,14 @@ do
 	end
 
 	-- RAIL allowed to cast against monster?
-	Actor.IsSkillAllowed = function(self)
+	Actor.IsSkillAllowed = function(self,level)
 		-- Check if skills are allowed
 		if not self:IsEnemy() or not self.BattleOpts.SkillsAllowed then
+			return false
+		end
+
+		-- Check that the skill level is high enough
+		if level < self.BattleOpts.MinSkillLevel then
 			return false
 		end
 
@@ -797,7 +809,13 @@ do
 			return false
 		end
 
-		return true
+		-- Check if we should wait before casting against this actor
+		if RAIL.SkillState.CompletedTime() + self.BattleOpts.TicksBetweenSkills > GetTick() then
+			return false
+		end
+
+		-- Skills are allowed (and hint at the max skill level)
+		return true,math.min(self.BattleOpts.MaxSkillLevel,level)
 	end
 
 	-- Determine if attacking this actor would be kill-stealing
