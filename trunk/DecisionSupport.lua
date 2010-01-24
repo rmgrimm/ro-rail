@@ -136,6 +136,9 @@ do
 				n=n+1
 			end
 
+			-- List of actors that should be protected from non-aggro removal
+			local protected = { }
+
 			-- Sieve the potential list through each of the targeting functions, until 1 or fewer targets are left
 			for i,f in ipairs(self) do
 				-- Check to see if any potentials are left
@@ -151,9 +154,7 @@ do
 					elseif self == SelectTarget.Chase then
 						sieveType = "Chase"
 					end
-					RAIL.Log(95,"Before Sieve #%d: sieve=%q; n=%d",i,sieveType,n)
-					potentials,n = f(potentials,n,friends)
-					RAIL.Log(95,"After  Sieve #%d: sieve=%q; n=%d",i,sieveType,n)
+					potentials,n,protected = f(potentials,n,friends,protected)
 				end
 			end
 
@@ -186,10 +187,10 @@ do
 				--v == MOTION_CASTING or
 				false
 			end
-			SelectTarget.Attack:Append(function(potentials,n)
+			SelectTarget.Attack:Append(function(potentials,n,protected)
 				-- If we're not supposed to assist the owner, don't modify anything
 				if not RAIL.State.AssistOwner then
-					return potentials,n
+					return potentials,n,protected
 				end
 
 				-- Get the owner's most recent offensive move
@@ -203,24 +204,26 @@ do
 					-- Check if that target is an option
 					if RAIL.IsActor(potentials[target]) then
 						-- Return only that actor
-						return { [target] = potentials[target] },1
+						local ret = { [target] = potentials[target] }
+						-- Note: return this table twice, to protect from being removed by non-aggro sieve
+						return ret,1,ret
 					end
 				end
 
 				-- Don't modify the potential targets
-				return potentials,n
+				return potentials,n,protected
 			end)
 	
 			-- Assist owner's merc/homu
-			SelectTarget.Attack:Append(function(potentials,n)
+			SelectTarget.Attack:Append(function(potentials,n,friends,protected)
 				-- disabled for now
 				if true then
-					return potentials,n
+					return potentials,n,protected
 				end
-					-- TODO: Setup a mechanism to communicate target and attack status
+				-- TODO: Setup a mechanism to communicate target and attack status
 
 				-- Don't modify the potential targets
-				return potentials,n
+				return potentials,n,protected
 			end)
 		end
 
@@ -258,16 +261,16 @@ do
 				return defend_actors,defend_n,defend_prio
 			end
 
-			SelectTarget.Attack:Append(function(potentials,n,friends)
+			SelectTarget.Attack:Append(function(potentials,n,friends,protected)
 				if not RAIL.State.Aggressive then
 					-- If not aggressive, and not defending while passive, don't modify the list
 					if not RAIL.State.DefendWhilePassive then
-						return potentials,n
+						return potentials,n,protected
 					end
 				else
 					-- If aggressive, and not prioritizing defense, don't modify the list
 					if not RAIL.State.DefendWhileAggro then
-						return potentials,n
+						return potentials,n,protected
 					end
 				end
 	
@@ -299,7 +302,7 @@ do
 				-- Check if any actor is being attacked
 				if owner_n == 0 and self_n == 0 and friends_n == 0 then
 					-- Don't modify the list if defense isn't needed
-					return potentials,n
+					return potentials,n,protected
 				end
 
 				-- Keep a list of the actors that will be defended
@@ -331,44 +334,42 @@ do
 					end
 				end
 
-				return ret,ret_n
+				-- Return potential defend targets, the number of potentials,
+				--	and use the same target table as protected, so none are removed
+				--	due to non-aggro
+				return ret,ret_n,ret
 			end)
 		end
 
 		-- Sieve out monsters that would be Kill Stolen
-		SelectTarget.Attack:Append(function(potentials,n)
+		SelectTarget.Attack:Append(function(potentials,n,friends,protected)
 			local ret,ret_n = {},0
 			for id,actor in potentials do
-				if not actor:WouldKillSteal() then
+				if not actor:WouldKillSteal() or protected[id] then
 					ret[id] = actor
 					ret_n = ret_n + 1
 				end
 			end
-			return ret,ret_n
+			return ret,ret_n,protected
 		end)
-	
-		-- If not aggressive, sieve out monsters that aren't targeting self, other, owner, or a friend
-		SelectTarget.Attack:Append(function(potentials,n,friends)
+
+		-- If not aggressive, sieve out monsters that aren't protected
+		SelectTarget.Attack:Append(function(potentials,n,friends,protected)
 			-- If aggressive, don't modify the list
 			if RAIL.State.Aggressive then
 				return potentials,n
 			end
 
-			for id,actor in potentials do
-				local target = actor.Target[0]
-				if
-					target ~= RAIL.Owner.ID and
-					target ~= RAIL.Self.ID and
-					target ~= RAIL.Other.ID and
-					friends[target] == nil
-				then
-					potentials[id] = nil
-					n = n - 1
-				end
+			-- Count the number of protected
+			local ret_n = 0
+			for id,actor in protected do
+				ret_n = ret_n + 1
 			end
-			return potentials,n
+
+			-- Return only monsters that have been protected by previous functions
+			return protected,ret_n,protected
 		end)
-	
+
 		-- Select the highest priority set of monsters
 		SelectTarget.Attack:Append(function(potentials,n)
 			local ret,ret_n,ret_priority = {},0,-10000
@@ -390,26 +391,27 @@ do
 				end
 	
 			end
-	
-			return ret,ret_n
+
+			return ret,ret_n,ret
 		end)
 	
 		-- Check to see if the previous target is still in this list
-		SelectTarget.Attack:Append(function(potentials,n)
+		SelectTarget.Attack:Append(function(potentials,n,friends,protected)
 			local id = RAIL.TargetHistory.Attack
 
 			-- Check if a target was acquired, and is in the list
 			if id ~= -1 and potentials[id] ~= nil then
 				-- Use the previous target
-				return { [id] = potentials[id] },1
+				local ret = { [id] = potentials[id] }
+				return ret,1,ret
 			end
 
 			-- It's not, so don't modify the potential list
-			return potentials,n
+			return potentials,n,protected
 		end)
 
 		-- Find the closest actors
-		SelectTarget.Attack:Append(function(potentials,n)
+		SelectTarget.Attack:Append(function(potentials,n,friends,protected)
 			local ret,ret_n,ret_dist = {},0,RAIL.State.MaxDistance+1
 
 			for id,actor in potentials do
@@ -431,7 +433,7 @@ do
 				end
 			end
 
-			return ret,ret_n
+			return ret,ret_n,ret
 		end)
 	end
 
@@ -441,7 +443,7 @@ do
 		setmetatable(SelectTarget.Chase,st_metatable)
 
 		-- First, ensure we won't move outside of RAIL.State.MaxDistance
-		SelectTarget.Chase:Append(function(potentials,n)
+		SelectTarget.Chase:Append(function(potentials,n,friends,protected)
 			-- MaxDistance is in block tiles, but attack range is in pythagorean distance...
 			local max_dist = RAIL.State.MaxDistance
 
@@ -473,7 +475,7 @@ do
 				end
 			end
 
-			return potentials,n
+			return potentials,n,protected
 		end)
 
 		-- Then, chase targeting is mostly the same as attack targeting
@@ -488,17 +490,18 @@ do
 		end
 
 		-- Check to see if the previous target is still in this list
-		SelectTarget.Chase:Append(function(potentials,n)
+		SelectTarget.Chase:Append(function(potentials,n,friends,protected)
 			local id = RAIL.TargetHistory.Chase
 
 			-- Check if a target was acquired, and is in the list
 			if id ~= -1 and potentials[id] ~= nil then
 				-- Use the previous target
-				return { [id] = potentials[id] },1
+				local ret = { [id] = potentials[id] }
+				return ret,1,ret
 			end
 
 			-- If not in the list, don't modify the list
-			return potentials,n
+			return potentials,n,protected
 		end)
 	end
 
