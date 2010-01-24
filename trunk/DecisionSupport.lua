@@ -175,39 +175,54 @@ do
 	do
 		SelectTarget.Attack = Table.New()
 		setmetatable(SelectTarget.Attack,st_metatable)
-	
-		-- Assist owner as first priority
-		SelectTarget.Attack:Append(function(potentials,n)
-			-- Check if we can assist our owner
-			--	(check if owner has attacked in the last second or so)
-			if History.FindMostRecent(RAIL.Owner.Motion,MOTION_ATTACK, 1250) <= 1000 then
-				local owner_target = RAIL.Owner.Target[0]
-				if RAIL.State.AssistOwner and potentials[owner_target] ~= nil then
-					return { [owner_target] = Actors[owner_target] },1
-				end
-			end
 
-			-- Don't modify the potential targets
-			return potentials,n
-		end)
-	
-		-- Assist owner's merc/homu
-		SelectTarget.Attack:Append(function(potentials,n)
-			-- Check if we can assist the other (merc or homun)
-			if
-				RAIL.Other ~= RAIL.Self and
-				-- TODO: Setup a mechanism to communicate target and attack status
-				RAIL.Other.Motion[0] == MOTION_ATTACK
-			then
-				local other_target = RAIL.Other.Target[0]
-				if RAIL.State.AssistOther and potentials[other_target] ~= nil then
-					return { [other_target] = Actors[other_target] },1
-				end
+		-- Assist owner or other as first priority
+		do
+			-- A helper function for most recent offensive motion
+			local offensive_motion = function(v) return
+				v == MOTION_ATTACK or
+				v == MOTION_ATTACK2 or
+				--v == MOTION_SKILL or
+				--v == MOTION_CASTING or
+				false
 			end
+			SelectTarget.Attack:Append(function(potentials,n)
+				-- If we're not supposed to assist the owner, don't modify anything
+				if not RAIL.State.AssistOwner then
+					return potentials,n
+				end
 
-			-- Don't modify the potential targets
-			return potentials,n
-		end)
+				-- Get the owner's most recent offensive move
+				local most_recent = History.FindMostRecent(RAIL.Owner.Motion,offensive_motion,1250)
+
+				-- Ensure most_recent isn't nil
+				if most_recent ~= nil then
+					-- Check the target of that offensive motion
+					local target = RAIL.Owner.Target[most_recent]
+
+					-- Check if that target is an option
+					if RAIL.IsActor(potentials[target]) then
+						-- Return only that actor
+						return { [target] = potentials[target] },1
+					end
+				end
+
+				-- Don't modify the potential targets
+				return potentials,n
+			end)
+	
+			-- Assist owner's merc/homu
+			SelectTarget.Attack:Append(function(potentials,n)
+				-- disabled for now
+				if true then
+					return potentials,n
+				end
+					-- TODO: Setup a mechanism to communicate target and attack status
+
+				-- Don't modify the potential targets
+				return potentials,n
+			end)
+		end
 
 		-- Defend owner, other, and friends
 		do
