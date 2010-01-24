@@ -556,7 +556,7 @@ do
 			if id == ARCHER01 then
 				return {
 					Attack = AllSkills[8207][2],	-- double strafe
-					-- AllSkills[8233],		-- berserk
+					-- AllSkills[8233][1],		-- berserk
 				}
 			elseif id == ARCHER02 then
 				return {
@@ -565,8 +565,7 @@ do
 				}
 			elseif id == ARCHER03 then
 				return {
-					--Attack = AllSkills[8214][1],	-- arrow repel
-					Pushback = AllSkills[8214][1],	-- arrow repel (skill duplicated; serves multiple purposes)
+					Pushback = AllSkills[8214][1],	-- arrow repel
 					Buff = AllSkills[8223][2],	-- weapon quicken
 				}
 			elseif id == ARCHER04 then
@@ -589,21 +588,38 @@ do
 				}
 			elseif id == ARCHER07 then
 				return {
+					MobAttack = AllSkills[8208][10],-- arrow shower
+					AllSkills[8212][2],		-- freezing trap
+					Recover = AllSkills[8230][1],	-- mental cure
 				}
 			elseif id == ARCHER08 then
 				return {
+					AllSkills[8211][5],		-- sandman
+					Buff = AllSkills[8223][2],	-- weapon quicken
+					Provoke = AllSkills[8232][3],	-- provoke
 				}
 			elseif id == ARCHER09 then
 				return {
+					Attack = AllSkills[8207][10],	-- double strafe
+					AllSkills[8210][5],		-- land mine
+					Pushback = AllSkills[8214][1],	-- arrow repel
 				}
 			elseif id == ARCHER10 then
 				return {
+					Pushback = AllSkills[8214][1],	-- arrow repel
+					--AllSkills[8223][1],		-- berserk
+					Attack = AllSkills[8215][1],	-- focused arrow strike
+					Buff = AllSkills[8223][5],	-- weapon quicken
 				}
 			elseif id == LANCER01 then
 				return {
+					Attack = AllSkills[8216][1],	-- pierce
+					Recover = AllSkills[8226][1],	-- regain
 				}
 			elseif id == LANCER02 then
 				return {
+					MobAttack = AllSkills[8217][2],	-- brandish spear
+					Debuff = AllSkills[8236][1],	-- lex divina
 				}
 			elseif id == LANCER03 then
 				return {
