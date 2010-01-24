@@ -37,10 +37,8 @@ do
 				local skill = AllSkills[msg[3]][msg[2]]
 
 				-- Add to queue
-				--RAIL.Cmd.Queue:PushRight(skill)
-
-				-- Until skills are implemented properly, just pass the skill along to the server
-				Actors[msg[4]]:SkillObject(skill)
+				--	Note: Redo msg to use the skill object instead of skill ID + level
+				RAIL.Cmd.Queue:PushRight({ SKILL_OBJECT_CMD, skill, msg[3] })
 			end,
 
 			-- Ground-targeted skill
@@ -49,10 +47,8 @@ do
 				local skill = AllSkills[msg[3]][msg[2]]
 
 				-- Add to queue
-				--RAIL.Cmd.Queue:PushRight(msg)
-
-				-- Until skills are implemented properly, just pass the skill along to the server
-				skill:Cast(msg[4],msg[5])
+				--	Note: Redo msg to use the skill object instead of skill ID + level
+				RAIL.Cmd.Queue:PushRight({ SKILL_AREA_CMD, skill, msg[4], msg[5] })
 			end,
 
 			-- "alt+t" ("ctrl+t" for mercenaries)
@@ -63,7 +59,7 @@ do
 				-- Log it
 				local key = "ALT+T"
 				if RAIL.Mercenary then key = "CTRL+T" end
-				RAIL.Log(1,"<%s> RAIL.State.Agressive = %s",key,tostring(RAIL.State.Aggressive))
+				RAIL.LogT(1,"<{1}> RAIL.State.Agressive set to {2}, due to {1} press.",key,RAIL.State.Aggressive)
 			end,
 		},
 		Evaluate = {
@@ -92,6 +88,7 @@ do
 			str:Append(string.format(t,msg[msg_i]))
 		end
 
+		-- Note: Do not use translatable LogT, because of variable base text
 		RAIL.Log(0,str:Append(")"):Get())
 	end
 

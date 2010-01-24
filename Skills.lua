@@ -64,9 +64,10 @@ do
 		[8009] = {
 			Name = "Moonlight",
 			CastFunction = "actor",
-			Range = function() return 500 end,
+			Range = function() return 15 end,
 			MaxLevel = 5,
 			SPCost = function(level) return 4 * level end,
+			CastDelay = 500,
 		},
 		[8010] = {
 			Name = "Flitting",
@@ -104,10 +105,10 @@ do
 		[8013] = {
 			Name = "Caprice",
 			CastFunction = "actor",
-			Range = function() return 500 end,
+			Range = function() return 15 end,
 			MaxLevel = 5,
 			SPCost = function(level) return 20 + level*2 end,
-			CastDelay = function(level) return level * 700 end,
+			CastDelay = function(level) return (0.8 + level*0.2) * 1000 end,
 		},
 		[8014] = {
 			Name = "Chaotic Blessings",
@@ -437,12 +438,18 @@ do
 			-- Log the skill usage.
 			RAIL.LogT(60,"Casting {1}.",self.Name)
 
+			-- Set the skill state
+			RAIL.SkillState:WaitFor(self)
+
 			-- Use the skill
 			SkillObject(RAIL.Self.ID,self.Level,self.ID,RAIL.Self.ID)
 		end,
 		["actor"] = function(self,actor)
 			-- Log the skill usage against actor
 			RAIL.LogT(60,"Casting {1} against {2}.",self.Name,Actors[actor])
+
+			-- Set the skill state
+			RAIL.SkillState:WaitFor(self)
 
 			-- Use the skill
 			SkillObject(RAIL.Self.ID,self.Level,self.ID,actor)
@@ -456,6 +463,9 @@ do
 			else
 				RAIL.LogT(60,"Casting {1} on ({2},{3}).",self.Name,x,y)
 			end
+
+			-- Set the skill state
+			RAIL.SkillState:WaitFor(self)
 
 			-- Use the skill
 			SkillGround(RAIL.Self.ID,self.Level,self.ID,x,y)
@@ -490,7 +500,7 @@ do
 				Name = parameters.Name,
 			}
 
-			-- Select the cast, usable, and range functions
+			-- Select the cast and range functions
 			local cast_func = function_or_string(parameters.CastFunction,CastFunctions,function(self,...)
 				-- TODO: Log
 			end)
@@ -555,7 +565,7 @@ do
 				}
 			elseif id == ARCHER03 then
 				return {
-					Attack = AllSkills[8214][1],	-- arrow repel
+					--Attack = AllSkills[8214][1],	-- arrow repel
 					Pushback = AllSkills[8214][1],	-- arrow repel (skill duplicated; serves multiple purposes)
 					Buff = AllSkills[8223][2],	-- weapon quicken
 				}
@@ -659,14 +669,14 @@ do
 				return {
 					Heal = AllSkills[8001],		-- healing hands
 					Buff = AllSkills[8002],		-- urgent escape
-					--AllSkills[8003],		-- brain surgery
+					--AllSkills[8003],		-- brain surgery (passive)
 					AllSkills[8004],		-- mental charge
 				}
 			elseif id == AMISTR or id == AMISTR2 or id == AMISTR_H or id == AMISTR_H2 then
 				return {
 					Defense = AllSkills[8005],	-- castling
 					Buff = AllSkills[8006],		-- amistr bulwark
-					--AllSkills[8007],		-- adamantium skin
+					--AllSkills[8007],		-- adamantium skin (passive)
 					AllSkills[8008],		-- blood lust
 				}
 			elseif id == FILIR or id == FILIR2 or id == FILIR_H or id == FILIR_H2 then
@@ -680,7 +690,7 @@ do
 				return {
 					Attack = AllSkills[8013],	-- caprice
 					Heal = AllSkills[8014],		-- chaotic blessings
-					--AllSkills[8015],		-- instruction change
+					--AllSkills[8015],		-- instruction change (passive)
 					AllSkills[8016],		-- self destruct
 				}
 			end
