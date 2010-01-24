@@ -49,10 +49,57 @@ do
 		})
 	end
 
+	-- Default Plants and Summons
+	local Plants = {
+		Types = {
+			[1078] = true,	-- Red Plant
+			[1079] = true,	-- Blue Plant
+			[1080] = true,	-- Green Plant
+			[1081] = true,	-- Yellow Plant
+			[1082] = true,	-- White Plant
+			[1083] = true,	-- Shining Plant
+			[1084] = true,	-- Red Mushroom
+			[1085] = true,	-- Black Mushroom
+		},
+		Options = {
+			Name = "Plant",
+			SkillsAllowed = false,
+		},
+	}
+	setmetatable(Plants.Options,{
+		__index = function(t,idx)
+			if idx == "Priority" then
+				return BattleOptsDefaults.Priority - 1
+			end
+
+			return BattleOptsDefaults[idx]
+		end,
+	})
+	local Summons = {
+		Types = {
+			[1555] = true,	-- Summoned Parasite
+			[1575] = true,	-- Summoned Flora
+			[1579] = true,	-- Summoned Hydra
+			[1589] = true,	-- Summoned Mandragora
+			[1590] = true,	-- Summoned Geographer
+		},
+		Options = {
+			Name = "Summoned",
+			AttackAllowed = false,
+			SkillsAllowed = false,
+		},
+	}
+	setmetatable(Summons.Options,{
+		__index = BattleOptsDefaults
+	})
+
 	-- By Type
 	do
 		-- Private key to access each type
 		local type_key = {}
+
+		-- Private key to access the default table
+		local default_key = {}
 
 		-- Auto-generated subtables will use this metatable
 		local mt = {
@@ -81,7 +128,7 @@ do
 				end
 
 				-- Otherwise, use default
-				return BattleOptsDefaults[key]
+				return t[default_key][key]
 			end
 		}
 
@@ -95,12 +142,27 @@ do
 			__index = function(t,key)
 				-- Make sure there are options for it
 				if RAIL.State.ActorOptions.ByType[key] == nil then
+					-- Check for special types
+					if Plants.Types[key] then
+						return Plants.Options
+					elseif Summons.Types[key] then
+						return Summons.Options
+					end
+
 					return nil
 				end
 
 				local ret = {
 					[type_key] = key,
+					[default_key] = BattleOptsDefaults,
 				}
+
+				-- Check for special types
+				if Plants.Types[key] then
+					ret[default_key] = Plants.Options
+				elseif Summons.Types[key] then
+					ret[default_key] = Summons.Options
+				end
 
 				setmetatable(ret,mt)
 				t[key] = ret
