@@ -49,49 +49,147 @@ do
 		})
 	end
 
-	-- Default Plants and Summons
-	local Plants = {
-		Types = {
-			[1078] = true,	-- Red Plant
-			[1079] = true,	-- Blue Plant
-			[1080] = true,	-- Green Plant
-			[1081] = true,	-- Yellow Plant
-			[1082] = true,	-- White Plant
-			[1083] = true,	-- Shining Plant
-			[1084] = true,	-- Red Mushroom
-			[1085] = true,	-- Black Mushroom
-		},
-		Options = {
-			Name = "Plant",
-			SkillsAllowed = false,
-		},
-	}
-	setmetatable(Plants.Options,{
-		__index = function(t,idx)
-			if idx == "Priority" then
-				return BattleOptsDefaults.Priority - 1
-			end
+	-- Default special actor types
+	local SpecialTypes = {}
+	do
+		-- Plants
+		SpecialTypes.Plants = {
+			Types = {
+				[1078] = true,	-- Red Plant
+				[1079] = true,	-- Blue Plant
+				[1080] = true,	-- Green Plant
+				[1081] = true,	-- Yellow Plant
+				[1082] = true,	-- White Plant
+				[1083] = true,	-- Shining Plant
+				[1084] = true,	-- Red Mushroom
+				[1085] = true,	-- Black Mushroom
+			},
+			Options = {
+				Name = "Plant",
+				SkillsAllowed = false,
+			},
+		}
+		setmetatable(SpecialTypes.Plants.Options,{
+			__index = function(t,idx)
+				if idx == "Priority" then
+					return BattleOptsDefaults.Priority - 1
+				end
+	
+				return BattleOptsDefaults[idx]
+			end,
+		})
 
-			return BattleOptsDefaults[idx]
-		end,
-	})
-	local Summons = {
-		Types = {
-			[1555] = true,	-- Summoned Parasite
-			[1575] = true,	-- Summoned Flora
-			[1579] = true,	-- Summoned Hydra
-			[1589] = true,	-- Summoned Mandragora
-			[1590] = true,	-- Summoned Geographer
-		},
-		Options = {
-			Name = "Summoned",
-			AttackAllowed = false,
-			SkillsAllowed = false,
-		},
-	}
-	setmetatable(Summons.Options,{
-		__index = BattleOptsDefaults
-	})
+		-- Alchemist-summoned plants
+		SpecialTypes.Summons = {
+			Types = {
+				[1555] = true,	-- Summoned Parasite
+				[1575] = true,	-- Summoned Flora
+				[1579] = true,	-- Summoned Hydra
+				[1589] = true,	-- Summoned Mandragora
+				[1590] = true,	-- Summoned Geographer
+			},
+			Options = {
+				Name = "Summoned",
+				AttackAllowed = false,
+				SkillsAllowed = false,
+			},
+		}
+
+		-- Homunculi
+		SpecialTypes.Lif = {
+			Types = {},
+			Options = {
+				Name = "Lif",
+			},
+		}
+		SpecialTypes.Amistr = {
+			Types = {},
+			Options = {
+				Name = "Amistr",
+			},
+		}
+		SpecialTypes.Filir = {
+			Types = {},
+			Options = {
+				Name = "Filir",
+			},
+		}
+		SpecialTypes.Vanilmirth = {
+			Types = {},
+			Options = {
+				Name = "Vanilmirth",
+			},
+		}
+		-- Populate the homunculus types
+		for i=1,16 do
+			local mod = math.mod(i,4)
+			if mod == 1 then
+				SpecialTypes.Lif.Types[6000 + i] = true
+			elseif mod == 2 then
+				SpecialTypes.Amistr.Types[6000 + i] = true
+			elseif mod == 3 then
+				SpecialTypes.Filir.Types[6000 + i] = true
+			else
+				SpecialTypes.Vanilmirth.Types[6000 + i] = true
+			end
+		end
+
+		-- Mercenary types
+		SpecialTypes.ArcherMerc = {
+			Types = {},
+			Options = {
+				Name = "Archer Mercenary",
+			},
+		}
+		SpecialTypes.LancerMerc = {
+			Types = {},
+			Options = {
+				Name = "Lancer Mercenary",
+			},
+		}
+		SpecialTypes.SwordmanMerc = {
+			Types = {},
+			Options = {
+				Name = "Swordman Mercenary",
+			},
+		}
+		-- Populate the mercenary types
+		for i=1,30 do
+			if i <= 10 then
+				SpecialTypes.ArcherMerc.Types[6016 + i] = true
+			elseif i <= 20 then
+				SpecialTypes.LancerMerc.Types[6016 + i] = true
+			else
+				SpecialTypes.SwordmanMerc.Types[6016 + i] = true
+			end
+		end
+
+
+		-- Ensure all the special types' options tables have metatables
+		local st_mt = {
+			__index = BattleOptsDefaults,
+		}
+		-- And redo the SpecialTypes table
+		local SpecialTypes_redo = {}
+		for id,table in SpecialTypes do
+			if
+				type(table) == "table" and
+				type(table.Types) == "table" and
+				type(table.Options) == "table"
+			then
+				local mt = getmetatable(table.Options)
+
+				if mt == nil then
+					setmetatable(table.Options,st_mt)
+				end
+
+				for type in table.Types do
+					SpecialTypes_redo[type] = table.Options
+				end
+			end
+		end
+		SpecialTypes = SpecialTypes_redo
+	end
 
 	-- By Type
 	do
@@ -143,10 +241,9 @@ do
 				-- Make sure there are options for it
 				if RAIL.State.ActorOptions.ByType[key] == nil then
 					-- Check for special types
-					if Plants.Types[key] then
-						return Plants.Options
-					elseif Summons.Types[key] then
-						return Summons.Options
+					local special = SpecialTypes[key]
+					if special then
+						return special
 					end
 
 					return nil
@@ -158,10 +255,9 @@ do
 				}
 
 				-- Check for special types
-				if Plants.Types[key] then
-					ret[default_key] = Plants.Options
-				elseif Summons.Types[key] then
-					ret[default_key] = Summons.Options
+				local special = SpecialTypes[key]
+				if special then
+					ret[default_key] = special
 				end
 
 				setmetatable(ret,mt)
@@ -449,7 +545,10 @@ do
 
 			-- Check the type for sanity
 			if (self.ID < 100000 or self.ID > 110000000) and
-				LIF <= self.Type and self.Type <= VANILMIRTH_H2
+				-- Homunculus types
+				((1 <= self.Type and self.Type <= 16) or
+				-- Mercenary types
+				(17 <= self.Type and self.Type <= 46))
 			then
 				self.Type = self.Type + 6000
 			end
