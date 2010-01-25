@@ -122,7 +122,7 @@ do
 		end
 
 		-- Build the string to send to TraceAI
-		local buf = StringBuffer.New():Append("("
+		local buf = StringBuffer.New():Append("(")
 
 		-- Insert the args into the base text
 		local str = func(text,unpack(arg))
