@@ -556,7 +556,7 @@ do
 			if id == ARCHER01 then
 				return {
 					Attack = AllSkills[8207][2],	-- double strafe
-					-- AllSkills[8233][1],		-- berserk
+					--AllSkills[8233][1],		-- berserk (passive)
 				}
 			elseif id == ARCHER02 then
 				return {
@@ -607,7 +607,7 @@ do
 			elseif id == ARCHER10 then
 				return {
 					Pushback = AllSkills[8214][1],	-- arrow repel
-					--AllSkills[8223][1],		-- berserk
+					--AllSkills[8223][1],		-- berserk (passive)
 					Attack = AllSkills[8215][1],	-- focused arrow strike
 					Buff = AllSkills[8223][5],	-- weapon quicken
 				}
@@ -623,57 +623,106 @@ do
 				}
 			elseif id == LANCER03 then
 				return {
+					Attack = AllSkills[8216][2],	-- pierce
+					Recover = AllSkills[8229][1],	-- recuperate
+					PartyBuff = AllSkills[8221][1],	-- sacrifice
 				}
 			elseif id == LANCER04 then
 				return {
+					Attack = AllSkills[8225][1],	-- crash
+					Buff = AllSkills[8219][1],	-- defending aura
 				}
 			elseif id == LANCER05 then
 				return {
+					Buff = AllSkills[8220][3],	-- guard
+					Attack = AllSkills[8216][5],	-- pierce
 				}
 			elseif id == LANCER06 then
 				return {
+					MobAttack = AllSkills[8217][5],	-- brandish spear
+					Buff = AllSkills[8223][2],	-- weapon quicken
 				}
 			elseif id == LANCER07 then
 				return {
+					--AllSkills[8223][1],		-- berserk (passive)
+					PartyBuff = AllSkills[8221][1],	-- sacrifice
 				}
 			elseif id == LANCER08 then
 				return {
+					Attack = AllSkills[8216][10],	-- pierce
+					Provoke = AllSkills[8232][5],	-- provoke
+					Emergency = AllSkills[8235][1],	-- scapegoat
 				}
 			elseif id == LANCER09 then
 				return {
+					MobAttack = AllSkills[8217][10],-- brandish spear
+					Buff = AllSkills[8219][3],	-- defending aura
+					Buff2 = AllSkills[8220][7],	-- guard
 				}
 			elseif id == LANCER10 then
 				return {
+					Attack = AllSkills[8218][5],	-- clashing spiral
+					Buff = AllSkills[8220][10],	-- guard
+					PartyBuff = AllSkills[8221][3],	-- sacrifice
+					Buff2 = AllSkills[8223][5],	-- weapon quicken
 				}
 			elseif id == SWORDMAN01 then
 				return {
+					Attack = AllSkills[8201][1],	-- bash
+					Debuff = AllSkills[8234][1],	-- decrease agi
 				}
 			elseif id == SWORDMAN02 then
 				return {
+					MobAttack = AllSkills[8202][3],	-- magnum break
+					Provoke = AllSkills[8232][5],	-- provoke
 				}
 			elseif id == SWORDMAN03 then
 				return {
+					Recover = AllSkills[8228][1],	-- benediction
+					Buff = AllSkills[8223][1],	-- weapon quicken
 				}
 			elseif id == SWORDMAN04 then
 				return {
+					Attack = AllSkills[8225][1],	-- crash
+					MobAttack = AllSkills[8202][5],	-- magnum break
 				}
 			elseif id == SWORDMAN05 then
 				return {
+					Attack = AllSkills[8201][5],	-- bash
+					Recover = AllSkills[8228][1],	-- benediction
+					Attack2 = AllSkills[8225][4],	-- crash
 				}
 			elseif id == SWORDMAN06 then
 				return {
+					Debuff = AllSkills[8234][3],	-- decrease agi
+					AllSkills[8237][1],		-- sense
+					Buff = AllSkills[8223][5],	-- weapon quicken
 				}
 			elseif id == SWORDMAN07 then
 				return {
+					Attack = AllSkills[8201][10],	-- bash
+					--AllSkills[8223][1],		-- berserk (passive)
+					Emergency = AllSkills[8235][1],	-- scapegoat
 				}
 			elseif id == SWORDMAN08 then
 				return {
+					MobAttack = AllSkills[8203][5],	-- bowling bash
+					Recover = AllSkills[8231][1],	-- compress
+					Buff = AllSkills[8204][4],	-- parry
+					Buff2 = AllSkills[8223][10],	-- weapon quicken
 				}
 			elseif id == SWORDMAN09 then
 				return {
+					Buff = AllSkills[8205][5],	-- shield reflect
+					Attack = AllSkills[8225][3],	-- crash
+					MobAttack = AllSkills[8203][8],	-- bowling bash
 				}
 			elseif id == SWORDMAN10 then
 				return {
+					Attack = AllSkills[8201][10],	-- bash
+					MobAttack = AllSkills[8203][10],-- bowling bash
+					AllSkills[8206][1],		-- frenzy
+					Buff = AllSkills[8223][10],	-- weapon quicken
 				}
 			end
 
@@ -699,7 +748,7 @@ do
 				return {
 					Attack = AllSkills[8009],	-- moonlight
 					Buff = AllSkills[8010],		-- flitting
-					AllSkills[8011],		-- accelerated flight
+					Buff2 = AllSkills[8011],	-- accelerated flight
 					AllSkills[8012],		-- sbr 44
 				}
 			elseif id == VANILMIRTH or id == VANILMIRTH2 or id == VANILMIRTH_H or id == VANILMIRTH_H2 then
