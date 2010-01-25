@@ -135,6 +135,9 @@ do
 			-- Don't anti-dup next time
 			antidup = nil
 		else
+			-- Add the level to the line
+			buf:Append(level)
+
 			-- Don't duplicate if the next log is the same
 			antidup = str
 		end
