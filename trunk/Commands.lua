@@ -38,7 +38,7 @@ do
 
 				-- Add to queue
 				--	Note: Redo msg to use the skill object instead of skill ID + level
-				RAIL.Cmd.Queue:PushRight({ SKILL_OBJECT_CMD, skill, msg[3] })
+				RAIL.Cmd.Queue:PushRight({ SKILL_OBJECT_CMD, skill, msg[4] })
 			end,
 
 			-- Ground-targeted skill
