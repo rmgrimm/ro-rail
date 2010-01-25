@@ -121,21 +121,36 @@ do
 			text = translate_table[text]
 		end
 
+		-- Build the string to send to TraceAI
+		local buf = StringBuffer.New():Append("("
+
+		-- Insert the args into the base text
 		local str = func(text,unpack(arg))
 
 		-- Check for a duplicate
 		if str == antidup then
 			-- Duplicate lines get level replaced with "D"
-			TraceAI("(DD) " .. str)
+			buf:Append("DD")
 
 			-- Don't anti-dup next time
-			str = nil
+			antidup = nil
 		else
-			-- Prepend the debug level
-			TraceAI(string.format("(%2d) %s",level,str))
+			-- Don't duplicate if the next log is the same
+			antidup = str
 		end
 
-		antidup = str
+		-- Add the mercenary or homunculus flag
+		if RAIL.Mercenary then
+			buf:Append("m")
+		else
+			buf:Append("h")
+		end
+
+		-- Add the string to the buffer
+		buf:Append(") "):Append(str)
+
+		-- And send it to TraceAI
+		TraceAI(buf:Get())
 	end
 
 	-- Old-style logging
