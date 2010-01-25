@@ -136,7 +136,7 @@ do
 			antidup = nil
 		else
 			-- Add the level to the line
-			buf:Append(level)
+			buf:Append(string.format("%2d",level))
 
 			-- Don't duplicate if the next log is the same
 			antidup = str
