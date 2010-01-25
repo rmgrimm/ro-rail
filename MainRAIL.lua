@@ -28,7 +28,35 @@ RAIL.Validate.MaxDistance = {"number", 13, 3, 14}
 function AI(id)
 	-- Get Owner and Self
 	RAIL.Owner = Actors[GetV(V_OWNER,id)]
+	RAIL.LogT(40," --> Owner;")
 	RAIL.Self  = Actors[id]
+
+	-- Get AI type
+	if RAIL.Mercenary then
+		RAIL.Self.AI_Type = GetV(V_MERTYPE,id)
+	else
+		RAIL.Self.AI_Type = GetV(V_HOMUNTYPE,id)
+	end
+	RAIL.Self.Skills = GetSkillList(RAIL.Self.AI_Type)
+
+	-- Get our attack range
+	RAIL.Self.AttackRange = GetV(V_ATTACKRANGE,id)
+
+	-- Log extra information about self
+	RAIL.LogT(40," --> Self; AI_Type = {2}; Range = {3}",RAIL.Self,GetV(V_HOM,RAIL.Self.AttackRange)
+
+	-- Extra info about skills
+	do
+		local buf = StringBuffer.New()
+		for skill_type,skill in pairs(RAIL.Self.Skills) do
+			buf:Append(skill.Name)
+			if type(skill_type) == "string" then
+				buf:Append(" as AI's \""):Append(skill_type):Append("\"")
+			end
+			buf:Append("; ")
+		end
+		RAIL.LogT(40," --> Skills: {1}",buf:Get())
+	end
 
 	-- Store the initialization time
 	RAIL.Self.InitTime = GetTick()
@@ -36,8 +64,8 @@ function AI(id)
 	-- Create a bogus Other until homu<->merc communication is established
 	RAIL.Other = RAIL.Self
 
-	-- Get our attack range
-	RAIL.Self.AttackRange = GetV(V_ATTACKRANGE,id)
+	-- Load persistent state data
+	RAIL.State:Load(true)
 
 	-- Track HP and SP
 	do
@@ -76,16 +104,6 @@ function AI(id)
 	-- Save some processing power on later cycles
 	RAIL.Owner.ExpireTimeout[1] = false
 	RAIL.Self.ExpireTimeout[1] = false
-
-	if RAIL.Mercenary then
-		RAIL.Self.AI_Type = GetV(V_MERTYPE,id)
-	else
-		RAIL.Self.AI_Type = GetV(V_HOMUNTYPE,id)
-	end
-	RAIL.Self.Skills = GetSkillList(RAIL.Self.AI_Type)
-
-	-- Load persistent state data
-	RAIL.State:Load(true)
 
 	-- Periodically save state data
 	RAIL.Timeouts:New(2500,true,function()
