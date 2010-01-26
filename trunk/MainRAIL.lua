@@ -120,7 +120,6 @@ end
 
 -- Targeting histories
 RAIL.TargetHistory = {
-	Skill = -1,
 	Attack = -1,
 	Chase = -1,
 	Move = {
@@ -179,7 +178,6 @@ function RAIL.AI(id)
 
 		-- Check if we're terminating this round
 		if not terminate then
-
 			-- Determine if we need to chase our owner
 			do
 				-- Owner-chase estimation is based on max distance
@@ -349,78 +347,9 @@ function RAIL.AI(id)
 	do
 		-- Don't process commands if we're chasing owner
 		if Target.Chase ~= RAIL.Owner then
-			-- Loop as long as there are commands to process (or break commands that follow)
-			while RAIL.Cmd.Queue:Size() > 0 do
-				local msg = RAIL.Cmd.Queue[RAIL.Cmd.Queue.first]
-
-				-- TODO: Shift following commands to Commands.lua's Evaluate table
-	
-				if msg[1] == MOVE_CMD then
-					-- Check for a couple states that would invalidate the move
-					if
-						-- TODO: If a move is out of range, move to the closest spot that is in range
-						-- Move would be out of range
-						RAIL.Owner:BlocksTo(msg[2],msg[3]) > RAIL.State.MaxDistance or
-						-- Already arrived
-						RAIL.Self:DistanceTo(msg[2],msg[3]) < 1
-					then
-						-- Remove this command
-						RAIL.Cmd.Queue:PopLeft()
-					else
-						-- Set this command
-						Target.Chase = msg
-						break
-					end
-	
-				elseif msg[1] == ATTACK_OBJECT_CMD then
-					-- Check for valid, active actor
-					local actor = Actors[msg[2]]
-					if not actor.Active then
-						-- Invalid actor
-						RAIL.Cmd.Queue:PopLeft()
-					else
-						-- If close enough, attack the monster
-						if RAIL.Self:DistanceTo(actor) <= RAIL.Self.AttackRange then
-							Target.Attack = actor
-						else
-							-- Otherwise, chase the monster
-							Target.Chase = actor
-						end
-
-						break
-					end
-				else
-					-- Skill commands are only thing left over
-					if RAIL.SkillState:Get() == RAIL.SkillState.Enum.READY then
-						-- Check if the target is still valid
-						if
-							-- Check for valid actor target
-							-- TODO: Check that actor is within range
-							(msg[4] == nil and not Actors[msg[3]].Active) or
-
-							-- Or valid ground target
-							-- TODO: Check that ground target is within range
-							(msg[4] ~= nil and false) or
-
-							-- Or if the skill should have been used
-							msg.CmdUsed
-						then
-							-- Remove the command
-							RAIL.Cmd.Queue:PopLeft()
-						else
-							-- Set the skill target
-							Target.Skill = { msg[2], msg[3], msg[4] }
-
-							-- Set a flag that the skill has been used
-							msg.CmdUsed = true
-
-							break
-						end
-					else
-						break
-					end
-				end
-			end -- while loop
+			-- Process commands to find skill target, attack target, and move target
+			Target.Skill,Target.Attack,Target.Chase =
+				RAIL.Cmd.Evaluate(Target.Skill,Target.Attack,Target.Chase)
 		end -- Target.Chase ~= RAIL.Owner
 	end -- do
 
@@ -468,19 +397,6 @@ function RAIL.AI(id)
 
 	-- Record the targets
 	do
-		-- Skill
-		-- TODO: Decide if recording skill targets is useful
-		if Target.Skill ~= nil then
-			local skill = Target.Skill[1]
-			if RAIL.IsActor(Target.Skill[2]) then
-				RAIL.TargetHistory.Skill = Target.Skill[2]
-			else
-				RAIL.TargetHistory.Skill = -1
-			end
-		else
-			-- If skill target is nil, don't set target to -1
-		end
-
 		-- Attack
 		if Target.Attack ~= nil then
 			RAIL.TargetHistory.Attack = Target.Attack.ID
