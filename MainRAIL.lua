@@ -21,7 +21,6 @@ require "Skills.lua"		-- depends on Table.lua
 
 -- State validation options
 RAIL.Validate.AcquireWhileLocked = {"boolean",false}
-RAIL.Validate.DefendFriends = {"boolean",false}
 RAIL.Validate.FollowDistance = {"number", 7, 3, 14}
 RAIL.Validate.MaxDistance = {"number", 13, 3, 14}
 

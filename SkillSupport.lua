@@ -192,7 +192,7 @@ do
 
 					-- Set state to delay
 					state = state_enum.DELAY
-					delay_ticks = GetTick()
+					delay_ticks = skill_ticks
 
 					-- Also check if delay time has already passed
 					return self:Update()

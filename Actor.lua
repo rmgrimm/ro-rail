@@ -1001,8 +1001,8 @@ do
 
 			local targ = Actors[targ]
 
-			-- Determine if we're supposed to defend friends
-			if RAIL.State.DefendFriends and targ:IsFriend() then
+			-- Can't kill steal friends
+			if targ:IsFriend() then
 				return false
 			end
 
