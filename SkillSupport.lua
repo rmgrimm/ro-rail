@@ -104,7 +104,8 @@ do
 
 				-- Check if the skill timed out
 				if most_recent == nil and tick_delta >= timeout then
-					-- TODO: Log timeout
+					RAIL.LogT(60,"Use of {1} seems to have failed; timeout after {2}ms.",skill.Name,tick_delta)
+
 					state = state_enum.READY
 					return
 				end
@@ -142,6 +143,8 @@ do
 
 				-- TODO: uninteruptible skill handling (eg, arrow repel)
 				--		(set to DELAY_ACK when skill is estimated to go off)
+
+				RAIL.LogT(60,"Use of {1} seems to have failed; casting state interrupted after {2}ms.",skill.Name,tick_delta)
 
 				-- Set the state to ready, the skill was interrupted
 				state = state_enum.READY
@@ -196,7 +199,8 @@ do
 
 				-- Check for timeout
 				if tick_delta >= timeout then
-					-- TODO: log timeout
+					RAIL.LogT(60,"Use of {1} seems to have failed; timeout after {2}ms.",skill.Name,tick_delta)
+
 					state = state_enum.READY
 					return
 				end
@@ -206,6 +210,8 @@ do
 
 				-- Check if enough time has passed
 				if GetTick() >= delay_ticks + skill.CastDelay then
+					RAIL.LogT(60,"Use of {1} seems to have succeeded; finished after {2}ms.",skill.Name,GetTick()-skill_ticks)
+
 					-- Set ready state
 					state = state_enum.READY
 					finish_ticks = GetTick()
