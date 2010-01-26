@@ -538,7 +538,7 @@ do
 		end
 
 		-- Default function is able to distinguish monster types
-		Actor[actor_key] = function(self)
+		Actor[actor_key] = function(self,notnpc)
 			-- Set the new type
 			self[actor_key] = get_type(self.ID)
 			self.Type = self[actor_key]
@@ -548,7 +548,9 @@ do
 				-- Homunculus types
 				((1 <= self.Type and self.Type <= 16) or
 				-- Mercenary types
-				(17 <= self.Type and self.Type <= 46))
+				(17 <= self.Type and self.Type <= 46)) and
+				-- Not a portal
+				(self.Type ~= 45 or notnpc)
 			then
 				self.Type = self.Type + 6000
 			end
@@ -644,6 +646,12 @@ do
 
 			-- Log
 			RAIL.LogT(40,"{1} changed type to {2}.",str,tostring(self))
+		elseif self.Type == 45 and GetV(V_MOTION,self.ID) ~= MOTION_STAND then
+			-- Call the private type changing function
+			Actor[actor_key](self,true)
+
+			-- Log
+			RAIL.LogT(40,"Incorrectly identified {1} as a Portal; fixed.",self)
 		elseif self.Type == -2 and self.ActorType == "NPC" and GetV(V_MOTION,self.ID) ~= MOTION_STAND then
 			-- Call the private type changing function
 			Actor[actor_key](self,true)
@@ -738,6 +746,12 @@ do
 
 			-- Log
 			RAIL.LogT(40,"Incorrectly identified {1} as an NPC; fixed.",self)
+		elseif self.Type == 45 then
+			-- Call the private type changing function
+			Actor[actor_key](self,true)
+
+			-- Log
+			RAIL.LogT(40,"Incorrectly identified {1} as an Portal; fixed.",self)
 		end
 
 		-- Use a table to make looping through and counting it faster

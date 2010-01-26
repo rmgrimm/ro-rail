@@ -16,6 +16,7 @@ RAIL.Validate.ProfileMark = {"number",20000,2000,nil}
 --	70 - Attack commands (sent to server)
 --	85 - Move commands (sent to server)
 --	90 - TODO: Actor data tracking
+--	95 - Targetting sieves
 --	98 - TODO: Performance logging; all calls
 --
 --

@@ -42,7 +42,7 @@ function AI(id)
 	RAIL.Self.AttackRange = GetV(V_ATTACKRANGE,id)
 
 	-- Log extra information about self
-	RAIL.LogT(40," --> Self; AI_Type = {2}; Range = {3}",RAIL.Self,RAIL.Self.AI_Type,RAIL.Self.AttackRange)
+	RAIL.LogT(40," --> Self; AI_Type = {2}; Attack Range = {3}",RAIL.Self,RAIL.Self.AI_Type,RAIL.Self.AttackRange)
 
 	-- Extra info about skills
 	do

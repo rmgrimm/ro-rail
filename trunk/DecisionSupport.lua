@@ -480,10 +480,14 @@ do
 			local max_dist = RAIL.State.MaxDistance
 
 			-- Process each actor
+			local ret,ret_n = {},0
 			for id,actor in potentials do
 				-- If the actor is within MaxDistance block tiles, this is easy
-				if RAIL.Owner:BlocksTo(actor) < max_dist then
+				local blocks = RAIL.Owner:BlocksTo(actor)
+				if blocks <= max_dist then
 					-- Leave the actor in the list
+					ret[id] = actor
+					ret_n = ret_n + 1
 				else
 					-- Get the angle from our owner to the actor
 					local angle,dist = RAIL.Owner:AngleTo(actor)
@@ -491,23 +495,30 @@ do
 					-- If the distance is less than our attack range, we'll be fine
 					if dist < RAIL.Self.AttackRange then
 						-- Leave the actor in the list
+						ret[id] = actor
+						ret_n = ret_n + 1
 					else
 						-- Plot a point that will be closer to the owner
-						local x,y = RAIL.Owner:AnglePlot(angle,dist - RAIL.Self.AttackRange + 1)
+						local x,y = RAIL.Owner:AnglePlot(angle,dist - RAIL.Self.AttackRange)
+						x = RoundNumber(x)
+						y = RoundNumber(y)
 
 						-- Check if this point would be inside MaxDistance
-						if RAIL.Owner:BlocksTo(x,y) < max_dist then
+						local closest_blocks = RAIL.Owner:BlocksTo(x,y)
+						if closest_blocks <= max_dist then
 							-- Leave the actor in the list
+							ret[id] = actor
+							ret_n = ret_n + 1
 						else
 							-- Take the actor out of the list, it's outside of range
-							potentials[id] = nil
-							n = n - 1
+							dist = RoundNumber(dist)
+							RAIL.LogT(95,"Chase sieve removed {1}; dist s->a = {2}; blocks o->a = {3}, closer o->a = {4}.",actor,dist,blocks,closest_blocks)
 						end
 					end
 				end
 			end
 
-			return potentials,n,protected
+			return ret,ret_n,protected
 		end)
 
 		-- Then, chase targeting is mostly the same as attack targeting
@@ -551,4 +562,75 @@ do
 		-- But remove the target locking
 		SelectTarget.Skill.Attack:Remove(SelectTarget.Skill.Attack:GetN()-1)
 	end
+end
+
+-- Skill type AIs and selector
+do
+	-- Private key to hold skills
+	local skills_key = {
+		-- Reuse this table to hold skill AIs
+		Attack = {
+			PreActors = function(skill)
+				-- TODO: clear a temporary list
+
+				-- Don't return anything, since no skill usage is urgent
+				return nil
+			end,
+			ActorCheck = function(skill,actor)
+				-- Check...
+				if
+					-- if the actor is an enemy
+					actor:IsEnemy() and
+					-- if skills are allowed against it
+					actor:IsSkillAllowed(skill.Level) and
+					-- and it's in range
+					RAIL.Self:DistanceTo(actor) <= skill:GetRange()
+				then
+					-- TODO: add actor to a temporary list
+				end
+			end,
+			SelectBest = function(skill)
+				-- TODO: return skill priority, skill object, and target
+				return nil
+			end,
+		},
+		Emergency = {
+			PreActors = function(skill)
+				-- TODO: Check if RAIL.Owner is in emergency state
+				--		and return the skill if it's urgent
+
+				return nil
+			end,
+		},
+	}
+
+	SelectTarget.Skills = {
+		-- Private table of skills that will be checked
+		[skills_key] = {},
+		Init = function(self,skills)
+			for ai_type,skill in skills do
+				-- Check if we can handle this AI type
+				if skills_key[ai_type] then
+					-- Add a key-value pair to our private table
+					self[skills_key][skill] = skills_key[ai_type]
+				end
+			end
+		end,
+		PreActors = function(self)
+			-- Loop through each skill
+			for skill,ai_obj in self[skills_key] do
+				-- Call the skill AI's pre-actors function
+				local urgent = ai_obj.PreActors(skill)
+
+				-- Check if an urgent skill was selected
+				if urgent then
+					-- TODO: do something with an urgent skill
+				end
+			end
+		end,
+		ActorCheck = function(self,actor)
+		end,
+		Select = function(self)
+		end
+	}
 end
