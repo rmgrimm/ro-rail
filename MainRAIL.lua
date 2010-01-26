@@ -76,7 +76,7 @@ function AI(id)
 			update(self)
 
 			-- The extended tracking information will be useless against other actors
-			if self.ID ~= RAIL.Owner and self.ID ~= RAIL.Self then
+			if self.ID ~= RAIL.Owner.ID and self.ID ~= RAIL.Self.ID then
 				return self
 			end
 
