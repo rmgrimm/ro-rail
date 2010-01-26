@@ -2,8 +2,13 @@
 RAIL.Validate.Aggressive = {"boolean",false}
 RAIL.Validate.AssistOwner = {"boolean",false}
 RAIL.Validate.AssistOther = {"boolean",false}
-RAIL.Validate.DefendWhilePassive = {"boolean",true}
-RAIL.Validate.DefendWhileAggro = {"boolean",true}
+RAIL.Validate.DefendOptions = {is_subtable = true,
+	DefendWhilePassive = {"boolean",true},
+	DefendWhileAggro = {"boolean",true},
+	OwnerThreshold = {"number",1,0},
+	SelfThreshold = {"number",5,0},
+	FriendThreshold = {"number",4,0},
+}
 RAIL.Validate.InterceptAlgorithm = {"string","normal"}
 
 -- Interception Routines
@@ -231,8 +236,8 @@ do
 		do
 			-- Prioritization support function
 			local prioritization = function(defend_actors,defend_n,defend_prio,actors,n,prio)
-				-- Make sure something is attacking this actor
-				if n < 1 then
+				-- Make sure something is attacking this actor, and the priority threshold is above 0
+				if n < 1 or prio < 1 then
 					return defend_actors,defend_n,defend_prio
 				end
 
@@ -269,7 +274,7 @@ do
 
 				-- Ensure that at least one is in the potentials list
 				for i=1,n do
-					if potentials[actor.TargetOf[i]] then
+					if potentials[actor.TargetOf[i].ID] then
 						-- One of actor's attackers is in the potentials list, return N
 						return n
 					end
@@ -282,12 +287,12 @@ do
 			SelectTarget.Attack:Append(function(potentials,n,friends,protected)
 				if not RAIL.State.Aggressive then
 					-- If not aggressive, and not defending while passive, don't modify the list
-					if not RAIL.State.DefendWhilePassive then
+					if not RAIL.State.DefendOptions.DefendWhilePassive then
 						return potentials,n,protected
 					end
 				else
 					-- If aggressive, and not prioritizing defense, don't modify the list
-					if not RAIL.State.DefendWhileAggro then
+					if not RAIL.State.DefendOptions.DefendWhileAggro then
 						return potentials,n,protected
 					end
 				end
@@ -297,7 +302,7 @@ do
 	
 				-- Check for the highest number of actors attacking friends/other
 				local friends_n,friends_actors = 0,Table.New()
-				do
+				if RAIL.State.DefendOptions.FriendThreshold > 0 then
 					-- First, set other as the actor
 					if RAIL.Self ~= RAIL.Other then
 						friends_n = getN(RAIL.Other,potentials)
@@ -331,15 +336,24 @@ do
 				-- Check to see if we should defend ourself
 				-- TODO: make a state option for priority (PrioritizeSelfDefense,PrioritizeOwnerDefense,PrioritizeFriendDefense)
 				defend_actors,defend_n,defend_prio =
-					prioritization(defend_actors,defend_n,defend_prio,RAIL.Self,self_n,5)
+					prioritization(
+						defend_actors,defend_n,defend_prio,
+						RAIL.Self,self_n,RAIL.State.DefendOptions.SelfThreshold
+					)
 
 				-- Check to see if we should defend our owner
 				defend_actors,defend_n,defend_prio =
-					prioritization(defend_actors,defend_n,defend_prio,RAIL.Owner,owner_n,1)
+					prioritization(
+						defend_actors,defend_n,defend_prio,
+						RAIL.Owner,owner_n,RAIL.State.DefendOptions.OwnerThreshold
+					)
 
 				-- Check to see if we should defend our friends
 				defend_actors,defend_n,defend_prio =
-					prioritization(defend_actors,defend_n,defend_prio,friends_actors,friends_n,4)
+					prioritization(
+						defend_actors,defend_n,defend_prio,
+						friends_actors,friends_n,RAIL.State.DefendOptions.FriendThreshold
+					)
 
 				-- Modify the return list
 				local ret,ret_n = {},0
