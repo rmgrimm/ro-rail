@@ -54,7 +54,7 @@ do
 
 	-- Skill timeout time
 	-- TODO: Make state option for this? Do I want that?
-	local timeout = 400
+	local timeout = 600
 
 	-- Helper functions for History.FindMostRecent
 	local casting_f = function(v) return v == MOTION_CASTING end
@@ -181,8 +181,9 @@ do
 						local new_level = FindSkillLevel(sp_delta, AllSkills[skill.ID])
 
 						-- Check if the new level is less than current
-						if new_level < skill.Level then
-							-- TODO: Log
+						if 0 < new_level and new_level < skill.Level then
+							RAIL.LogT(60,"Cast of {1} seems to have used level {2}; SP used = {3}.",
+								skill.Name,new_level,sp_delta)
 
 							-- Replace it, so delay time will be more accurate
 							skill = AllSkills[skill.ID][new_level]
