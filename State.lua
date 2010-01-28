@@ -350,10 +350,29 @@ do
 				-- Check if it exists, and isn't already set
 				if other and other ~= RAIL.Other then
 					-- Log it
-					RAIL.LogT(3,"Found owner's {1}; {1} = {2}",alt_name,other)
+					RAIL.LogT(40,"Found owner's {1} ({2}).",alt_name,other)
 
 					-- Set it to RAIL.Other
 					RAIL.Other = other
+
+					-- Hook the expire function
+					local expire = RAIL.Other.Expire
+					RAIL.Other.Expire = function(self)
+						-- Check if we're still the owner's other
+						if RAIL.Other == self then
+							-- Log it
+							RAIL.LogT(40,"Owner's {1} expired; removing from friends.",alt_name)
+
+							-- Unset (set to RAIL.Self)
+							RAIL.Other = RAIL.Self
+						end
+
+						-- Return the expire function
+						self.Expire = expire
+
+						-- Forward the function call
+						return self:Expire()
+					end
 				end
 			end
 		end
