@@ -91,7 +91,7 @@ do
 			-- Set the timeout
 			if not timeout then
 				-- TODO: make state option for this
-				timeout = 600
+				timeout = 1000
 			end
 			self[key].timeout = timeout
 

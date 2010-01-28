@@ -27,6 +27,7 @@ RAIL.Validate.Information = {is_subtable = true,
 	SelfID = {"number", 0},
 }
 RAIL.Validate.AcquireWhileLocked = {"boolean",false}
+RAIL.Validate.AttackWhileChasing = {"boolean",false}
 RAIL.Validate.FollowDistance = {"number", 7, 3, 14}
 RAIL.Validate.MaxDistance = {"number", 13, 3, 14}
 
@@ -130,8 +131,8 @@ end
 
 -- Targeting histories
 RAIL.TargetHistory = {
-	Attack = -1,
-	Chase = -1,
+	Attack = -1, -- History.New(-1,false),
+	Chase = History.New(-1,false),
 	Move = {
 		DanceTarget = -1,
 		X = -1,
@@ -142,16 +143,6 @@ RAIL.TargetHistory = {
 function RAIL.AI(id)
 	-- Potential targets
 	local Potential = {
-		Skill = {
-			Attack = {
-				Level = 0,
-				Actors = {},
-			},
-			MobAttack = {
-				Level = 0,
-				Mobs = Table.New()
-			},
-		},
 		Attack = {},
 		Chase = {},
 	}
@@ -170,12 +161,9 @@ function RAIL.AI(id)
 
 	-- Update actor information
 	do
-		-- Update owner, self, and other before every other actor
+		-- Update owner and self before every other actor
 		RAIL.Owner:Update()
 		RAIL.Self:Update()
-		if RAIL.Other ~= RAIL.Self then
-			RAIL.Other:Update()
-		end
 
 		-- Check if action is impossible due to casting time
 		if RAIL.Self.SkillState:Get() == RAIL.Self.SkillState.Enum.CASTING then
@@ -208,7 +196,7 @@ function RAIL.AI(id)
 					) > RAIL.State.MaxDistance or
 
 					-- Continue following
-					(RAIL.TargetHistory.Chase == RAIL.Owner.ID and
+					(RAIL.TargetHistory.Chase[0] == RAIL.Owner.ID and
 					RAIL.Owner.Motion[0] == MOTION_MOVE and
 					RAIL.Self:BlocksTo(0)(
 						-- Guess some tiles ahead when already following
@@ -235,7 +223,7 @@ function RAIL.AI(id)
 		local i,actor
 		for i,actor in ipairs(GetActors()) do
 			-- Don't double-update the owner or self
-			if RAIL.Owner.ID ~= actor and RAIL.Self.ID ~= actor and RAIL.Other.ID ~= actor then
+			if RAIL.Owner.ID ~= actor and RAIL.Self.ID ~= actor then
 				-- Indexing non-existant actors will auto-create them
 				local actor = Actors[actor]
 
@@ -371,29 +359,39 @@ function RAIL.AI(id)
 		-- Move
 		if Target.Chase == nil then
 			-- Check to see if we should add our attack target to the chase list as well
-			if not RAIL.State.AcquireWhileLocked and Target.Attack ~= nil then
+			if not RAIL.State.AcquireWhileLocked and Target.Attack then
 				Potential.Chase[Target.Attack.ID] = Target.Attack
 			end
 
 			-- Find highest priority monster to move toward
 			Target.Chase = SelectTarget.Chase(Potential.Chase,Friends)
 		end
+
+		-- Check if we should attack while chasing
+		if
+			Target.Attack and
+			Target.Chase and
+			Target.Attack ~= Target.Chase and
+			not RAIL.State.AttackWhileChasing
+		then
+			Target.Attack = nil
+		end
 	end
 
 	-- Record the targets
 	do
 		-- Attack
-		if Target.Attack ~= nil then
+		if Target.Attack then
 			RAIL.TargetHistory.Attack = Target.Attack.ID
 		else
 			RAIL.TargetHistory.Attack = -1
 		end
 
 		-- Chase
-		if Target.Chase ~= nil then
-			RAIL.TargetHistory.Chase = Target.Chase.ID
+		if Target.Chase then
+			History.Update(RAIL.TargetHistory.Chase,Target.Chase.ID)
 		else
-			RAIL.TargetHistory.Chase = -1
+			History.Update(RAIL.TargetHistory.Chase,-1)
 		end
 	end
 

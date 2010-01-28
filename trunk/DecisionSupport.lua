@@ -194,8 +194,8 @@ do
 			local offensive_motion = function(v) return
 				v == MOTION_ATTACK or
 				v == MOTION_ATTACK2 or
-				--v == MOTION_SKILL or
-				--v == MOTION_CASTING or
+				v == MOTION_SKILL or
+				v == MOTION_CASTING or
 				false
 			end
 			SelectTarget.Attack:Append{"AssistOwner",function(potentials,n,protected)
@@ -224,13 +224,30 @@ do
 				-- Don't modify the potential targets
 				return potentials,n,protected
 			end}
-	
+
 			-- Assist owner's merc/homu
 			SelectTarget.Attack:Append{"AssistOther",function(potentials,n,friends,protected)
-				-- disabled for now
-				if true then
+				-- If we're not supposed to assist the other, don't modify anything
+				if not RAIL.State.AssistOther or RAIL.Other == RAIL.Self then
 					return potentials,n,protected
 				end
+
+				-- Get the other's most recent offensive move
+				local most_recent = History.FindMostRecent(RAIL.Other.Motion,offensive_motion,1250)
+
+				-- Ensure the motion isn't nil
+				if most_recent ~= nil then
+					-- Check the target of that offensive motion
+					local target = RAIL.Other.Target[most_recent]
+
+					-- Check if that target is an option
+					if RAIL.IsActor(potentials[target]) then
+						-- Return only that actor
+						local ret = { [target] = potentials[target] }
+						return ret,1,ret
+					end
+				end
+
 				-- TODO: Setup a mechanism to communicate target and attack status
 
 				-- Don't modify the potential targets
@@ -540,7 +557,7 @@ do
 
 		-- Check to see if the previous target is still in this list
 		SelectTarget.Chase:Append{"Retarget",function(potentials,n,friends,protected)
-			local id = RAIL.TargetHistory.Chase
+			local id = RAIL.TargetHistory.Chase[0]
 
 			-- Check if a target was acquired, and is in the list
 			if id ~= -1 and potentials[id] ~= nil then
@@ -680,8 +697,12 @@ do
 				skill[priv_key].TargetsOnScreen = false
 			end,
 			ActorCheck = function(skill,actor)
-				if actor:IsEnemy() and not actor:IsIgnored() then
-					-- Check if the actor is an enemy
+				-- Check if the actor is an enemy, and we're attacking
+				if
+					actor:IsEnemy() and
+					not actor:IsIgnored() and
+					RAIL.TargetHistory.Attack ~= -1
+				then
 					skill[priv_key].TargetsOnScreen = true
 				end
 			end,
