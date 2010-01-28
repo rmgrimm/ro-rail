@@ -439,7 +439,7 @@ do
 			RAIL.LogT(60,"Casting {1}.",self.Name)
 
 			-- Set the skill state
-			RAIL.SkillState:WaitFor(self)
+			RAIL.Self.SkillState:WaitFor(self)
 
 			-- Use the skill
 			SkillObject(RAIL.Self.ID,self.Level,self.ID,RAIL.Self.ID)
@@ -449,7 +449,7 @@ do
 			RAIL.LogT(60,"Casting {1} against {2}.",self.Name,Actors[actor])
 
 			-- Set the skill state
-			RAIL.SkillState:WaitFor(self)
+			RAIL.Self.SkillState:WaitFor(self)
 
 			-- Use the skill
 			SkillObject(RAIL.Self.ID,self.Level,self.ID,actor)
@@ -465,7 +465,7 @@ do
 			end
 
 			-- Set the skill state
-			RAIL.SkillState:WaitFor(self)
+			RAIL.Self.SkillState:WaitFor(self)
 
 			-- Use the skill
 			SkillGround(RAIL.Self.ID,self.Level,self.ID,x,y)
@@ -566,11 +566,11 @@ do
 			elseif id == ARCHER03 then
 				return {
 					Pushback = AllSkills[8214][1],	-- arrow repel
-					Buff = AllSkills[8223][2],	-- weapon quicken
+					Buff = AllSkills[8223][1],	-- weapon quicken
 				}
 			elseif id == ARCHER04 then
 				return {
-					Buff = AllSkills[8222][1],	-- magnificat
+					AlwaysBuff = AllSkills[8222][1],-- magnificat
 					AllSkills[8237][1],		-- sense
 					Recover = AllSkills[8227][1],	-- tender
 				}
@@ -601,7 +601,7 @@ do
 			elseif id == ARCHER09 then
 				return {
 					Attack = AllSkills[8207][10],	-- double strafe
-					AllSkills[8210][5],		-- land mine
+					Attack2 = AllSkills[8210][5],	-- land mine
 					Pushback = AllSkills[8214][1],	-- arrow repel
 				}
 			elseif id == ARCHER10 then
@@ -732,8 +732,8 @@ do
 		function GetSkillList(id)
 			if id == LIF or id == LIF2 or id == LIF_H or id == LIF_H2 then
 				return {
-					Heal = AllSkills[8001],		-- healing hands
-					Buff = AllSkills[8002],		-- urgent escape
+					HealHands = AllSkills[8001],	-- healing hands
+					AlwaysBuff = AllSkills[8002],	-- urgent escape
 					--AllSkills[8003],		-- brain surgery (passive)
 					AllSkills[8004],		-- mental charge
 				}
@@ -754,7 +754,7 @@ do
 			elseif id == VANILMIRTH or id == VANILMIRTH2 or id == VANILMIRTH_H or id == VANILMIRTH_H2 then
 				return {
 					Attack = AllSkills[8013],	-- caprice
-					Heal = AllSkills[8014],		-- chaotic blessings
+					ChaosHeal = AllSkills[8014],	-- chaotic blessings
 					--AllSkills[8015],		-- instruction change (passive)
 					AllSkills[8016],		-- self destruct
 				}

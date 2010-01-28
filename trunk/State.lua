@@ -268,96 +268,141 @@ do
 		RAIL.Log(3,"Saved state to %q",filename)
 	end)
 
-	local KeepInState = { Load = true, Save = true, [data_t] = true, [vali_t] = true }
+	local KeepInState = { SetOwnerID = true, Load = true, Save = true, [data_t] = true, [vali_t] = true }
+
+	-- Set OwnerID function
+	rawset(RAIL.State,"SetOwnerID",function(self,id)
+		local base = StringBuffer.New():Append("RAIL_State.")
+		if not SingleStateFile then
+			base:Append("%d.")
+		end
+		base = string.format(base:Get(),id)
+
+		local homu = base .. "homu.lua"
+		local merc = base .. "merc.lua"
+
+		if RAIL.Mercenary then
+			filename = merc
+			alt_filename = homu
+		else
+			filename = homu
+			alt_filename = merc
+		end
+	end)
 
 	-- Load function
 	rawset(RAIL.State,"Load",function(self,forced)
-		-- Make sure we have a proper filename
-		if not filename then
-			local base = string.format("RAIL_State.%d.",RAIL.Owner.ID)
-			local homu = base .. "homu.lua"
-			local merc = base .. "merc.lua"
-			if RAIL.Mercenary then
-				filename = merc
-				alt_filename = homu
-			else
-				filename = homu
-				alt_filename = merc
-			end
+		-- Load file for both ourself and other
+		local from_file = filename
+		local f_self,err_self = loadfile(filename)
+		local f_alt,err_alt = loadfile(alt_filename)
+
+		-- Get the other's name for logging purposes
+		local alt_name = "mercenary"
+		if RAIL.Mercenary then
+			alt_name = "homunculus"
 		end
 
-		-- Do nothing if the file doesn't exist
-		local f,err = loadfile(filename)
-		local from_alt = false
+		-- Check if self is nil, but we're forcing a load
+		if f_self == nil and forced then
+			-- Log it
+			RAIL.LogT(3,"Failed to load state from \"{1}\": {2}",filename,err_self)
+			RAIL.LogT(3," --> Trying from {1}'s state file.",alt_name)
 
-		if f == nil then
-			if forced then
-				RAIL.Log(3,"Failed to load state from %q: %s",filename,tostring(err))
+			-- Check if alt is also nil
+			if f_alt == nil then
+				-- Log it
+				RAIL.LogT(3,"Failed to load state from \"{1}\": {2}",alt_filename,err_alt)
 
-				if RAIL.Mercenary then
-					RAIL.LogT(3,"Loading state from homunculus's state file.")
-				else
-					RAIL.LogT(3,"Loading state from mercenary's state file.")
-				end
-
-				f,err = loadfile(alt_filename)
-				from_alt = true
-
-				if f == nil then
-					RAIL.Log(3,"Failed to load state from %q: %s",alt_filename,tostring(err))
-					return
-				end
-			else
-				-- Can't load, and not forced
+				-- Can't load, just return
 				return
 			end
+
+			-- Load from the alternate state file
+			f_self = f_alt
+			from_file = alt_filename
 		end
 
-		-- Generate a clean state for loading the config
-		local f_G = ProtectedEnvironment()
+		-- First, load alternate state, to see if we can find RAIL.Other's ID
+		if f_alt ~= nil then
+			-- Get a clean, safe environment to load into
+			local f_G = ProtectedEnvironment()
+			setfenv(f_alt,f_G)
 
-		-- Set the environment that the function will run in; protect RAIL from config-file code
-		setfenv(f,f_G)
+			-- Run the function
+			f_alt()
 
-		-- Run the function
-		f()
-
-		-- See if it left us with a workable state
-		local rail_state = f_G.rail_state
-		if type(rail_state) ~= "table" then
-			-- TODO: Log invalid state?
-			return
-		end
-
-		-- Decide if we should load this state
-		if rail_state.update or forced then
-			self[data_t] = rail_state
-			dirty = false
-			if from_alt then
-				RAIL.Log(3,"Loaded state from %q.",alt_filename)
-			else
-				RAIL.Log(3,"Loaded state from %q.",filename)
+			-- Try to find the other's ID
+			local id
+			if
+				type(f_G.rail_state) == "table" and
+				type(f_G.rail_state.Information) == "table" and 
+				type(f_G.rail_state.Information.SelfID) == "number"
+			then
+				id = f_G.rail_state.Information.SelfID
 			end
 
-			-- Resave with the update flag off if we need to
-			if self[data_t].update then
-				self[data_t].update = false
+			-- Check if we found the other's ID
+			if id then
+				-- Try to get it from the Actors table
+				local other = rawget(Actors,id)
 
-				-- Save the state to a file
-				local file = io.open(filename,"w")
-				if file ~= nil then
-					file:write(Serialize("rail_state",self[data_t]))
-					file:close()
+				-- Check if it exists, and isn't already set
+				if other and other ~= RAIL.Other then
+					-- Log it
+					RAIL.LogT(3,"Found owner's {1}; {1} = {2}",alt_name,other)
+
+					-- Set it to RAIL.Other
+					RAIL.Other = other
+				end
+			end
+		end
+
+		-- Load our state
+		if f_self ~= nil then
+			-- Get a clean environment
+			local f_G = ProtectedEnvironment()
+			setfenv(f_self,f_G)
+
+			-- Run the contents of the state file
+			f_self()
+
+			-- See if it left us with a workable rail_state object
+			local rail_state = f_G.rail_state
+			if type(rail_state) ~= "table" then
+				-- TODO: Log invalid state?
+				return
+			end
+	
+			-- Decide if we should load this state
+			if rail_state.update or forced then
+				self[data_t] = rail_state
+				dirty = false
+
+				-- Log it
+				RAIL.LogT(3,"Loaded state from \"{1}\".",from_file)
+
+				-- Resave with the update flag off if we need to
+				if self[data_t].update then
+					self[data_t].update = false
+	
+					-- Save the state to a file
+					local file = io.open(filename,"w")
+					if file ~= nil then
+						file:write(Serialize("rail_state",self[data_t]))
+						file:close()
+					end
+				end
+	
+				-- Clear any proxied tables in RAIL.State
+				local k,v
+				for k,v in pairs(RAIL.State) do
+					if not KeepInState[k] then
+						RAIL.State[k] = nil
+					end
 				end
 			end
 
-			-- Clear any proxied tables in RAIL.State
-			local k,v
-			for k,v in pairs(RAIL.State) do
-				if not KeepInState[k] then
-					RAIL.State[k] = nil
-				end
-			end
 		end
 	end)
 end
@@ -385,60 +430,71 @@ do
 
 			-- Try to load the MobID file into a function
 			local f,err = loadfile(RAIL.State.MobIDFile)
-	
+
 			if not f then
-				RAIL.Log(55,"MobID file %q failed to load: %s",RAIL.State.MobIDFile,err)
+				RAIL.LogT(55,"Failed to load MobID file \"{1}\": {2}",RAIL.State.MobIDFile,err)
 				return
 			end
-	
+
 			-- Protect RAIL from any unwanted code
 			local env = ProtectedEnvironment()
 			setfenv(f,env)
-	
+
 			-- Run the MobID function
 			f()
-	
+
 			-- Check for the creation of a MobID table
-			if type(f.MobID) ~= "table" then
-				RAIL.Log(55,"MobID file %q failed to load MobID table.",RAIL.State.MobIDFile)
+			if type(env.MobID) ~= "table" then
+				RAIL.LogT(55,"MobID file \"{1}\" failed to load MobID table.",RAIL.State.MobIDFile)
 				return
 			end
 
 			-- Log it
-			RAIL.Log(55,"MobID table loaded from %q.",RAIL.State.MobIDFile)
+			RAIL.LogT(55,"MobID table loaded from \"{1}\".",RAIL.State.MobIDFile)
 
 			-- Add RAIL's MobID update function
-			f.MobID.Update = self.Update
+			env.MobID.Update = self.Update
 
 			-- Set the update time
-			f.MobID[priv_key] = GetTick()
+			env.MobID[priv_key] = GetTick()
 
 			-- Save it as our own MobID
-			MobID = f.MobID
+			MobID = env.MobID
 		end
 	else
 		-- And homunculi save the MobID file
 		MobID.Update = function(self)
+			-- Check if the MobID file needs to be saved
+			if not self.Save then
+				-- Nothing needs to be saved
+				return
+			else
+				-- Unset the save flag
+				self.Save = nil
+			end
+
 			-- Check if it's too soon to update
 			if math.abs(self[priv_key] - GetTick()) < 100 then
 				return
 			end
 
-			-- Temporarily remove the update function
-			local update = self.Update
-			self.Update = nil
-	
+			-- Create a simply serialized string (no need for full serialization)
+			local buf = StringBuffer.New()
+				:Append("MobID = {}\n")
+			for key,value in self do
+				if type(key) == "number" then
+					buf:Append("MobID["):Append(key):Append("] = "):Append(value):Append("\n")
+				end
+			end
+
 			-- Save the state to a file
 			local file = io.open(RAIL.State.MobIDFile,"w")
 			if file ~= nil then
-				file:write(Serialize("MobID",self).."\n")
+				file:write(buf:Get())
 				file:close()
+
+				RAIL.Log(55,"MobID table saved to %q.",RAIL.State.MobIDFile)
 			end
-	
-			RAIL.Log(55,"MobID table saved to %q.",RAIL.State.MobIDFile)
-	
-			-- Restore the save and load functions
-			self.Update = update
 
 			-- Set the update time
 			self[priv_key] = GetTick()
