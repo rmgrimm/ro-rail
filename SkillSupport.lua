@@ -132,7 +132,7 @@ do
 				-- Check for server acknowledgement
 
 				-- Find the most recent casting time
-				local most_recent = History.FindMostRecent(self[key].actor.Motion,casting_f,ticks_in_state)
+				local most_recent = History.FindMostRecent(self[key].actor.Motion,casting_f,nil,ticks_in_state)
 
 				-- Check if a most recent skill casting action was found
 				if most_recent ~= nil then
@@ -156,7 +156,7 @@ do
 				local actor = self[key].actor
 
 				-- Find the most recent non-casting item
-				local most_recent = History.FindMostRecent(actor.Motion,not_casting_f,ticks_in_state)
+				local most_recent = History.FindMostRecent(actor.Motion,not_casting_f,nil,ticks_in_state)
 
 				-- If we're still casting, nothing should match
 				if most_recent == nil then
@@ -187,7 +187,7 @@ do
 				local actor = self[key].actor
 
 				-- Find the most recent MOTION_SKILL
-				local most_recent = History.FindMostRecent(actor.Motion,skill_f,ticks_in_state)
+				local most_recent = History.FindMostRecent(actor.Motion,skill_f,nil,ticks_in_state)
 
 				-- Check if a most recent skill usage was found
 				if most_recent ~= nil then

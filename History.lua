@@ -152,7 +152,7 @@ do
 	end
 
 	-- Find the most recent entry in a history that will return true from value
-	History.FindMostRecent = function(table,value,search_begin)
+	History.FindMostRecent = function(table,value,search_after,search_before)
 		-- TODO: Double-check logic of this function
 
 		local list = table[list_key]
@@ -174,32 +174,66 @@ do
 			v_func = value
 		end
 
-		-- Validate search_begin
-		if type(search_begin) ~= "number" or search_begin < 0 then
-			-- Default at the beginning
-			search_begin = 0
+		-- Validate search_after
+		do
+			if type(search_after) ~= "number" or search_after < 0 then
+				-- Default at the current time
+				search_after = 0
+			end
+	
+			-- Determine the target tick count to begin searching after
+			local target_after = GetTick() - search_after
+
+			-- If the target tick count is smaller than the first entry, nothing will match
+			if target_after < list[list.first][2] then
+				return nil
+
+			-- If the target tick count is greater than the most recent entry, begin searching at the most recent entry
+			elseif target_after >= list[list.last][2] then
+				search_after = list.last
+
+			-- Otherwise, find the most appropriate list entry to begin searching from
+			else
+				local exact
+				search_after,exact = BinarySearch(list,target_after)
+			end
 		end
 
-		-- Determine the target tick count to begin searching from
-		local target = GetTick() - search_begin
+		-- Validate search_before
+		do
+			if type(search_before) ~= "number" then
+				search_before = GetTick()
+			end
 
-		-- If the target tick count is smaller than the first entry, nothing will match
-		if target < list[list.first][2] then
+			-- Determine the target tick count to begin searching before
+			local target_before = GetTick() - search_before
+
+			-- If the target tick count is smaller than the first entry, use the first entry
+			if target_before < list[list.first][2] then
+				search_before = list.first
+
+			-- If the target tick count is greater than the most recent entry, nothing will match
+			elseif target_before >= list[list.last][2] then
+				return nil
+
+			-- Otherwise, find the most appropriate list entry to search until
+			else
+				local exact
+				search_before,exact = BinarySearch(list,target_before)
+
+				-- Ensure the time won't be after the target time
+				search_before = search_before - 1
+			end
+		end
+
+		-- Check that search_before references an older entry than search_after
+		if search_before > search_after or search_before > list.last then
 			return nil
-
-		-- If the target tick count is greater than the latest entry, begin searching at the most recent entry
-		elseif target >= list[list.last][2] then
-			search_begin = list.last
-
-		-- Otherwise, find the most appropriate list entry to begin searching from
-		else
-			local exact
-			search_begin,exact = BinarySearch(list,target)
 		end
 
-		-- Start from the determined search-begin entry, and iterate until the earliest entry in the list
+		-- Start from the determined search-after entry, and iterate until the oldest entry in the list
 		local i
-		for i=search_begin,list.first,-1 do
+		for i=search_after,search_before,-1 do
 			-- Check if the entry in the list matches
 			if v_func(list[i][1]) then
 				-- Return the number of ticks since the most-recent, matching entry

@@ -205,7 +205,7 @@ do
 				end
 
 				-- Get the owner's most recent offensive move
-				local most_recent = History.FindMostRecent(RAIL.Owner.Motion,offensive_motion,1250)
+				local most_recent = History.FindMostRecent(RAIL.Owner.Motion,offensive_motion,nil,1250)
 
 				-- Ensure most_recent isn't nil
 				if most_recent ~= nil then
@@ -233,7 +233,7 @@ do
 				end
 
 				-- Get the other's most recent offensive move
-				local most_recent = History.FindMostRecent(RAIL.Other.Motion,offensive_motion,1250)
+				local most_recent = History.FindMostRecent(RAIL.Other.Motion,offensive_motion,nil,1250)
 
 				-- Ensure the motion isn't nil
 				if most_recent ~= nil then
