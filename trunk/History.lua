@@ -222,12 +222,12 @@ do
 				search_before,exact = BinarySearch(list,target_before)
 
 				-- Ensure the time won't be after the target time
-				search_before = search_before - 1
+				search_before = search_before + 1
 			end
 		end
 
 		-- Check that search_before references an older entry than search_after
-		if search_before > search_after or search_before > list.last then
+		if search_before > search_after then
 			return nil
 		end
 

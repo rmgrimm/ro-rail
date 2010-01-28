@@ -922,10 +922,12 @@ do
 				break
 			end
 
-			-- Find the most recent non-move that follows the move, and make sure it's not a bad state
-			non_move = move
-			while non_move >= move do
-				non_move = History.FindMostRecent(self.Motion,find_non_move,nil,non_move - 10) or 0
+			-- Find the most recent non-move that follows the move
+			non_move = History.FindMostRecent(self.Motion,find_non_move,nil,move) or 0
+
+			-- Check for bad state
+			if non_move > move then
+				move = non_move + 150
 			end
 
 			-- Determine the time passed that passed
