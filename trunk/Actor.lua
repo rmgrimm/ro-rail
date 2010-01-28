@@ -894,22 +894,18 @@ do
 			return unpack(self.EstimatedMove)
 		end
 
-		local move = -1
-		local non_move = 0
+		local move = 0
+		local non_move
 		local time_delta
 		local tile_delta
 		local tile_angle
 
 		repeat
+			-- Find the most recent move
+			move = History.FindMostRecent(self.Motion,find_move)
 
-			-- Find the most recent non-move
-			non_move = History.FindMostRecent(self.Motion,find_non_move,move) or 0
-
-			-- Find the most recent move that follows this non-move
-			move = History.FindMostRecent(self.Motion,find_move,non_move)
-
-			-- If there was never motion, use default move-speed of 150
-			if move == nil or non_move <= move then
+			-- If there was never motion (or it JUST started), use default move-speed of 150
+			if move == nil or move < 100 then
 				-- Default move-speed to regular walk
 				--	according to http://forums.roempire.com/archive/index.php/t-137959.html:
 				--		0.15 sec per cell at regular speed
@@ -926,16 +922,26 @@ do
 				break
 			end
 
-			-- Determine the time passed
-			time_delta = non_move - move
+			-- Find the most recent non-move that follows the move, and make sure it's not a bad state
+			non_move = move
+			while non_move >= move do
+				non_move = History.FindMostRecent(self.Motion,find_non_move,nil,non_move - 10) or 0
+			end
+
+			-- Determine the time passed that passed
+			time_delta = move - non_move
+
+			-- Check if the time_delta is too big (and we can shorten it)
+			if time_delta > 500 then
+				time_delta = 500
+			end
 
 			local nmX,nmY = self.X[non_move],self.Y[non_move]
-			local mX,mY = self.X[move],self.Y[move]
+			local mX,mY = self.X[non_move+time_delta],self.Y[non_move+time_delta]
 
 			-- Determine the direction/distance moved
 			tile_angle,tile_delta = GetAngle(mX,mY,nmX,nmY)
-
-		until time_delta > 50 and tile_delta > 0
+		until true
 
 		-- Return our estimated movement speed
 		self.EstimatedMove = { time_delta / tile_delta, tile_angle, GetTick() }
