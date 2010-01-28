@@ -112,7 +112,7 @@ do
 			end,
 			[SKILL_OBJECT_CMD] = function(msg,skill,atk,chase)
 				-- Check if a skill is usable now
-				if RAIL.SkillState:Get() == RAIL.SkillState.Enum.READY then
+				if RAIL.Self.SkillState:Get() == RAIL.Self.SkillState.Enum.READY then
 					-- Check if we've already used this command
 					if msg.CmdUsed then
 						-- Remove the command and don't modify targets
@@ -146,7 +146,7 @@ do
 			end,
 			[SKILL_AREA_CMD] = function(msg,skill,atk,chase)
 				-- Check if a skill is usable now
-				if RAIL.SkillState:Get() == RAIL.SkillState.Enum.READY then
+				if RAIL.Self.SkillState:Get() == RAIL.Self.SkillState.Enum.READY then
 					-- Check if we've already used this command
 					if msg.CmdUsed then
 						-- Remove the command and don't modify targets

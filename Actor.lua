@@ -444,14 +444,7 @@ do
 		--	(it will be updated in Actor.Update)
 		ret.ExpireTimeout = RAIL.Timeouts:New(2500,false,Actor.Expire,ret,"timeout")
 
-		ret[closures] = {
-			DistanceTo = {},
-			DistancePlot = {},
-			BlocksTo = {},
-			AngleTo = {},
-			AngleFrom = {},
-			AnglePlot = {},
-		}
+		ret[closures] = {}
 
 		-- Initialize the type
 		Actor[actor_key](ret)
@@ -512,7 +505,7 @@ do
 				-- Check to update the Mob ID file
 				if RAIL.State.UseMobID and MobID[id] ~= type then
 					MobID[id] = type
-					MobID:Update()
+					MobID.Save = true
 				end
 
 				return type
@@ -777,12 +770,7 @@ do
 		end
 
 		-- Unset any closures used
-		local t
-		for k,t in pairs(self[closures]) do
-			for k,v in pairs(t) do
-				t[k] = nil
-			end
-		end
+		self[closures] = {}
 
 		-- Clear the histories
 		History.Clear(self.Motion)
@@ -985,7 +973,7 @@ do
 		end
 
 		-- Check if we should wait before casting against this actor
-		if RAIL.SkillState.CompletedTime() + self.BattleOpts.TicksBetweenSkills > GetTick() then
+		if RAIL.Self.SkillState:CompletedTime() + self.BattleOpts.TicksBetweenSkills > GetTick() then
 			return false
 		end
 
@@ -1105,6 +1093,11 @@ do
 		-- Check if a specific closure is requested
 		if type(a) == "number" and b == nil then
 
+			-- Ensure we have a closures table
+			if not self[closures].DistanceTo then
+				self[closures].DistanceTo = {}
+			end
+
 			-- Check if a closure already exists
 			if not self[closures].DistanceTo[a] then
 
@@ -1136,6 +1129,11 @@ do
 	Actor.DistancePlot = function(self,a,b,c)
 		-- Check if a specific closure is requested
 		if type(a) == "number" and c == nil then
+
+			-- Ensure we have a closures table
+			if not self[closures].DistancePlot then
+				self[closures].DistancePlot = {}
+			end
 
 			-- Check if a closure already exists
 			if not self[closures].DistancePlot[a] then
@@ -1171,6 +1169,11 @@ do
 		-- Check if a specific closure is requested
 		if type(a) == "number" and b == nil then
 
+			-- Ensure we have a closures table
+			if not self[closures].BlocksTo then
+				self[closures].BlocksTo = {}
+			end
+
 			-- Check if a closure already exists
 			if not self[closures].BlocksTo[a] then
 
@@ -1203,6 +1206,11 @@ do
 		-- Check if a specific closure is requested
 		if type(a) == "number" and b == nil then
 
+			-- Ensure we have a closures table
+			if not self[closures].AngleTo then
+				self[closures].AngleTo = {}
+			end
+
 			-- Check if a closure already exists
 			if not self[closures].AngleTo[a] then
 
@@ -1234,6 +1242,11 @@ do
 		-- Check if a specific closure is requested
 		if type(a) == "number" and b == nil then
 
+			-- Ensure we have a closures table
+			if not self[closures].AngleFrom then
+				self[closures].AngleFrom = {}
+			end
+
 			-- Check if a closure already exists
 			if not self[closures].AngleFrom[a] then
 
@@ -1264,6 +1277,11 @@ do
 	Actor.AnglePlot = function(self,a,b)
 		-- Check if a specific closure is requested
 		if type(a) == "number" and b == nil then
+
+			-- Ensure we have a closures table
+			if not self[closures].AnglePlot then
+				self[closures].AnglePlot = {}
+			end
 
 			-- Check if a closure already exists
 			if not self[closures].AnglePlot[a] then
@@ -1299,15 +1317,35 @@ do
 		-- After sending an attack, this actor can never be kill-stealed (until Actor.Expire)
 		self.BattleOpts.FreeForAll = true
 	end
+
 	Actor.SkillObject = function(self,skill)
 		-- Send the skill
 		skill:Cast(self.ID)
 
-		-- Increment skill counter
-		self.BattleOpts.CastsAgainst = (self.BattleOpts.CastsAgainst or 0) + 1
+		-- Ensure we have a closures table
+		if not self[closures].SkillCallbacks then
+			self[closures].SkillCallbacks = {
+				Success = function(s,ticks)
+					-- Reset skill-failed counter
+					self.BattleOpts.CastsFailed = 0
+	
+					-- Increment skill counter
+					self.BattleOpts.CastsAgainst = (self.BattleOpts.CastsAgainst or 0) + 1
+	
+					-- And never see this actor as kill-stealing
+					self.BattleOpts.FreeForAll = true
+				end,
+				Failure = function(s,ticks)
+					-- Increment skill-failed counter
+					self.BattleOpts.CastsFailed = (self.BattleOpts.CastsFailed or 0) + 1
 
-		-- And never see it as kill-stealing
-		self.BattleOpts.FreeForAll = true
+					-- TODO: Ignore after a number of consequtive failures
+				end
+			}
+		end
+
+		-- Create a closure for skill success/failure
+		SetSkillCallbacks(skill,self[closures].SkillCallbacks.Success,self[closures].SkillCallbacks.Failure)
 	end
 
 	-----------------------
@@ -1340,6 +1378,7 @@ do
 
 	-- Create Actors[-1], and disable certain features
 	rawset(Actors,-1,Actor:New(-1))
+
 	Actors[-1].ExpireTimeout[1] = false
 
 	Actors[-1].Update    = function(self) return self end
@@ -1349,7 +1388,6 @@ do
 	Actors[-1].IsAllowed = function() return false end
 
 	-- After setting up the Actor class and Actors table,
-	--	rework the API to allow Actor inputs
-	--local
+	--	rework the ragnarok API to allow Actor inputs
 	-- TODO? Don't think I even want this...
 end

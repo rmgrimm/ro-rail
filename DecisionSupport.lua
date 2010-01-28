@@ -11,6 +11,9 @@ RAIL.Validate.DefendOptions = {is_subtable = true,
 }
 RAIL.Validate.InterceptAlgorithm = {"string","normal"}
 
+-- Minimum priority (not an option)
+local min_priority = -10000
+
 -- Interception Routines
 do
 	CalculateIntercept = {
@@ -145,11 +148,14 @@ do
 			local protected = { }
 
 			-- Sieve the potential list through each of the targeting functions, until 1 or fewer targets are left
-			for i,f in ipairs(self) do
+			for i,t in ipairs(self) do
 				-- Check to see if any potentials are left
 				if n < 1 then
 					return nil
 				end
+
+				-- Get the function
+				local f = t[2]
 
 				-- Call the function
 				if type(f) == "function" then
@@ -192,7 +198,7 @@ do
 				--v == MOTION_CASTING or
 				false
 			end
-			SelectTarget.Attack:Append(function(potentials,n,protected)
+			SelectTarget.Attack:Append{"AssistOwner",function(potentials,n,protected)
 				-- If we're not supposed to assist the owner, don't modify anything
 				if not RAIL.State.AssistOwner then
 					return potentials,n,protected
@@ -217,10 +223,10 @@ do
 
 				-- Don't modify the potential targets
 				return potentials,n,protected
-			end)
+			end}
 	
 			-- Assist owner's merc/homu
-			SelectTarget.Attack:Append(function(potentials,n,friends,protected)
+			SelectTarget.Attack:Append{"AssistOther",function(potentials,n,friends,protected)
 				-- disabled for now
 				if true then
 					return potentials,n,protected
@@ -229,7 +235,7 @@ do
 
 				-- Don't modify the potential targets
 				return potentials,n,protected
-			end)
+			end}
 		end
 
 		-- Defend owner, other, and friends
@@ -284,7 +290,7 @@ do
 				return 0
 			end
 
-			SelectTarget.Attack:Append(function(potentials,n,friends,protected)
+			SelectTarget.Attack:Append{"Defend",function(potentials,n,friends,protected)
 				if not RAIL.State.Aggressive then
 					-- If not aggressive, and not defending while passive, don't modify the list
 					if not RAIL.State.DefendOptions.DefendWhilePassive then
@@ -370,11 +376,11 @@ do
 				--	and use the same target table as protected, so none are removed
 				--	due to non-aggro
 				return ret,ret_n,ret
-			end)
+			end}
 		end
 
 		-- Sieve out monsters that would be Kill Stolen
-		SelectTarget.Attack:Append(function(potentials,n,friends,protected)
+		SelectTarget.Attack:Append{"KillSteal",function(potentials,n,friends,protected)
 			local ret,ret_n = {},0
 			for id,actor in potentials do
 				if not actor:WouldKillSteal() or protected[id] then
@@ -383,10 +389,10 @@ do
 				end
 			end
 			return ret,ret_n,protected
-		end)
+		end}
 
 		-- If not aggressive, sieve out monsters that aren't protected
-		SelectTarget.Attack:Append(function(potentials,n,friends,protected)
+		SelectTarget.Attack:Append{"Aggressive",function(potentials,n,friends,protected)
 			-- If aggressive, don't modify the list
 			if RAIL.State.Aggressive then
 				return potentials,n,protected
@@ -400,11 +406,11 @@ do
 
 			-- Return only monsters that have been protected by previous functions
 			return protected,ret_n,protected
-		end)
+		end}
 
 		-- Select the highest priority set of monsters
-		SelectTarget.Attack:Append(function(potentials,n,protected)
-			local ret,ret_n,ret_priority = {},0,-10000
+		SelectTarget.Attack:Append{"Priority",function(potentials,n,protected)
+			local ret,ret_n,ret_priority = {},0,min_priority
 	
 			for id,actor in potentials do
 				-- Check this actors priority against the existing list
@@ -425,10 +431,10 @@ do
 			end
 
 			return ret,ret_n,ret
-		end)
+		end}
 	
 		-- Check to see if the previous target is still in this list
-		SelectTarget.Attack:Append(function(potentials,n,friends,protected)
+		SelectTarget.Attack:Append{"Retarget",function(potentials,n,friends,protected)
 			local id = RAIL.TargetHistory.Attack
 
 			-- Check if a target was acquired, and is in the list
@@ -440,10 +446,10 @@ do
 
 			-- It's not, so don't modify the potential list
 			return potentials,n,protected
-		end)
+		end}
 
 		-- Find the closest actors
-		SelectTarget.Attack:Append(function(potentials,n,friends,protected)
+		SelectTarget.Attack:Append{"Closest",function(potentials,n,friends,protected)
 			local ret,ret_n,ret_dist = {},0,RAIL.State.MaxDistance+1
 
 			for id,actor in potentials do
@@ -466,7 +472,7 @@ do
 			end
 
 			return ret,ret_n,ret
-		end)
+		end}
 	end
 
 	-- Chase targeting
@@ -475,7 +481,7 @@ do
 		setmetatable(SelectTarget.Chase,st_metatable)
 
 		-- First, ensure we won't move outside of RAIL.State.MaxDistance
-		SelectTarget.Chase:Append(function(potentials,n,friends,protected)
+		SelectTarget.Chase:Append{"MaxDistance",function(potentials,n,friends,protected)
 			-- MaxDistance is in block tiles, but attack range is in pythagorean distance...
 			local max_dist = RAIL.State.MaxDistance
 
@@ -519,21 +525,21 @@ do
 			end
 
 			return ret,ret_n,protected
-		end)
+		end}
 
 		-- Then, chase targeting is mostly the same as attack targeting
 		--	Note: Don't copy the attack-target locking
 		do
 			local max = SelectTarget.Attack:GetN()
 			for i=1,max do
-				if i ~= max-1 then
+				if SelectTarget.Attack[i][1] ~= "Retarget" then
 					SelectTarget.Chase:Append(SelectTarget.Attack[i])
 				end
 			end
 		end
 
 		-- Check to see if the previous target is still in this list
-		SelectTarget.Chase:Append(function(potentials,n,friends,protected)
+		SelectTarget.Chase:Append{"Retarget",function(potentials,n,friends,protected)
 			local id = RAIL.TargetHistory.Chase
 
 			-- Check if a target was acquired, and is in the list
@@ -545,36 +551,47 @@ do
 
 			-- If not in the list, don't modify the list
 			return potentials,n,protected
-		end)
-	end
-
-	-- Attack Skill targeting
-	do
-		SelectTarget.Skill = {}
-		SelectTarget.Skill.Attack = Table.New()
-		setmetatable(SelectTarget.Skill.Attack,st_metatable)
-
-		-- Copy everything from attack
-		for i=1,SelectTarget.Attack:GetN() do
-			SelectTarget.Skill.Attack:Append(SelectTarget.Attack[i])
-		end
-
-		-- But remove the target locking
-		SelectTarget.Skill.Attack:Remove(SelectTarget.Skill.Attack:GetN()-1)
+		end}
 	end
 end
 
 -- Skill type AIs and selector
 do
+	-- Private key to hold information on a skill
+	local priv_key = {}
+
 	-- Private key to hold skills
-	local skills_key = {
+	local skills_key
+	skills_key = {
 		-- Reuse this table to hold skill AIs
 		Attack = {
-			PreActors = function(skill)
-				-- TODO: clear a temporary list
+			Init = function(skill)
+				priv_key.AttackSieve = Table.New()
+
+				-- Copy the attack skill sieve, but drop retargeting
+				for i=1,SelectTarget.Attack:GetN() do
+					if SelectTarget.Attack[i][1] ~= "Retarget" then
+						priv_key.AttackSieve:Append(SelectTarget.Attack[i])
+					end
+				end
+
+				-- Set the metatable from SelectTarget.Attack's metatable
+				setmetatable(priv_key.AttackSieve,getmetatable(SelectTarget.Attack))
+			end,
+			CycleBegin = function(skill)
+				skill[priv_key] = {}
+
+				-- Create a temporary list of potential skill targets
+				skill[priv_key].Targets = {}
+
+				-- Get the level of skill usable this round
+				skill[priv_key].Level = FindSkillLevel(RAIL.Self.SP[0],skill)
+
+				-- Create a temporary list of friends
+				skill[priv_key].Friends = {}
 
 				-- Don't return anything, since no skill usage is urgent
-				return nil
+				return
 			end,
 			ActorCheck = function(skill,actor)
 				-- Check...
@@ -582,20 +599,123 @@ do
 					-- if the actor is an enemy
 					actor:IsEnemy() and
 					-- if skills are allowed against it
-					actor:IsSkillAllowed(skill.Level) and
+					actor:IsSkillAllowed(skill[priv_key].Level) and
 					-- and it's in range
 					RAIL.Self:DistanceTo(actor) <= skill:GetRange()
 				then
-					-- TODO: add actor to a temporary list
+					-- Add it to the temporary list
+					skill[priv_key].Targets[actor.ID] = actor
+				elseif
+					actor:IsFriend()
+				then
+					-- Add it to the temporary friend list
+					skill[priv_key].Friends[actor.ID] = actor
 				end
 			end,
-			SelectBest = function(skill)
-				-- TODO: return skill priority, skill object, and target
-				return nil
+			Select = function(skill,friends)
+
+				-- Run the sieve and find a target
+				local target = priv_key.AttackSieve(skill[priv_key].Targets,skill[priv_key].Friends)
+
+				-- Check if a target was found
+				if target ~= nil then
+					-- Check if the skill level is selectable
+					if skill[1] then
+						-- Get the level we should use against the monster
+						local dummy,level = target:IsSkillAllowed(skill[priv_key].Level)
+
+						-- Set the skill to use
+						skill = skill[level]
+					end
+
+					-- Get the target priority
+					local prio = target.BattleOpts.Priority
+
+					return prio,skill,target
+				end
+
+				-- Otherwise, target nothing
+				return
+			end,
+		},
+		AlwaysBuff = {
+			-- Just copy from Buff, but don't check for targets
+			Init = function(skill)
+				-- Use Buff's init callback
+				skills_key.Buff.Init(skill)
+
+				-- But set TargetsOnScreen to true
+				skill[priv_key].TargetsOnScreen = true
+
+				-- And copy the Select function to our own
+				skills_key.AlwaysBuff.Select = skills_key.Buff.Select
+			end,
+		},
+		Buff = {
+			Init = function(skill)
+				-- Set the private key to hold the next time the skill should be used
+				skill[priv_key] = {
+					NextUse = 0,
+					Failures = 0,
+					TargetsOnScreen = false,
+				}
+
+				-- Add callbacks to the skill
+				SetSkillCallbacks(skill,
+					function(self,ticks)
+						-- Reset the failure count
+						skill[priv_key].Failures = 0
+
+						-- Set the next use time
+						skill[priv_key].NextUse = GetTick() + self.Duration - ticks
+					end,
+					function(self,ticks)
+						-- Increment the failure count
+						skill[priv_key].Failures = skill[priv_key].Failures + 1
+					end
+				)
+			end,
+			CycleBegin = function(skill)
+				-- Assume no targets are on screen
+				skill[priv_key].TargetsOnScreen = false
+			end,
+			ActorCheck = function(skill,actor)
+				if actor:IsEnemy() and not actor:IsIgnored() then
+					-- Check if the actor is an enemy
+					skill[priv_key].TargetsOnScreen = true
+				end
+			end,
+			Select = function(skill)
+				-- Check to see if the skill has failed 10 times in a row
+				--	TODO: option for max failures
+				if skill[priv_key].Failures >= 10 then
+					-- We probably don't actually have this skill; stop trying
+					return
+				end
+
+				-- Don't use the buff if we don't have enough SP
+				if RAIL.Self.SP[0] < skill.SPCost then
+					return
+				end
+
+				-- Don't use the buff if no targets are on the screen
+				if not skill[priv_key].TargetsOnScreen then
+					return
+				end
+
+				-- Check to see if the skill has worn off
+				if GetTick() >= skill[priv_key].NextUse then
+					-- Return the skill priority and the skill
+					-- TODO: priority option
+					return -min_priority,skill,RAIL.Self
+				end
+
+				-- Otherwise, return nothing
+				return
 			end,
 		},
 		Emergency = {
-			PreActors = function(skill)
+			CycleBegin = function(skill)
 				-- TODO: Check if RAIL.Owner is in emergency state
 				--		and return the skill if it's urgent
 
@@ -604,33 +724,106 @@ do
 		},
 	}
 
-	SelectTarget.Skills = {
+	SelectSkill = {
 		-- Private table of skills that will be checked
 		[skills_key] = {},
 		Init = function(self,skills)
+			-- Types that we have
+			local cyclebegin,actorcheck,select = false,false,false
+
 			for ai_type,skill in skills do
 				-- Check if we can handle this AI type
 				if skills_key[ai_type] then
 					-- Add a key-value pair to our private table
 					self[skills_key][skill] = skills_key[ai_type]
+
+					-- Init the skill
+					if skills_key[ai_type].Init then
+						skills_key[ai_type].Init(skill)
+					end
+
+					-- Check which functions this skill AI type uses
+					if skills_key[ai_type].CycleBegin then cyclebegin = true end
+					if skills_key[ai_type].ActorCheck then actorcheck = true end
+					if skills_key[ai_type].Select then select = true end
 				end
 			end
+
+			-- Remove functions that aren't used
+			if not cyclebegin then
+				self.CycleBegin = function() return nil end
+			end
+			if not actorcheck then
+				self.ActorCheck = function() end
+			end
+			if not select then
+				self.Select = function() return nil end
+			end
 		end,
-		PreActors = function(self)
+		CycleBegin = function(self)
+			-- If skills aren't usable, do nothing
+			if RAIL.Self.SkillState:Get() ~= RAIL.Self.SkillState.Enum.READY then
+				return
+			end
+
 			-- Loop through each skill
 			for skill,ai_obj in self[skills_key] do
-				-- Call the skill AI's pre-actors function
-				local urgent = ai_obj.PreActors(skill)
+				-- Call the skill AI's cycle-begin function
+				local urgent
+				if ai_obj.CycleBegin then
+					urgent = ai_obj.CycleBegin(skill)
+				end
 
 				-- Check if an urgent skill was selected
 				if urgent then
-					-- TODO: do something with an urgent skill
+					-- Return the skill
+					return urgent
 				end
 			end
 		end,
 		ActorCheck = function(self,actor)
+			-- If skills aren't usable, do nothing
+			if RAIL.Self.SkillState:Get() ~= RAIL.Self.SkillState.Enum.READY then
+				return
+			end
+
+			-- Loop through each skill
+			for skill,ai_obj in self[skills_key] do
+				if ai_obj.ActorCheck then
+					ai_obj.ActorCheck(skill,actor)
+				end
+			end
 		end,
-		Select = function(self)
+		Run = function(self)
+			-- If skills aren't usable, do nothing
+			if RAIL.Self.SkillState:Get() ~= RAIL.Self.SkillState.Enum.READY then
+				return
+			end
+
+			-- Loop through each skill
+			local best_prio,best_skill,best_target_x,best_target_y = min_priority
+			for skill_obj,ai_obj in self[skills_key] do
+				local prio,skill,target_x,target_y = best_prio,nil,nil
+				if ai_obj.Select then
+					prio,skill,target_x,target_y = ai_obj.Select(skill_obj)
+
+					if prio == nil then
+						prio = min_priority
+					end
+				end
+
+				if prio > best_prio then
+					best_prio,best_skill,best_target_x,best_target_y = prio,skill,target_x,target_y
+				end
+			end
+
+			-- Ensure a skill was selected
+			if best_prio == min_priority then
+				return nil
+			end
+
+			-- Return the skill and target that were selected (if target_x is an actor, target_y will be nil)
+			return { best_skill, best_target_x, best_target_y }
 		end
 	}
 end

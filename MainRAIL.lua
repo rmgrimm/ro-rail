@@ -8,7 +8,6 @@ require "State.lua"
 require "Const.lua"
 require "Debug.lua"
 require "History.lua"
-require "SkillSupport.lua"
 require "Table.lua"
 require "Timeout.lua"
 require "Utils.lua"
@@ -18,16 +17,32 @@ require "Actor.lua"		-- depends on History.lua
 require "Commands.lua"		-- depends on Table.lua
 require "DecisionSupport.lua"	-- depends on Table.lua
 require "Skills.lua"		-- depends on Table.lua
+require "SkillSupport.lua"	-- depends on Actor.lua
 
 -- State validation options
+RAIL.Validate.Information = {is_subtable = true,
+	InitTime = {"number", 0},
+	OwnerID = {"number", 0},
+	OwnerName = {"string", "unknown"},
+	SelfID = {"number", 0},
+}
 RAIL.Validate.AcquireWhileLocked = {"boolean",false}
 RAIL.Validate.FollowDistance = {"number", 7, 3, 14}
 RAIL.Validate.MaxDistance = {"number", 13, 3, 14}
 
 function AI(id)
+	-- Load persistent state data
+	RAIL.State:SetOwnerID(GetV(V_OWNER,id))
+	RAIL.State:Load(true)
+
+	-- Store the initialization time
+	RAIL.State.Information.InitTime = GetTick()
+	RAIL.State.Information.OwnerID = GetV(V_OWNER,id)
+	RAIL.State.Information.SelfID = id
+
 	-- Get Owner and Self
 	RAIL.Owner = Actors[GetV(V_OWNER,id)]
-	RAIL.LogT(40," --> Owner;")
+	RAIL.LogT(40," --> Owner; Name = {1}",RAIL.State.Information.OwnerName)
 	RAIL.Self  = Actors[id]
 
 	-- Get AI type
@@ -57,27 +72,19 @@ function AI(id)
 		RAIL.LogT(40," --> Skills: {1}",buf:Get())
 	end
 
-	-- Store the initialization time
-	RAIL.Self.InitTime = GetTick()
+	-- Initialize Skill decision making
+	SelectSkill:Init(RAIL.Self.Skills)
 
 	-- Create a bogus Other until homu<->merc communication is established
 	RAIL.Other = RAIL.Self
 
-	-- Load persistent state data
-	RAIL.State:Load(true)
-
 	-- Track HP and SP
 	do
-		local update = RAIL.Self.Update
+		local update = RAIL.Owner.Update
 		-- An extended variant of Update(), to track HP and SP values
 		RAIL.Owner.Update = function(self)
 			-- First, call the regular update
 			update(self)
-
-			-- The extended tracking information will be useless against other actors
-			if self.ID ~= RAIL.Owner.ID and self.ID ~= RAIL.Self.ID then
-				return self
-			end
 
 			-- Update the HP and SP tables
 			History.Update(self.HP,GetV(V_HP,self.ID))
@@ -93,6 +100,10 @@ function AI(id)
 		RAIL.Self.HP = History.New(GetV(V_MAXHP,RAIL.Self.ID),false)
 		RAIL.Self.SP = History.New(GetV(V_MAXSP,RAIL.Self.ID),false)
 	end
+
+	-- Track skill state for self
+	--	Note: This will hook Update(), so it has to be after SP check hook
+	RAIL.Self:InitSkillState()
 
 	-- Never show up as either enemies or friends
 	RAIL.Owner.IsEnemy  = function() return false end
@@ -166,13 +177,10 @@ function RAIL.AI(id)
 			RAIL.Other:Update()
 		end
 
-		-- Update skill state
-		RAIL.SkillState:Update()
-
 		-- Check if action is impossible due to casting time
-		if RAIL.SkillState:Get() == RAIL.SkillState.Enum.CASTING then
+		if RAIL.Self.SkillState:Get() == RAIL.Self.SkillState.Enum.CASTING then
 			-- Terminate due to skill state
-			terminate = RAIL.SkillState
+			terminate = RAIL.Self.SkillState
 		end
 
 		-- Check if we're terminating this round
@@ -212,18 +220,13 @@ function RAIL.AI(id)
 				end
 			end
 
-			-- Determine if we should scan for potential skill targets this cycle
-			if RAIL.SkillState:Get() == RAIL.SkillState.Enum.READY then
-				-- Check if we have a direct attack skill to use
-				if RAIL.Self.Skills.Attack then
-					Potential.Skill.Attack.Level =
-						FindSkillLevel(RAIL.Self.SP[0],RAIL.Self.Skills.Attack)
-				end
+			-- Begin determining the best skill to use
+			do
+				local skill = SelectSkill:CycleBegin()
 
-				-- Check if we have a mob attack skill to use
-				if RAIL.Self.Skills.MobAttack then
-					Potential.Skill.MobAttack.Level =
-						FindSkillLevel(RAIL.Self.SP[0],RAIL.Self.Skills.MobAttack)
+				if skill ~= nil then
+					-- An emergency skill, use it and terminate
+					terminate = skill
 				end
 			end
 		end -- not terminate
@@ -248,7 +251,7 @@ function RAIL.AI(id)
 						local inFuture = RAIL.Owner:BlocksTo(-1.5*RAIL.Owner:EstimateMove())(actor)
 							-- and now
 						local now = RAIL.Owner:BlocksTo(actor)
-	
+
 						if inFuture < 3 and inFuture < now then
 							terminate = actor
 						end
@@ -274,23 +277,10 @@ function RAIL.AI(id)
 										Potential.Chase[actor.ID] = actor
 									end
 								end
-
-								-- Check if attack skills are allowed against the enemy
-								if actor:IsSkillAllowed(Potential.Skill.Attack.Level) then
-									-- If it's in range, add it to the potential skill list
-									if dist <= RAIL.Self.Skills.Attack:GetRange() then
-										Potential.Skill.Attack.Actors[actor.ID] = actor
-									else
-										-- Otherwise, add it to the potential chase list
-										Potential.Chase[actor.ID] = actor
-									end
-								end
-
-								-- Check if mob skills are allowed against the enemy
-								if actor:IsSkillAllowed(Potential.Skill.MobAttack.Level) then
-									-- Find a mob to add to, or create a new one
-								end
 							end
+
+							-- Check the actor against potential skills
+							SelectSkill:ActorCheck(actor)
 
 							-- Keep track of friends
 							if actor:IsFriend() then
@@ -302,6 +292,11 @@ function RAIL.AI(id)
 				end -- not terminate
 			end -- RAIL.Owner.ID ~= actor
 		end -- i,actor in ipairs(GetActor())
+	end
+
+	-- After update of actors is done, check if we need to save the MobID file
+	if not RAIL.Mercenary and RAIL.State.UseMobID then
+		MobID:Update()
 	end
 
 	-- Iterate through the timeouts
@@ -334,8 +329,15 @@ function RAIL.AI(id)
 			RAIL.State:Save()
 
 		-- Check if its due to skill state
-		elseif terminate == RAIL.SkillState then
-			RAIL.LogT(7,"Unable to act due to skill casting time; cycle terminating after data collection.")
+		elseif terminate == RAIL.Self.SkillState then
+			RAIL.LogT(7,"Casting motion prevents action; cycle terminating after data collection.")
+
+		-- Check if its due to an emergency skill
+		elseif type(terminate) == "table" and type(terminate[1]) == "table" and terminate[1].Cast then
+			RAIL.LogT(7, "Urgently casting {1}; cycle terminating after data collection.",terminate[1].Name)
+
+			terminate[1]:Cast(terminate[2],terminate[3])
+
 		end
 
 		-- Terminate this cycle early
@@ -356,24 +358,8 @@ function RAIL.AI(id)
 	do
 		-- Skill
 		if Target.Skill == nil and Target.Chase ~= RAIL.Owner then
-			-- TODO: Decide between attack, mob attack, buff, and defense skills
-			if true then
-				local skill = RAIL.Self.Skills.Attack
-				local target = SelectTarget.Skill.Attack(Potential.Skill.Attack.Actors,Friends)
-				if target ~= nil then
-					-- Check if the level is selectable
-					if skill[1] then
-						-- Get the skill level hint from actor.IsSkillAllowed
-						local dummy,level = target:IsSkillAllowed(Potential.Skill.Attack.Level)
-
-						-- Set the skill level to use
-						skill = skill[level]
-					end
-
-					-- Set the skill target
-					Target.Skill = { skill, target }
-				end
-			end
+			-- Select a skill to use
+			Target.Skill = SelectSkill:Run()
 		end
 
 		-- Attack
@@ -518,6 +504,7 @@ function RAIL.AI(id)
 			while dist > 10 do
 				dist = dist / 2
 			end
+
 			-- Plot a shorter distance in the same direction
 			x,y = RAIL.Self:AnglePlot(angle,dist)
 
