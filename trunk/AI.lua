@@ -17,11 +17,32 @@ do
 			print(str);
 		end
 	end
-	if not GetV then
-		GetV = function(v,id)
-			return -1
+	if not IsMonster then
+		IsMonster = function()
+			return 0
 		end
-		TraceAI("GetV() not supplied, undefined behavior may occur.")
+		TraceAI("IsMonster() not supplied, undefined behavior may occur.")
+		--RAIL.CantRun = true
+	end
+	if not GetActors then
+		GetActors = function()
+			return { }
+		end
+		TraceAI("GetActors() not supplied, undefined behavior may occur.")
+		--RAIL.CantRun = true
+	end
+	if not GetMsg then
+		GetMsg = function()
+			return { 0 }
+		end
+		TraceAI("GetMsg() not supplied, undefined behavior may occur.")
+		--RAIL.CantRun = true
+	end
+	if not GetResMsg then
+		GetResMsg = function()
+			return { 0 }
+		end
+		TraceAI("GetResMsg() not supplied, undefined behavior may occur.")
 		--RAIL.CantRun = true
 	end
 	if not GetTick then
@@ -31,11 +52,11 @@ do
 		TraceAI("GetTick() not supplied, undefined behavior may occur.")
 		--RAIL.CantRun = true
 	end
-	if not IsMonster then
-		IsMonster = function()
-			return 0
+	if not GetV then
+		GetV = function(v,id)
+			return -1
 		end
-		TraceAI("IsMonster() not supplied, undefined behavior may occur.")
+		TraceAI("GetV() not supplied, undefined behavior may occur.")
 		--RAIL.CantRun = true
 	end
 end

@@ -112,7 +112,11 @@ do
 	-- Generalized log function
 	local antidup = ""
 	local function log(func,t,level,text,...)
-		if tonumber(level) > RAIL.State.DebugLevel then
+		if type(level) ~= "number" then
+			RAIL.LogT(0,"Missing level parameter for base text: {1}",level)
+			return RAIL.LogT(0,level,text,unpack(arg))
+		end
+		if level > RAIL.State.DebugLevel then
 			return
 		end
 

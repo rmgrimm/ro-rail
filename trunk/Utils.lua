@@ -72,10 +72,10 @@ do
 		return x+x_delta, y+y_delta
 	end
 
-	-- Check to see if an angle is within X radians of a second
+	-- Check to see if an angle is within X degrees of a second
 	function CompareAngle(angle1,angle2,degrees)
 		local bottom,top
-	
+
 		-- Get the modulus remainder of both angles
 		angle1 = math.mod(angle1,360)
 		angle2 = math.mod(angle2,360)
