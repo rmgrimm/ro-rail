@@ -26,10 +26,13 @@ RAIL.Validate.Information = {is_subtable = true,
 	OwnerName = {"string", "unknown"},
 	SelfID = {"number", 0},
 }
+
 RAIL.Validate.AcquireWhileLocked = {"boolean",false}
 RAIL.Validate.AttackWhileChasing = {"boolean",false}
-RAIL.Validate.FollowDistance = {"number", 7, 3, 14}
+
+RAIL.Validate.RunAhead = {"boolean",false}
 RAIL.Validate.MaxDistance = {"number", 13, 3, 14}
+RAIL.Validate.FollowDistance = {"number", 7, 3, 14}
 
 function AI(id)
 	-- Load persistent state data
@@ -57,6 +60,11 @@ function AI(id)
 	-- Get our attack range
 	RAIL.Self.AttackRange = GetV(V_ATTACKRANGE,id)
 
+	-- AttackRange seems to be misreported for melee
+	if RAIL.Self.AttackRange <= 2 then
+		RAIL.Self.AttackRange = 1.5
+	end
+
 	-- Log extra information about self
 	RAIL.LogT(40," --> Self; AI_Type = {2}; Attack Range = {3}",RAIL.Self,RAIL.Self.AI_Type,RAIL.Self.AttackRange)
 
@@ -70,7 +78,7 @@ function AI(id)
 			end
 			buf:Append("; ")
 		end
-		RAIL.LogT(40," --> Skills: {1}",buf:Get())
+		RAIL.LogT(40," --> Skills: {1}",buf:Append(" "):Get())
 	end
 
 	-- Initialize Skill decision making
@@ -180,13 +188,15 @@ function RAIL.AI(id)
 					* RAIL.Owner:EstimateMove()
 				local fol_estim = (-1 * math.ceil(RAIL.State.FollowDistance / 4))
 					* RAIL.Owner:EstimateMove()
+				--local max_estim = -4 * RAIL.Owner:EstimateMove()
+				--local fol_estim = -3 * RAIL.Owner:EstimateMove()
 
 				if
 					-- Make sure setting the chase would be worthwhile
 					terminate == nil and (
 
-					-- Debug toggle for interception debugging
-					(false and RAIL.Owner.Motion[0] == MOTION_MOVE) or
+					-- Check if we're supposed to be leading in front of our owner
+					(RAIL.State.RunAhead and RAIL.Owner.Motion[0] == MOTION_MOVE) or
 
 					-- Regular determination
 					RAIL.Self:BlocksTo(0)(
@@ -358,6 +368,53 @@ function RAIL.AI(id)
 
 		-- Move
 		if Target.Chase == nil then
+			-- Check chase target history
+			-- TODO: test further
+			if
+				false and
+				RAIL.TargetHistory.Chase[0] ~= -1 and
+				RAIL.TargetHistory.Chase[0] ~= RAIL.TargetHistory.Attack and
+				RAIL.TargetHistory.Chase[0] ~= RAIL.Owner.ID
+			then
+				local list = History.GetConstList(RAIL.TargetHistory.Chase)
+				local tick_delta = GetTick() - list[list.last][2]
+
+				-- TODO: Make state option for this
+				local ignore_after = 5000
+
+				-- Check if we've been chasing this actor for a while
+				if tick_delta >= ignore_after then
+					-- Decide if we've been able to get closer
+
+					-- Get our current position
+					local actor = Actors[list[list.last][1]]
+					local x,y = actor.X[0],actor.Y[0]
+
+					-- Check if X coordinate has changed recently
+					local x_changed_f = function(v) return v ~= x end
+					local most_recent_x = History.FindMostRecent(actor.X,x_changed_f,nil,tick_delta)
+
+					-- If it hasn't, then check Y
+					if not most_recent_x or most_recent_x > 2000 then
+						local y_changed_f = function(v) return v ~= y end
+						local most_recent_y = History.FindMostRecent(actor.Y,y_changed_f,nil,tick_delta)
+
+						-- If it hasn't, ignore the actor
+						if not most_recent_y or most_recent_y > 2000 then
+							-- Log it
+							RAIL.LogT(20,"Failed to get closer to {1} (closest = {2}); ignoring.",
+								actor,RAIL.Self:DistanceTo(actor))
+
+							-- Ignore the actor
+							actor:Ignore()
+
+							-- Also remove from the potential chase
+							Potential.Chase[actor.ID] = nil
+						end
+					end
+				end
+			end
+
 			-- Check to see if we should add our attack target to the chase list as well
 			if not RAIL.State.AcquireWhileLocked and Target.Attack then
 				Potential.Chase[Target.Attack.ID] = Target.Attack
@@ -430,15 +487,32 @@ function RAIL.AI(id)
 				-- Move to actor
 				x,y = CalculateIntercept(Target.Chase)
 
+				-- Check if it's our owner
+				if Target.Chase == RAIL.Owner then
+					-- Get the angle and distance to the owner's intercept position
+					local angle,dist = RAIL.Self:AngleTo(x,y)
+
+					-- Determine the follow distance
+					local dist_mod = RAIL.State.FollowDistance
+
+					-- Determine if we're supposed to be leading
+					if RAIL.State.RunAhead then
+						dist_mod = -dist_mod
+					end
+
+					-- Replot the position, modified for follow distance
+					-- Note: Disabled until tested further
+					--x,y = RAIL.Self:AnglePlot(angle,dist - dist_mod)
+
 				-- Check if it's an enemy (likely chasing to attack it)
-				if Target.Chase:IsEnemy() then
+				elseif Target.Chase:IsEnemy() then
 					local angle,dist = RAIL.Self:AngleTo(x,y)
 
 					-- Check if the enemy is outside of attack range
 					-- TODO: check skill ranges
 					if dist > RAIL.Self.AttackRange then
 						-- Replot a new target move
-						x,y = RAIL.Self:AnglePlot(angle,dist - RAIL.Self.AttackRange + 1)
+						x,y = RAIL.Self:AnglePlot(angle,dist - RAIL.Self.AttackRange)
 					end
 				end
 			else

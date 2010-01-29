@@ -374,6 +374,20 @@ do
 	-- Private key for keeping closures
 	local closures = {}
 
+	-- Position tracking uses a specialty "diff" function
+	local pos_diff = function(a,b)
+		-- If a tile changed, then the position is different
+		if math.abs(a[1]-b[1]) >= 1 then return true end
+
+		-- If enough time has passed, count the position as different
+		--	Note: This ensures that subvalues will be accurately calculated
+		--	TODO: Or does it?
+		--if math.abs(a[2]-b[2]) > 500 then return true end
+
+		-- Otherwise, the position is still the same
+		return false
+	end
+
 	-- Initialize a new Actor
 	Actor.New = function(self,ID)
 		local ret = { }
@@ -416,13 +430,6 @@ do
 		-- The following have their histories tracked
 		ret.Target = History.New(-1,false)
 		ret.Motion = History.New(MOTION_STAND,false)
-
-		-- Position tracking uses a specialty "diff" function
-		local pos_diff = function(a,b)
-			if math.abs(a[1]-b[1]) > 1 then return true end
-			if math.abs(a[2]-b[2]) > 500 then return true end
-			return false
-		end
 
 		-- And they'll also predict sub-history positions
 		ret.X = History.New(-1,true,pos_diff)
@@ -744,7 +751,7 @@ do
 			Actor[actor_key](self,true)
 
 			-- Log
-			RAIL.LogT(40,"Incorrectly identified {1} as an Portal; fixed.",self)
+			RAIL.LogT(40,"Incorrectly identified {1} as a Portal; fixed.",self)
 		end
 
 		-- Use a table to make looping through and counting it faster
@@ -877,7 +884,7 @@ do
 		-- Use default ticks if needed
 		if type(ticks) ~= "number" then
 			-- TODO: default ignore time as option
-			ticks = 1000
+			ticks = 10000
 		end
 
 		RAIL.LogT(20,"{1} ignored for {2} milliseconds.",self,ticks)
@@ -890,21 +897,11 @@ do
 	local find_move = function(v) return v == MOTION_MOVE end
 	Actor.EstimateMove = function(self)
 		-- Don't estimate too often
-		if self.EstimatedMove ~= nil and GetTick() - self.EstimatedMove[3] < 250 then
-			return unpack(self.EstimatedMove)
-		end
-
-		local move = 0
-		local non_move
-		local time_delta
-		local tile_delta
-		local tile_angle
-
-		repeat
+		if self.EstimatedMove == nil or GetTick() - self.EstimatedMove[3] >= 500 then
 			-- Find the most recent move
-			move = History.FindMostRecent(self.Motion,find_move)
-
-			-- If there was never motion (or it JUST started), use default move-speed of 150
+			local move = History.FindMostRecent(self.Motion,find_move)
+	
+			-- If there was never motion, use default move-speed of 150
 			if move == nil or move < 100 then
 				-- Default move-speed to regular walk
 				--	according to http://forums.roempire.com/archive/index.php/t-137959.html:
@@ -916,38 +913,110 @@ do
 				--		~0.21 sec per cell at regular speed
 				--		~0.11 sec per cell with emergency avoid
 				--
-				time_delta = 150
-				tile_delta = 1
-				tile_angle = 0
-				break
+				-- Speed of 150 ticks per 1 tile; Angle of 90 (straight north)
+				return 150, 90
 			end
-
+	
 			-- Find the most recent non-move that follows the move
-			non_move = History.FindMostRecent(self.Motion,find_non_move,nil,move) or 0
+			local non_move = History.FindMostRecent(self.Motion,find_non_move,nil,move)
+	
+			-- Check if there was no non-move (or if the non-move was somehow after the move)
+			if not non_move or non_move >= move then
+				non_move = 0
+			end
+	
+			-- Convert to tick counts, rather than history deltas
+			move = GetTick() - move
+			non_move = GetTick() - non_move
+	
+			-- Get the X and Y position lists
+			local x_list = History.GetConstList(self.X)
+			local y_list = History.GetConstList(self.Y)
+	
+			-- Find the position (in list) closest to non_move
+			local begin_x = x_list:BinarySearch(non_move)
+			local begin_y = y_list:BinarySearch(non_move)
 
-			-- Check for bad state
-			if non_move > move then
-				move = non_move + 150
+			-- Begin searching backward into history
+			local i_x,i_y = begin_x,begin_y
+			while true do
+				-- Get the X,Y coords
+				local x = x_list[i_x][1]
+				local y = y_list[i_y][1]
+
+				-- Check to see if we can search further back
+				local next_i_x = i_x
+				if i_x-1 >= x_list.first and x_list[i_x-1][2] >= move then
+					next_i_x = i_x - 1
+				end
+				local next_i_y = i_y
+				if i_y-1 >= y_list.first and y_list[i_y-1][2] >= move then
+					next_i_y = i_y - 1
+				end
+
+				-- Check if we've reached the back
+				if next_i_x == i_x and next_i_y == i_y then
+					break
+				end
+
+				-- Find the next changed point
+				if x_list[next_i_x][2] < y_list[next_i_y][2] and next_i_x ~= i_x then
+					next_i_y = i_y
+				elseif x_list[next_i_x][2] > y_list[next_i_y][2] and next_i_y ~= i_y then
+					next_i_x = i_x
+				end
+
+				-- Get the angle of the two adjacent points
+				local angle = GetAngle(
+					x_list[next_i_x][1],y_list[next_i_y][1],
+					x,y
+				)
+
+				-- Get the angle of the beginning to our current point
+				local angle2 = GetAngle(
+					x,y,
+					x_list[begin_x][1],y_list[begin_y][1]
+				)
+
+				-- If x,y are still at beginning position, move to next
+				if angle2 == -1 then angle2 = angle end
+
+				-- Check to see if the adjacent angle is within 45 degrees (either way) of the longer angle
+				if not CompareAngle(angle2,angle+45,90) then
+					-- Not inside, so break
+					break
+				end
+
+				i_x = next_i_x
+				i_y = next_i_y
 			end
 
-			-- Determine the time passed that passed
-			time_delta = move - non_move
+			-- Get the beginning position and end position
+			--	Note: begin refers to the most recent, so it becomes x2,y2
+			local x2,y2 = x_list[begin_x][1],y_list[begin_y][1]
+			local x1,y1 = x_list[i_x][1],y_list[i_y][1]
 
-			-- Check if the time_delta is too big (and we can shorten it)
-			if time_delta > 500 then
-				time_delta = 500
+			-- Get the angle and the block distance
+			local angle = GetAngle(x1,y1,x2,y2)
+			local dist = BlockDistance(x1,y1,x2,y2)
+
+			-- Ensure we're still sane
+			if angle == -1 or dist < 1 then
+				-- Use 150ms/1tile speed, angle 90
+				return 150, 90
 			end
 
-			local nmX,nmY = self.X[non_move],self.Y[non_move]
-			local mX,mY = self.X[non_move+time_delta],self.Y[non_move+time_delta]
+			-- Get the tick delta
+			local tick_delta_x = x_list[begin_x][2] - x_list[i_x][2]
+			local tick_delta_y = y_list[begin_y][2] - y_list[i_y][2]
+			local tick_delta = math.max(tick_delta_x,tick_delta_y)
 
-			-- Determine the direction/distance moved
-			tile_angle,tile_delta = GetAngle(mX,mY,nmX,nmY)
-		until true
+			-- Save the estimated move
+			self.EstimatedMove = { tick_delta / dist, angle, GetTick() }
+		end
 
-		-- Return our estimated movement speed
-		self.EstimatedMove = { time_delta / tile_delta, tile_angle, GetTick() }
-		return unpack(self.EstimatedMove)
+		-- And return
+		return self.EstimatedMove[1], self.EstimatedMove[2]
 	end
 
 	--------------------

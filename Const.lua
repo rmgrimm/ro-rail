@@ -118,6 +118,8 @@ MOTION_JUMP_FALL= 20	-- TaeKwon Kid Leap -- falling
 MOTION_SOULLINK	= 23	-- Soul linker using a link skill
 MOTION_TUMBLE	= 25	-- Tumbling / TK Kid Leap Landing
 MOTION_BIGTOSS	= 28 	-- A heavier toss (slim potions / acid demonstration)
+MOTION_DESPERADO= 38	-- Desperado
+MOTION_FULLBLAST= 42	-- Full Blast
 -----------------------------------------
 
 ------------------------------------------

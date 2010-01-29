@@ -9,7 +9,7 @@ RAIL.Validate.DefendOptions = {is_subtable = true,
 	SelfThreshold = {"number",5,0},
 	FriendThreshold = {"number",4,0},
 }
-RAIL.Validate.InterceptAlgorithm = {"string","normal"}
+RAIL.Validate.InterceptAlgorithm = {"string","none"}
 
 -- Minimum priority (not an option)
 local min_priority = -10000
@@ -34,9 +34,12 @@ do
 
 			-- Estimate time it'd take to reach the target (if it were standing still)
 			local dist = RAIL.Self:DistanceTo(target)
-			local ticks = dist/speed
+			local ticks = dist * speed
 
-			-- Return the actor's projected position in <ticks> time
+			-- Bring ticks down a bit
+			ticks = math.floor(ticks / 2)
+
+			-- Return the actor's projected position at <ticks> time in the future
 			return target.X[-ticks],target.Y[-ticks]
 		end,
 
@@ -54,7 +57,7 @@ do
 			local t_speed,t_move_angle = target:EstimateMove()
 	
 			local t_to_s_angle,t_dist = GetAngle(t_x,t_y,s_x,s_y)
-	
+
 			-- In a triangle,
 			--
 			--	A
@@ -65,20 +68,21 @@ do
 			--	(Side-Side-Angle: s_speed, t_speed, t_angle_in_triangle)
 			--	(Result will be s_angle_in_triangle)
 			--
-	
-			local t_angle_in_triangle = math.abs(t_to_s_angle - t_move_angle)
+
+			-- Start working in a triangle now
+			local t_angle_in_triangle = math.abs(t_move_angle - t_to_s_angle)
 			if t_angle_in_triangle > 180 then
-				t_angle_in_triangle = 360 - t_angle_in_triangle
+				t_angle_in_triangle = t_angle_in_triangle - 180
 			end
-	
+
 			-- Invert speeds, such that high numbers are faster
 			s_speed = 1 / s_speed
 			t_speed = 1 / t_speed
-	
+
 			-- Solve for s_angle_in_triangle
 			local law_of_sines_ratio = s_speed / math.sin(t_angle_in_triangle)
 			local s_angle_in_triangle = math.asin(1 / (law_of_sines_ratio / t_speed))
-	
+
 			-- Complete the triangle
 			local x_angle_in_triangle = 180 - (s_angle_in_triangle + t_angle_in_triangle)
 			local x_speed = law_of_sines_ratio * math.sin(x_angle_in_triangle)
@@ -86,7 +90,7 @@ do
 			-- Find destination angle on angle side
 			local s_to_t_angle = math.mod(t_to_s_angle + 180,360)
 			local s_move_angle
-	
+
 			if CompareAngle(t_to_s_angle,t_move_angle,-180) then
 				s_move_angle = math.mod(s_to_t_angle + s_angle_in_triangle,360)
 			else
@@ -95,6 +99,10 @@ do
 					s_move_angle = s_move_angle + 360
 				end
 			end
+
+			-- Return the speeds to ticks per tile
+			s_speed = 1 / s_speed
+			x_speed = 1 / x_speed
 	
 			-- Determine the distance to move
 			local radius = t_dist * (s_speed / x_speed)
@@ -111,20 +119,28 @@ do
 				return nil
 			end
 
-			-- Check for the default intercept algorithm
-			local algo = t[string.lower(RAIL.State.InterceptAlgorithm)] or
-				t.none
+			-- Check if the target isn't moving
+			if
+				target.Motion[0] ~= MOTION_MOVE and
+
+				-- debug switch: false = test intercept algorithm
+				true
+			then
+				-- Return the actor's current position since it's standing still
+				return target.X[0],target.Y[0]
+			end
+
+			-- Get the intercept algorithm
+			local algo = t[string.lower(RAIL.State.InterceptAlgorithm)] or t.none
+
+			-- Verify the algorithm is a function
 			if type(algo) ~= "function" then
-				return nil
+				-- Return the target's current position
+				return target.X[0],target.Y[0]
 			end
 
-			-- Check if the target is moving
-			if target.Motion[0] == MOTION_MOVE or type(t.none) ~= "function" then
-				return algo(target)
-			end
-
-			-- Use none, since it doesn't need to be intercepted
-			return t.none(target)
+			-- Run the intercept algorithm
+			return algo(target)
 		end,
 	})
 end
