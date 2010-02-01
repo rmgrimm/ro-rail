@@ -5,6 +5,7 @@ RAIL._G = getfenv(0)
 require "State.lua"
 
 -- Alphabetical
+require "ActorOpts.lua"
 require "Const.lua"
 require "Debug.lua"
 require "History.lua"
@@ -183,38 +184,42 @@ function RAIL.AI(id)
 		if not terminate then
 			-- Determine if we need to chase our owner
 			do
-				-- Owner-chase estimation is based on max distance
-				local max_estim = (-1 * math.ceil(RAIL.State.MaxDistance / 4) + (-2))
-					* RAIL.Owner:EstimateMove()
-				local fol_estim = (-1 * math.ceil(RAIL.State.FollowDistance / 4))
-					* RAIL.Owner:EstimateMove()
-				--local max_estim = -4 * RAIL.Owner:EstimateMove()
-				--local fol_estim = -3 * RAIL.Owner:EstimateMove()
+				-- Check that chasing would be worthwhile
+				if terminate == nil then
+					-- Check if we're following normally
+					if not RAIL.State.RunAhead then
+						-- Owner-chase estimation is based on max distance
+						local max_estim = (-1 * math.ceil(RAIL.State.MaxDistance / 4))
+							* RAIL.Owner:EstimateMove()
 
-				if
-					-- Make sure setting the chase would be worthwhile
-					terminate == nil and (
+						if
+							RAIL.Self:BlocksTo(0)(
+								-- Guess some tiles ahead, so homu/merc isn't off screen when finally decides to move
+								RAIL.Owner.X[max_estim],
+								RAIL.Owner.Y[max_estim]
+							) > RAIL.State.MaxDistance or
 
-					-- Check if we're supposed to be leading in front of our owner
-					(RAIL.State.RunAhead and RAIL.Owner.Motion[0] == MOTION_MOVE) or
-
-					-- Regular determination
-					RAIL.Self:BlocksTo(0)(
-						-- Guess some tiles ahead, so homu/merc isn't off screen when finally decides to move
-						RAIL.Owner.X[max_estim],
-						RAIL.Owner.Y[max_estim]
-					) > RAIL.State.MaxDistance or
-
-					-- Continue following
-					(RAIL.TargetHistory.Chase[0] == RAIL.Owner.ID and
-					RAIL.Owner.Motion[0] == MOTION_MOVE and
-					RAIL.Self:BlocksTo(0)(
-						-- Guess some tiles ahead when already following
-						RAIL.Owner.X[fol_estim],
-						RAIL.Owner.Y[fol_estim]
-					) > RAIL.State.FollowDistance)
-				) then
-					Target.Chase = RAIL.Owner
+							-- Continue following
+							(RAIL.TargetHistory.Chase[0] == RAIL.Owner.ID and
+							RAIL.Owner.Motion[0] == MOTION_MOVE and
+							RAIL.Self:BlocksTo(0)(
+								-- Guess some tiles ahead when already following
+								RAIL.Owner.X[0],
+								RAIL.Owner.Y[0]
+							) > RAIL.State.FollowDistance)
+						then
+							Target.Chase = RAIL.Owner
+						end
+					else
+						-- Or if we're running ahead
+						if
+							RAIL.Owner.Motion[0] == MOTION_MOVE or
+							(RAIL.TargetHistory.Chase[0] == RAIL.Owner.ID and
+							math.abs(RAIL.Self:DistanceTo(RAIL.Owner) - RAIL.State.FollowDistance) > 1)
+						then
+							Target.Chase = RAIL.Owner
+						end
+					end
 				end
 			end
 
@@ -371,7 +376,10 @@ function RAIL.AI(id)
 			-- Check chase target history
 			-- TODO: test further
 			if
-				false and
+				-- Debug toggle
+				true and
+
+
 				RAIL.TargetHistory.Chase[0] ~= -1 and
 				RAIL.TargetHistory.Chase[0] ~= RAIL.TargetHistory.Attack and
 				RAIL.TargetHistory.Chase[0] ~= RAIL.Owner.ID
@@ -484,37 +492,41 @@ function RAIL.AI(id)
 		if Target.Chase ~= nil and Target.Chase ~= Target.Attack then
 
 			if RAIL.IsActor(Target.Chase) then
-				-- Move to actor
-				x,y = CalculateIntercept(Target.Chase)
+				-- Default range is attack range
+				--	Note: Underestimate just to be safe
+				local range = RAIL.Self.AttackRange - 1
 
-				-- Check if it's our owner
+				-- Check if we're chasing owner
 				if Target.Chase == RAIL.Owner then
-					-- Get the angle and distance to the owner's intercept position
-					local angle,dist = RAIL.Self:AngleTo(x,y)
+					-- Set range to follow distance
+					range = RAIL.State.FollowDistance
 
-					-- Determine the follow distance
-					local dist_mod = RAIL.State.FollowDistance
-
-					-- Determine if we're supposed to be leading
+					-- Check if we're supposed to run ahead
 					if RAIL.State.RunAhead then
-						dist_mod = -dist_mod
-					end
+						-- Estimate the owner's walking speed
+						local owner_speed,angle = RAIL.Owner:EstimateMove()
 
-					-- Replot the position, modified for follow distance
-					-- Note: Disabled until tested further
-					--x,y = RAIL.Self:AnglePlot(angle,dist - dist_mod)
-
-				-- Check if it's an enemy (likely chasing to attack it)
-				elseif Target.Chase:IsEnemy() then
-					local angle,dist = RAIL.Self:AngleTo(x,y)
-
-					-- Check if the enemy is outside of attack range
-					-- TODO: check skill ranges
-					if dist > RAIL.Self.AttackRange then
-						-- Replot a new target move
-						x,y = RAIL.Self:AnglePlot(angle,dist - RAIL.Self.AttackRange)
+						-- Plot a point ahead of them
+						x,y = RAIL.Owner:AnglePlot(angle,RAIL.State.FollowDistance)
 					end
 				end
+
+				-- TODO: Check if we're chasing for a skill (to update range)
+
+				-- If a target destination hasn't been plotted yet, calculate one now
+				if not x then
+					x,y = CalculateIntercept(Target.Chase,range)
+				end
+
+				-- Check if the distance between this and last move is about the same
+				if x and y then
+					local last_x,last_y = RAIL.TargetHistory.Move.Y,RAIL.TargetHistory.Move.Y
+					if PythagDistance(x,y,last_x,last_y) <= 1 then
+						-- Use the old move
+						x,y = last_x,last_y
+					end
+				end
+
 			else
 				-- Move to ground
 				x,y = Target.Chase[2],Target.Chase[3]
@@ -554,7 +566,7 @@ function RAIL.AI(id)
 
 		if type(x) == "number" and type(y) == "number" then
 			-- Make sure the move isn't outside MaxDistance
-			local owner_estim = (-1 * math.ceil(RAIL.State.MaxDistance / 4) + (-2))
+			local owner_estim = (-1 * math.ceil(RAIL.State.MaxDistance / 4))
 				* RAIL.Owner:EstimateMove()
 			local x_d = RAIL.Owner.X[owner_estim] - x
 			local y_d = RAIL.Owner.Y[owner_estim] - y

@@ -2,331 +2,6 @@
 RAIL.Validate.TempFriendRange = {"number",-1,-1,5}
 RAIL.Validate.UseMobID = {"boolean",false}
 
--- Actor options
-RAIL.Validate.ActorOptions = {is_subtable=true}
-RAIL.Validate.ActorOptions.Default = {is_subtable=true,
-	Name = {"string","unknown"},
-	Friend = {"boolean",false},
-	Priority = {"number",0},		-- higher number, higher priority; eg, 10 is higher than 1
-	AttackAllowed = {"boolean",true},
-	DefendOnly = {"boolean",false},
-	SkillsAllowed = {"boolean",false},
-	MinSkillLevel = {"number",1,1,10},
-	MaxSkillLevel = {"number",5,1,10},
-	TicksBetweenSkills = {"number",0,0},
-	MaxCastsAgainst = {"number",-1,-1},	-- -1 is unlimited
-}
-RAIL.Validate.ActorOptions.ByType = {is_subtable=true}
-RAIL.Validate.ActorOptions.ByID = {is_subtable=true}
-
--- Max homunculus skill level is 5
-if not RAIL.Mercenary then
-	RAIL.Validate.ActorOptions.Default.MinSkillLevel[4] = 5
-	RAIL.Validate.ActorOptions.Default.MaxSkillLevel[4] = 5
-end
-
--- Actor Battle Options
-do
-	-- TODO: Optimize Actor Options...
-	--
-	--	Actor[id].BattleOpts (metatable; checks ByID, ByType, Default)
-	--	ByID checks ByTypes
-	--	ByTypes checks Defaults
-	--	Defaults/ByID/ByTypes all trigger validation of tables
-	--		RAIL.State.ActorOptions
-	--		RAIL.State.ActorOptions.[Defaults/ByID/ByType]
-	--
-	--	Called almost every cycle...
-	--
-
-	-- Defaults
-	do
-		BattleOptsDefaults = { }
-		setmetatable(BattleOptsDefaults,{
-			__index = function(t,key)
-				return RAIL.State.ActorOptions.Default[key]
-			end
-		})
-	end
-
-	-- Default special actor types
-	local SpecialTypes = {}
-	do
-		-- Plants
-		SpecialTypes.Plants = {
-			Types = {
-				[1078] = true,	-- Red Plant
-				[1079] = true,	-- Blue Plant
-				[1080] = true,	-- Green Plant
-				[1081] = true,	-- Yellow Plant
-				[1082] = true,	-- White Plant
-				[1083] = true,	-- Shining Plant
-				[1084] = true,	-- Red Mushroom
-				[1085] = true,	-- Black Mushroom
-			},
-			Options = {
-				Name = "Plant",
-				SkillsAllowed = false,
-			},
-		}
-		setmetatable(SpecialTypes.Plants.Options,{
-			__index = function(t,idx)
-				if idx == "Priority" then
-					return BattleOptsDefaults.Priority - 1
-				end
-	
-				return BattleOptsDefaults[idx]
-			end,
-		})
-
-		-- Alchemist-summoned plants
-		SpecialTypes.Summons = {
-			Types = {
-				[1555] = true,	-- Summoned Parasite
-				[1575] = true,	-- Summoned Flora
-				[1579] = true,	-- Summoned Hydra
-				[1589] = true,	-- Summoned Mandragora
-				[1590] = true,	-- Summoned Geographer
-			},
-			Options = {
-				Name = "Summoned",
-				AttackAllowed = false,
-				SkillsAllowed = false,
-			},
-		}
-
-		-- Homunculi
-		SpecialTypes.Lif = {
-			Types = {},
-			Options = {
-				Name = "Lif",
-			},
-		}
-		SpecialTypes.Amistr = {
-			Types = {},
-			Options = {
-				Name = "Amistr",
-			},
-		}
-		SpecialTypes.Filir = {
-			Types = {},
-			Options = {
-				Name = "Filir",
-			},
-		}
-		SpecialTypes.Vanilmirth = {
-			Types = {},
-			Options = {
-				Name = "Vanilmirth",
-			},
-		}
-		-- Populate the homunculus types
-		for i=1,16 do
-			local mod = math.mod(i,4)
-			if mod == 1 then
-				SpecialTypes.Lif.Types[6000 + i] = true
-			elseif mod == 2 then
-				SpecialTypes.Amistr.Types[6000 + i] = true
-			elseif mod == 3 then
-				SpecialTypes.Filir.Types[6000 + i] = true
-			else
-				SpecialTypes.Vanilmirth.Types[6000 + i] = true
-			end
-		end
-
-		-- Mercenary types
-		SpecialTypes.ArcherMerc = {
-			Types = {},
-			Options = {
-				Name = "Archer Mercenary",
-			},
-		}
-		SpecialTypes.LancerMerc = {
-			Types = {},
-			Options = {
-				Name = "Lancer Mercenary",
-			},
-		}
-		SpecialTypes.SwordmanMerc = {
-			Types = {},
-			Options = {
-				Name = "Swordman Mercenary",
-			},
-		}
-		-- Populate the mercenary types
-		for i=1,30 do
-			if i <= 10 then
-				SpecialTypes.ArcherMerc.Types[6016 + i] = true
-			elseif i <= 20 then
-				SpecialTypes.LancerMerc.Types[6016 + i] = true
-			else
-				SpecialTypes.SwordmanMerc.Types[6016 + i] = true
-			end
-		end
-
-
-		-- Ensure all the special types' options tables have metatables
-		local st_mt = {
-			__index = BattleOptsDefaults,
-		}
-		-- And redo the SpecialTypes table
-		local SpecialTypes_redo = {}
-		for id,table in SpecialTypes do
-			if
-				type(table) == "table" and
-				type(table.Types) == "table" and
-				type(table.Options) == "table"
-			then
-				local mt = getmetatable(table.Options)
-
-				if mt == nil then
-					setmetatable(table.Options,st_mt)
-				end
-
-				for type in table.Types do
-					SpecialTypes_redo[type] = table.Options
-				end
-			end
-		end
-		SpecialTypes = SpecialTypes_redo
-	end
-
-	-- By Type
-	do
-		-- Private key to access each type
-		local type_key = {}
-
-		-- Private key to access the default table
-		local default_key = {}
-
-		-- Auto-generated subtables will use this metatable
-		local mt = {
-			__index = function(t,key)
-				-- Check the RAIL.State.ActorOptions.ByType table
-				local ByType = RAIL.State.ActorOptions.ByType
-				local type_num = t[type_key]
-				if type(ByType[type_num]) ~= "table" then
-					ByType[type_num] = { }
-				end
-
-				-- Use value from ByType table if non-nil
-				local value = ByType[type_num][key]
-				if value ~= nil then
-					local validated = RAIL.Validate(value,RAIL.Validate.ActorOptions.Default[key])
-
-					-- Check to see if it was changed during validation
-					if value ~= validated then
-						-- Save the updated version
-						ByType[id_num][key] = validated
-
-						-- TODO: set dirty flag
-					end
-
-					return validated
-				end
-
-				-- Otherwise, use default
-				return t[default_key][key]
-			end
-		}
-
-		BattleOptsByType = {
-			-- Mercenaries will use default options against actors of unknown type
-			[-2] = BattleOptsDefaults
-		}
-
-		-- Generate subtables for each type requested
-		setmetatable(BattleOptsByType,{
-			__index = function(t,key)
-				-- Make sure there are options for it
-				if RAIL.State.ActorOptions.ByType[key] == nil then
-					-- Check for special types
-					local special = SpecialTypes[key]
-					if special then
-						return special
-					end
-
-					return nil
-				end
-
-				local ret = {
-					[type_key] = key,
-					[default_key] = BattleOptsDefaults,
-				}
-
-				-- Check for special types
-				local special = SpecialTypes[key]
-				if special then
-					ret[default_key] = special
-				end
-
-				setmetatable(ret,mt)
-				t[key] = ret
-
-				return ret
-			end
-		})
-	end
-
-	-- By ID
-	do
-		-- Private key to access each ID
-		local id_key = {}
-
-		local mt = {
-			__index = function(t,key)
-				-- Check the RAIL.State.ActorOptions.ByID table
-				local ByID = RAIL.State.ActorOptions.ByID
-				local id_num = t[id_key]
-				if type(ByID[id_num]) ~= "table" then
-					ByID[id_num] = { }
-				end
-
-				-- Use value from ByID table if non-nil
-				local value = ByID[id_num][key]
-				if value ~= nil then
-					local validated = RAIL.Validate(value,RAIL.Validate.ActorOptions.Default[key])
-
-					-- Check to see if it was changed during validation
-					if value ~= validated then
-						-- Save the updated version
-						ByID[id_num][key] = validated
-
-						-- TODO: set dirty flag
-					end
-
-					return validated
-				end
-
-				-- Otherwise, use ByType table
-				local t = BattleOptsByType[Actors[id_num].Type]
-					or BattleOptsDefaults
-				return t[key]
-			end
-		}
-
-		BattleOptsByID = { }
-		setmetatable(BattleOptsByID,{
-			__index = function(t,key)
-				-- Make sure there are options for it
-				if RAIL.State.ActorOptions.ByID[key] == nil then
-					return nil
-				end
-
-				local ret = {
-					[id_key] = key,
-				}
-
-				setmetatable(ret,mt)
-				t[key] = ret
-
-				return ret
-			end
-		})
-	end
-
-end
-
 -- Actor data-collection
 do
 	-- This unique table ID will be used as a key to identify Actor tables
@@ -381,7 +56,7 @@ do
 
 		-- If enough time has passed, count the position as different
 		--	Note: This ensures that subvalues will be accurately calculated
-		--	TODO: Or does it?
+		--	Note: This isn't really needed...
 		--if math.abs(a[2]-b[2]) > 500 then return true end
 
 		-- Otherwise, the position is still the same
@@ -451,7 +126,34 @@ do
 		--	(it will be updated in Actor.Update)
 		ret.ExpireTimeout = RAIL.Timeouts:New(2500,false,Actor.Expire,ret,"timeout")
 
-		ret[closures] = {}
+		-- Create tables to hold the closures
+		ret[closures] = {
+			DistanceTo = {},
+			DistancePlot = {},
+			BlocksTo = {},
+			AngleTo = {},
+			AngleFrom = {},
+			AnglePlot = {},
+			SkillCallbacks = {
+				-- Generate the skill success and failure callbacks now
+				Success = function(s,ticks)
+					-- Reset skill-failed counter
+					ret.BattleOpts.CastsFailed = 0
+
+					-- Increment skill counter
+					ret.BattleOpts.CastsAgainst = (ret.BattleOpts.CastsAgainst or 0) + 1
+
+					-- And never see this actor as kill-stealing
+					ret.BattleOpts.FreeForAll = true
+				end,
+				Failure = function(s,ticks)
+					-- Increment skill-failed counter
+					ret.BattleOpts.CastsFailed = (ret.BattleOpts.CastsFailed or 0) + 1
+
+					-- TODO: Ignore after a number of consequtive failures
+				end
+			},
+		}
 
 		-- Initialize the type
 		Actor[actor_key](ret)
@@ -633,9 +335,6 @@ do
 			return self
 		end
 
-		-- The actor is active unless it expires
-		self.Active = true
-
 		-- Check for a type change
 		if not RAIL.Mercenary and GetV(V_HOMUNTYPE,self.ID) ~= self[actor_key] then
 			-- Pre-log
@@ -674,6 +373,9 @@ do
 
 		-- Update the LastUpdate field
 		self.LastUpdate = GetTick()
+
+		-- The actor is active unless it expires
+		self.Active = true
 
 		-- Some actors don't require everything tracked
 		if not self.FullUpdate then
@@ -775,9 +477,6 @@ do
 		for k,v in pairs(self.BattleOpts) do
 			self.BattleOpts[k] = nil
 		end
-
-		-- Unset any closures used
-		self[closures] = {}
 
 		-- Clear the histories
 		History.Clear(self.Motion)
@@ -893,130 +592,169 @@ do
 	end
 
 	-- Estimate Movement Speed (in milliseconds per cell) and Direction
+	local estimate_key = {}
 	local find_non_move = function(v) return v ~= MOTION_MOVE end
 	local find_move = function(v) return v == MOTION_MOVE end
 	Actor.EstimateMove = function(self)
-		-- Don't estimate too often
-		if self.EstimatedMove == nil or GetTick() - self.EstimatedMove[3] >= 500 then
-			-- Find the most recent move
-			local move = History.FindMostRecent(self.Motion,find_move)
-	
-			-- If there was never motion, use default move-speed of 150
-			if move == nil or move < 100 then
+		-- Ensure we have a place to store estimation data
+		if not self[estimate_key] then
+			self[estimate_key] = {
 				-- Default move-speed to regular walk
 				--	according to http://forums.roempire.com/archive/index.php/t-137959.html:
 				--		0.15 sec per cell at regular speed
 				--		0.11 sec per cell w/ agi up
 				--		0.06 sec per cell w/ Lif's emergency avoid
 				--
-				--	Those values seem wrong, or are calculated differently...
-				--		~0.21 sec per cell at regular speed
-				--		~0.11 sec per cell with emergency avoid
-				--
-				-- Speed of 150 ticks per 1 tile; Angle of 90 (straight north)
-				return 150, 90
+				-- Default move-direction to straight north; the same as the server seems to
+				speed = 150,
+				angle = 90,
+
+				-- Last time calculated was never
+				last = 0,
+				-- And the distance used to calculate speed was 0
+				dist = 0,
+			}
+		end
+
+		-- Get the estimation data table
+		local estimate = self[estimate_key]
+
+		-- Don't estimate too often
+		if GetTick() - estimate.last <= 250 then
+			return estimate.speed, estimate.angle
+		end
+
+		local move = 0
+		local non_move = 0
+
+		while BlockDistance(self.X[move],self.Y[move],self.X[non_move],self.Y[non_move]) < 1 do
+			-- Find the most recent move
+			move = History.FindMostRecent(self.Motion,find_move,move+10,nil)
+
+			-- If there was never motion, return from estimate
+			if move == nil then
+				return estimate.speed, estimate.angle
 			end
-	
+
 			-- Find the most recent non-move that follows the move
-			local non_move = History.FindMostRecent(self.Motion,find_non_move,nil,move)
-	
-			-- Check if there was no non-move (or if the non-move was somehow after the move)
-			if not non_move or non_move >= move then
+			local non_move = History.FindMostRecent(self.Motion,find_non_move,non_move+10,move)
+
+			if not non_move then
 				non_move = 0
 			end
-	
-			-- Convert to tick counts, rather than history deltas
-			move = GetTick() - move
-			non_move = GetTick() - non_move
-	
-			-- Get the X and Y position lists
-			local x_list = History.GetConstList(self.X)
-			local y_list = History.GetConstList(self.Y)
-	
-			-- Find the position (in list) closest to non_move
-			local begin_x = x_list:BinarySearch(non_move)
-			local begin_y = y_list:BinarySearch(non_move)
+		end
 
-			-- Begin searching backward into history
-			local i_x,i_y = begin_x,begin_y
-			while true do
-				-- Get the X,Y coords
-				local x = x_list[i_x][1]
-				local y = y_list[i_y][1]
+		-- Check if there was no non-move (or if the non-move was somehow after the move)
+		if not non_move or non_move >= move then
+			non_move = 0
+		end
 
-				-- Check to see if we can search further back
-				local next_i_x = i_x
-				if i_x-1 >= x_list.first and x_list[i_x-1][2] >= move then
-					next_i_x = i_x - 1
-				end
-				local next_i_y = i_y
-				if i_y-1 >= y_list.first and y_list[i_y-1][2] >= move then
-					next_i_y = i_y - 1
-				end
+		-- Convert to tick counts, rather than history deltas
+		move = GetTick() - move
+		non_move = GetTick() - non_move
 
-				-- Check if we've reached the back
-				if next_i_x == i_x and next_i_y == i_y then
+		-- Get the X and Y position lists
+		local x_list = History.GetConstList(self.X)
+		local y_list = History.GetConstList(self.Y)
+
+		-- Find the position (in list) closest to non_move
+		local begin_x = x_list:BinarySearch(non_move)
+		local begin_y = y_list:BinarySearch(non_move)
+
+		-- Begin searching backward into history
+		local i_x,i_y = begin_x,begin_y
+		while true do
+			-- Get the X,Y coords
+			local x = x_list[i_x][1]
+			local y = y_list[i_y][1]
+
+			-- Check to see if we can search further back
+			local next_i_x = i_x
+			if i_x-1 >= x_list.first and x_list[i_x-1][2] >= move then
+				next_i_x = i_x - 1
+			end
+			local next_i_y = i_y
+			if i_y-1 >= y_list.first and y_list[i_y-1][2] >= move then
+				next_i_y = i_y - 1
+			end
+
+			-- Check if we've reached the back
+			if next_i_x == i_x and next_i_y == i_y then
+				break
+			end
+
+			-- Find the next changed point
+			if x_list[next_i_x][2] > y_list[next_i_y][2] and next_i_x ~= i_x then
+				next_i_y = i_y
+			elseif x_list[next_i_x][2] < y_list[next_i_y][2] and next_i_y ~= i_y then
+				next_i_x = i_x
+			end
+
+			-- Get the angle of the two adjacent points
+			local angle = GetAngle(
+				x_list[next_i_x][1],y_list[next_i_y][1],
+				x,y
+			)
+
+			-- Get the angle of the beginning to our current point
+			local angle2 = GetAngle(
+				x,y,
+				x_list[begin_x][1],y_list[begin_y][1]
+			)
+
+			-- If x,y are still at beginning position, move to next
+			if angle ~= -1 and angle2 ~= -1 then
+				-- Check to see if the angle is within 45 degrees either way
+				if not CompareAngle(angle,angle2+45,90) then
+					-- Doesn't match
 					break
 				end
 
-				-- Find the next changed point
-				if x_list[next_i_x][2] < y_list[next_i_y][2] and next_i_x ~= i_x then
-					next_i_y = i_y
-				elseif x_list[next_i_x][2] > y_list[next_i_y][2] and next_i_y ~= i_y then
-					next_i_x = i_x
-				end
-
-				-- Get the angle of the two adjacent points
-				local angle = GetAngle(
-					x_list[next_i_x][1],y_list[next_i_y][1],
-					x,y
-				)
-
-				-- Get the angle of the beginning to our current point
-				local angle2 = GetAngle(
-					x,y,
-					x_list[begin_x][1],y_list[begin_y][1]
-				)
-
-				-- If x,y are still at beginning position, move to next
-				if angle2 == -1 then angle2 = angle end
-
-				-- Check to see if the adjacent angle is within 45 degrees (either way) of the longer angle
-				if not CompareAngle(angle2,angle+45,90) then
-					-- Not inside, so break
+				-- Check if the distance is great enough
+				local blocks = BlockDistance(x,y,x_list[begin_x][1],y_list[begin_y][1])
+				if blocks >= 4 then
 					break
 				end
-
-				i_x = next_i_x
-				i_y = next_i_y
 			end
 
-			-- Get the beginning position and end position
-			--	Note: begin refers to the most recent, so it becomes x2,y2
-			local x2,y2 = x_list[begin_x][1],y_list[begin_y][1]
-			local x1,y1 = x_list[i_x][1],y_list[i_y][1]
+			i_x = next_i_x
+			i_y = next_i_y
+		end
 
-			-- Get the angle and the block distance
-			local angle = GetAngle(x1,y1,x2,y2)
-			local dist = BlockDistance(x1,y1,x2,y2)
+		-- Get the beginning position and end position
+		--	Note: begin refers to the most recent, so it becomes x2,y2
+		local x2,y2 = x_list[begin_x][1],y_list[begin_y][1]
+		local x1,y1 = x_list[i_x][1],y_list[i_y][1]
 
-			-- Ensure we're still sane
-			if angle == -1 or dist < 1 then
-				-- Use 150ms/1tile speed, angle 90
-				return 150, 90
-			end
+		-- Get the angle and the block distance
+		local angle = GetAngle(x1,y1,x2,y2)
+		local dist = BlockDistance(x1,y1,x2,y2)
+
+		-- Ensure we're still sane
+		if angle ~= -1 then
+			-- Store our estimated angle
+			estimate.angle = angle
+		end
+
+		-- Check if we've calculated a better speed than before
+		if dist >= estimate.dist then
+			-- Store our speed and distance
+
+			estimate.dist = dist
 
 			-- Get the tick delta
 			local tick_delta_x = x_list[begin_x][2] - x_list[i_x][2]
 			local tick_delta_y = y_list[begin_y][2] - y_list[i_y][2]
 			local tick_delta = math.max(tick_delta_x,tick_delta_y)
 
-			-- Save the estimated move
-			self.EstimatedMove = { tick_delta / dist, angle, GetTick() }
+			estimate.speed = tick_delta / dist
+
+			-- Store the time of last estimation
+			estimate.last = GetTick()
 		end
 
 		-- And return
-		return self.EstimatedMove[1], self.EstimatedMove[2]
+		return estimate.speed, estimate.angle
 	end
 
 	--------------------
@@ -1159,27 +897,25 @@ do
 	--	- negative values represent future (estimated)
 	--	- positive values represent past (recorded)
 	--
-	-- NOTE:
-	--	Because of the nature of closures, a new function is generated for each
-	--	originating actor and for each millisecond value. In effort to reduce
-	--	memory bloat, keep arbitrary actors/numbers to a minimum.
-	--		
+	--
+
+	-- Closures will timeout and be removed after 10 seconds of non-use
+	local closure_timeout = 10000
 
 	-- Pythagorean Distance
 	Actor.DistanceTo = function(self,a,b)
 		-- Check if a specific closure is requested
 		if type(a) == "number" and b == nil then
 
-			-- Ensure we have a closures table
-			if not self[closures].DistanceTo then
-				self[closures].DistanceTo = {}
-			end
-
 			-- Check if a closure already exists
 			if not self[closures].DistanceTo[a] then
 
+				-- Create table to hold the closure
+				local table = {}
+				self[closures].DistanceTo[a] = table
+
 				-- Create closure
-				self[closures].DistanceTo[a] = function(x,y)				
+				table.func = function(x,y)
 					-- Main function logic follows
 
 					-- Check if "x" is an actor table
@@ -1192,10 +928,18 @@ do
 
 				end -- function(x,y)
 
+				-- Add a timeout to remove the table
+				table.timeout = RAIL.Timeouts:New(closure_timeout,false,function()
+					self[closures].DistanceTo[a] = nil
+				end)
+
 			end -- not self[closures].DistanceTo[a]
 
+			-- Update the timeout
+			self[closures].DistanceTo[a].timeout[2] = GetTick()
+
 			-- Return the requested closure
-			return self[closures].DistanceTo[a]
+			return self[closures].DistanceTo[a].func
 		end
 
 		-- Not requesting specific closure, so use 0
@@ -1207,16 +951,15 @@ do
 		-- Check if a specific closure is requested
 		if type(a) == "number" and c == nil then
 
-			-- Ensure we have a closures table
-			if not self[closures].DistancePlot then
-				self[closures].DistancePlot = {}
-			end
-
 			-- Check if a closure already exists
 			if not self[closures].DistancePlot[a] then
 
+				-- Create table to hold the closure
+				local table = {}
+				self[closures].DistancePlot[a] = table
+
 				-- Create closure
-				self[closures].DistancePlot[a] = function(x,y,dist_delta)
+				table.func = function(x,y,dist_delta)
 					-- Main function logic follows
 
 					-- Check if "x" is an actor table
@@ -1231,10 +974,18 @@ do
 
 				end -- function(x,y,dist)
 
+				-- Add a timeout to remove the table
+				table.timeout = RAIL.Timeouts:New(closure_timeout,false,function()
+					self[closures].DistancePlot[a] = nil
+				end)
+
 			end -- not self[closures].DistancePlot[a]
 
+			-- Update the timeout
+			self[closures].DistancePlot[a].timeout[2] = GetTick()
+
 			-- Return the requested closure
-			return self[closures].DistancePlot[a]
+			return self[closures].DistancePlot[a].func
 		end
 
 		-- Not requesting specific closure, so use 0
@@ -1246,16 +997,15 @@ do
 		-- Check if a specific closure is requested
 		if type(a) == "number" and b == nil then
 
-			-- Ensure we have a closures table
-			if not self[closures].BlocksTo then
-				self[closures].BlocksTo = {}
-			end
-
 			-- Check if a closure already exists
 			if not self[closures].BlocksTo[a] then
 
+				-- Create table to hold the closure
+				local table = {}
+				self[closures].BlocksTo[a] = table
+
 				-- Create closure
-				self[closures].BlocksTo[a] = function(x,y)
+				table.func = function(x,y)
 					-- Main function logic follows
 
 					-- Check if "x" is an actor table
@@ -1268,10 +1018,18 @@ do
 
 				end -- function(x,y)
 
+				-- Add a timeout to remove the table
+				table.timeout = RAIL.Timeouts:New(closure_timeout,false,function()
+					self[closures].BlocksTo[a] = nil
+				end)
+
 			end -- not self[closures].BlocksTo[a]
 
+			-- Update the timeout
+			self[closures].BlocksTo[a].timeout[2] = GetTick()
+
 			-- Return the requested closure
-			return self[closures].BlocksTo[a]
+			return self[closures].BlocksTo[a].func
 		end
 
 		-- Not requesting specific closure, so use 0
@@ -1282,11 +1040,6 @@ do
 	Actor.AngleTo = function(self,a,b)
 		-- Check if a specific closure is requested
 		if type(a) == "number" and b == nil then
-
-			-- Ensure we have a closures table
-			if not self[closures].AngleTo then
-				self[closures].AngleTo = {}
-			end
 
 			-- Check if a closure already exists
 			if not self[closures].AngleTo[a] then
@@ -1319,11 +1072,6 @@ do
 		-- Check if a specific closure is requested
 		if type(a) == "number" and b == nil then
 
-			-- Ensure we have a closures table
-			if not self[closures].AngleFrom then
-				self[closures].AngleFrom = {}
-			end
-
 			-- Check if a closure already exists
 			if not self[closures].AngleFrom[a] then
 
@@ -1354,11 +1102,6 @@ do
 	Actor.AnglePlot = function(self,a,b)
 		-- Check if a specific closure is requested
 		if type(a) == "number" and b == nil then
-
-			-- Ensure we have a closures table
-			if not self[closures].AnglePlot then
-				self[closures].AnglePlot = {}
-			end
 
 			-- Check if a closure already exists
 			if not self[closures].AnglePlot[a] then
@@ -1399,29 +1142,7 @@ do
 		-- Send the skill
 		skill:Cast(self.ID)
 
-		-- Ensure we have a closures table
-		if not self[closures].SkillCallbacks then
-			self[closures].SkillCallbacks = {
-				Success = function(s,ticks)
-					-- Reset skill-failed counter
-					self.BattleOpts.CastsFailed = 0
-	
-					-- Increment skill counter
-					self.BattleOpts.CastsAgainst = (self.BattleOpts.CastsAgainst or 0) + 1
-	
-					-- And never see this actor as kill-stealing
-					self.BattleOpts.FreeForAll = true
-				end,
-				Failure = function(s,ticks)
-					-- Increment skill-failed counter
-					self.BattleOpts.CastsFailed = (self.BattleOpts.CastsFailed or 0) + 1
-
-					-- TODO: Ignore after a number of consequtive failures
-				end
-			}
-		end
-
-		-- Create a closure for skill success/failure
+		-- Set the callbacks for the skill
 		SetSkillCallbacks(skill,self[closures].SkillCallbacks.Success,self[closures].SkillCallbacks.Failure)
 	end
 
