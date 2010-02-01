@@ -16,20 +16,44 @@ local min_priority = -10000
 
 -- Interception Routines
 do
+	local none_algo
+
 	CalculateIntercept = {
 		-- Routine with no interception algorithm
-		none = function(target)
-			return target.X[0],target.Y[0]
+		none = function(target,range,ticks)
+			local x,y
+
+			-- Use a projected time of 0 if none is specified
+			--	(or it references a time in the past)
+			if not ticks or ticks > 0 then
+				ticks = 0
+			end
+
+			-- Calculate the distance and angle from it (now)
+			local angle,dist = RAIL.Self:AngleFrom(ticks)(target)
+
+			-- Check if the target is within range
+			if dist > range then
+				-- Plot a point that's within range of the target
+				x,y = target:AnglePlot(ticks)(angle,range)
+			else
+				-- Don't move
+				x,y = nil,nil
+			end
+
+			return x,y
 		end,
 
 		-- Sloppy, but processor unintensive
-		sloppy = function(target)
-			return target.X[-500],target.Y[-500]
+		sloppy = function(target,range)
+			-- Calculate the distance and angle from the target's projected position 500ms in the future
+			--	(reuse the "none" algorithm, but at 500ms into the future)
+			return none_algo(target,range,-500)
 		end,
 
 		-- Regular
-		normal = function(target)
-			-- Get movement speed
+		normal = function(target,range)
+			-- Get movement speed of ourself
 			local speed = RAIL.Self:EstimateMove()
 
 			-- Estimate time it'd take to reach the target (if it were standing still)
@@ -39,12 +63,26 @@ do
 			-- Bring ticks down a bit
 			ticks = math.floor(ticks / 2)
 
-			-- Return the actor's projected position at <ticks> time in the future
-			return target.X[-ticks],target.Y[-ticks]
+			-- Use the actor's projected position at <ticks> time in the future
+			local x,y = target.X[-ticks],target.Y[-ticks]
+
+			-- Calculate the distance and angle from that position
+			local angle,dist = RAIL.Self:AngleFrom(0)(x,y)
+
+			-- Check if the position is within range
+			if dist > range then
+				-- Plot a point that's closer to it
+				x,y = PlotCircle(x,y,angle,range)
+			else
+				-- Don't move
+				x,y = nil,nil
+			end
+
+			return x,y
 		end,
 
 		-- Should be accurate, but more processor intensive
-		advanced = function(target)
+		advanced = function(target,range)
 			-- TODO: This is all fuckered up. Unusable in current form.
 			--		Fix it.
 
@@ -112,8 +150,10 @@ do
 		end,
 	}
 
+	none_algo = CalculateIntercept.none
+
 	setmetatable(CalculateIntercept,{
-		__call = function(t,target)
+		__call = function(t,target,range)
 			-- Verify input
 			if not RAIL.IsActor(target) then
 				return nil
@@ -127,7 +167,7 @@ do
 				true
 			then
 				-- Return the actor's current position since it's standing still
-				return target.X[0],target.Y[0]
+				return none_algo(target,range)
 			end
 
 			-- Get the intercept algorithm
@@ -136,11 +176,11 @@ do
 			-- Verify the algorithm is a function
 			if type(algo) ~= "function" then
 				-- Return the target's current position
-				return target.X[0],target.Y[0]
+				return none_algo(target,range)
 			end
 
 			-- Run the intercept algorithm
-			return algo(target)
+			return algo(target,range)
 		end,
 	})
 end
