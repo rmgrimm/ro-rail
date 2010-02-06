@@ -1044,8 +1044,12 @@ do
 			-- Check if a closure already exists
 			if not self[closures].AngleTo[a] then
 
+				-- Create table to hold the closure
+				local table = {}
+				self[closures].AngleTo[a] = table
+
 				-- Create closure
-				self[closures].AngleTo[a] = function(x,y)
+				table.func = function(x,y)
 					-- Main function logic follows
 
 					-- Check if "x" is an actor table
@@ -1057,10 +1061,18 @@ do
 					return GetAngle(self.X[a],self.Y[a],x,y)
 				end -- function(x,y)
 
+				-- Add a timeout to remove the table
+				table.timeout = RAIL.Timeouts:New(closure_timeout,false,function()
+					self[closures].AngleTo[a] = nil
+				end)
+
 			end -- not self[closures].AngleTo[a]
 
+			-- Update the timeout
+			self[closures].AngleTo[a].timeout[2] = GetTick()
+
 			-- Return the requested closure
-			return self[closures].AngleTo[a]
+			return self[closures].AngleTo[a].func
 		end
 
 		-- Not requesting specific closure, so use 0
@@ -1075,8 +1087,12 @@ do
 			-- Check if a closure already exists
 			if not self[closures].AngleFrom[a] then
 
+				-- Create table to hold the closure
+				local table = {}
+				self[closures].AngleFrom[a] = table
+
 				-- Create closure
-				self[closures].AngleFrom[a] = function(x,y)
+				table.func = function(x,y)
 					-- Main function logic follows
 
 					-- Check if "x" is an actor table
@@ -1088,10 +1104,18 @@ do
 					return GetAngle(x,y,self.X[a],self.Y[a])
 				end -- function(x,y)
 
+				-- Add a timeout to remove the table
+				table.timeout = RAIL.Timeouts:New(closure_timeout,false,function()
+					self[closures].AngleFrom[a] = nil
+				end)
+
 			end -- not self[closures].AngleFrom[a]
 
+			-- Update the timeout
+			self[closures].AngleFrom[a].timeout[2] = GetTick()
+
 			-- Return the requested closure
-			return self[closures].AngleFrom[a]
+			return self[closures].AngleFrom[a].func
 		end
 
 		-- Not requesting specific closure, so use 0
@@ -1106,17 +1130,29 @@ do
 			-- Check if a closure already exists
 			if not self[closures].AnglePlot[a] then
 
+				-- Create table to hold the closure
+				local table = {}
+				self[closures].AnglePlot[a] = table
+
 				-- Create closure
-				self[closures].AnglePlot[a] = function(angle,radius)
+				table.func = function(angle,radius)
 					-- Main function logic follows
 
 					return PlotCircle(self.X[a],self.Y[a],angle,radius)
 				end -- function(angle,radius)
 
+				-- Add a timeout to remove the table
+				table.timeout = RAIL.Timeouts:New(closure_timeout,false,function()
+					self[closures].AnglePlot[a] = nil
+				end)
+
 			end -- not self[closures].AnglePlot[a]
 
+			-- Update the timeout
+			self[closures].AnglePlot[a].timeout[2] = GetTick()
+
 			-- Return the requested closure
-			return self[closures].AnglePlot[a]
+			return self[closures].AnglePlot[a].func
 		end
 
 		-- Not requesting specific closure, so use 0
