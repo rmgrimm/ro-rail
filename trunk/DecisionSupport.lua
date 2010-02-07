@@ -9,7 +9,18 @@ RAIL.Validate.DefendOptions = {is_subtable = true,
 	SelfThreshold = {"number",5,0},
 	FriendThreshold = {"number",4,0},
 }
-RAIL.Validate.InterceptAlgorithm = {"string","none"}
+RAIL.Validate.InterceptAlgorithm = {"string","normal"}
+RAIL.Validate.SkillOptions = {is_subtable = true,
+	AttackPriorityOffset = {"number",0},
+	ChaosHeal = {is_subtable = true,
+		Priority = {"number",50},
+		EstimateFutureTicks = {"number",0,0},
+		OwnerHP = {"number",50,0},
+		OwnerHPisPercent = {"boolean",true},
+		SelfHP = {"number",0,0},
+		SelfHPisPercent = {"boolean",false},
+	},
+}
 
 -- Minimum priority (not an option)
 local min_priority = -10000
@@ -53,18 +64,22 @@ do
 
 		-- Regular
 		normal = function(target,range)
-			-- Get movement speed of ourself
-			local speed = RAIL.Self:EstimateMove()
+			-- Get movement speed of ourself and our target
+			local s_speed = RAIL.Self:EstimateMove()
+			local t_speed,t_angle = target:EstimateMove()
 
 			-- Estimate time it'd take to reach the target (if it were standing still)
-			local dist = RAIL.Self:DistanceTo(target)
-			local ticks = dist * speed
+			local s_dist = RAIL.Self:DistanceTo(target)
+			local ticks = s_dist * s_speed
 
-			-- Bring ticks down a bit
-			ticks = math.floor(ticks / 2)
+			-- See how far the target will go in that time
+			local t_dist = math.floor(ticks / t_speed)
 
-			-- Use the actor's projected position at <ticks> time in the future
-			local x,y = target.X[-ticks],target.Y[-ticks]
+			-- Bring distance down a bit
+			if t_dist >= 3 then t_dist = 3 end
+
+			-- Project where the actor will be after moving that distance
+			local x,y = target:AnglePlot(t_angle,t_dist)
 
 			-- Calculate the distance and angle from that position
 			local angle,dist = RAIL.Self:AngleFrom(0)(x,y)
@@ -704,6 +719,9 @@ do
 					-- Get the target priority
 					local prio = target.BattleOpts.Priority
 
+					-- And offset it based on options
+					prio = prio + RAIL.State.SkillOptions.AttackPriorityOffset
+
 					return prio,skill,target
 				end
 
@@ -788,6 +806,47 @@ do
 				end
 
 				-- Otherwise, return nothing
+				return
+			end,
+		},
+		ChaosHeal = {
+			Select = function(skill)
+				-- Get some skill options for use later
+				local priority = RAIL.State.SkillOptions.ChaosHeal.Priority
+				local advance_heal = -RAIL.State.SkillOptions.ChaosHeal.EstimateFutureTicks
+
+				-- Check if we're going for percentages
+				local owner_cur_hp = RAIL.Owner.HP[advance_heal]
+				if RAIL.State.SkillOptions.ChaosHeal.OwnerHPisPercent then
+					owner_cur_hp = math.floor(owner_cur_hp * 100 / GetV(V_MAXHP,RAIL.Owner.ID))
+				end
+				local self_cur_hp = RAIL.Self.HP[advance_heal]
+				if RAIL.State.SkillOptions.ChaosHeal.SelfHPisPercent then
+					self_cur_hp = math.floor(self_cur_hp * 100 / GetV(V_MAXHP,RAIL.Self.ID))
+				end
+
+				-- Check to see if we should try healing our owner
+				if
+					owner_cur_hp <= RAIL.State.SkillOptions.ChaosHeal.OwnerHP and
+					RAIL.Self.SP[0] >= skill[3].SPCost
+				then
+					-- Heal our owner
+					--	Note: level 3 has 50% chance to heal owner
+					return priority,skill[3],RAIL.Owner
+
+				elseif
+					self_cur_hp <= RAIL.State.SkillOptions.ChaosHeal.SelfHP and
+					RAIL.Self.SP[0] >= skill[4].SPCost
+				then
+					-- Heal our homunculus
+					--	Note: level 4 has a 60% chance to heal self
+					return priority,skill[4],RAIL.Self
+
+				end
+
+				-- TODO: if heal should take priority over attacking, wait for SP
+
+				-- Return nothing
 				return
 			end,
 		},
