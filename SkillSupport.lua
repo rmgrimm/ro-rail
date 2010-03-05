@@ -26,20 +26,6 @@ do
 	end
 end
 
--- Add callback functions to a skill
-do
-	function SetSkillCallbacks(skill,success,failure)
-		local skill_base = AllSkills[skill.ID]
-
-		-- Loop through each level and set success/failure callback
-		for i=1,skill_base.Level do
-			-- Set the success and failure callback
-			skill_base[i].Success = success
-			skill_base[i].Failure = failure
-		end
-	end
-end
-
 -- Skill state
 do
 	-- Possible skill states
@@ -70,7 +56,7 @@ do
 		Enum = state_enum,
 
 		-- Wait for a skill to cast
-		WaitFor = function(self,skill,timeout)
+		WaitFor = function(self,skill,target,timeout)
 			-- Ensure we're ready for a skill
 			if self[key].state ~= state_enum.READY then
 				return false
@@ -85,6 +71,7 @@ do
 			-- Set the state, skill, and the beginning time
 			self[key].state = state
 			self[key].skill = skill
+			self[key].target = target
 			self[key].ticks[state] = GetTick()
 			self[key].ticks.begin = self[key].ticks[state]
 
@@ -245,6 +232,97 @@ do
 				return
 			end,
 		},
+
+		-- Callback functions
+		Callbacks = {
+			-- Add functions to the callback list
+			Add = function(self,skill,success,failure,persistent)
+				-- Get the parent table's hidden callbacks table
+				local cb = self[key][key].callbacks
+
+				-- If tables don't exist, create them
+				if not cb.success[skill.ID] then
+					cb.success[skill.ID] = {}
+				end
+				if not cb.failure[skill.ID] then
+					cb.failure[skill.ID] = {}
+				end
+
+				-- Ensure we have have a persistent option
+				if persistent == nil then
+					persistent = false
+				end
+
+				-- Add callbacks to the table
+				if success ~= nil then
+					cb.success[skill.ID][success] = persistent
+				end
+				if failure ~= nil then
+					cb.failure[skill.ID][failure] = persistent
+				end
+			end,
+
+			-- Fire the callbacks that are registered for a skill
+			Fire = function(self,skill,succeeded,...)
+				-- Get the parent table's hidden callback set
+				local cb = self[key][key].callbacks
+
+				-- Decide whether to use success callbacks or failure callbacks
+				local t
+				if succeeded then
+					t = cb.success[skill.ID]
+				else
+					t = cb.failure[skill.ID]
+				end
+
+				-- Check if there are any callbacks
+				if t ~= nil and type(t) == "table" then
+					-- Loop through the functions
+					for f in t do
+						-- Call the function
+						f(skill,unpack(arg))
+					end
+				end
+			end,
+
+			-- Clear some or all callbacks
+			Clear = function(self,skill)
+				-- Get the parent table's hidden callback table
+				local cb = self[key][key].callbacks
+
+				-- Check if we're clearing all callbacks
+				if not skill then
+					-- Loop through each skill and clear it
+					for id,table in cb.success do
+						-- Note: Use a fake skill that only holds ID
+						self:Clear({ID = id})
+					end
+				else
+					-- Check if there are tables for this skill
+					if not cb.success[skill.ID] then
+						return
+					end
+
+					-- Loop through the success callbacks, and add them to a replacement table
+					local success = {}
+					for f,persist in cb.success[skill.ID] do
+						if persist then
+							success[f] = persist
+						end
+					end
+					cb.success[skill.ID] = success
+
+					-- Loop through the failure callbacks, and add them to a replacement table
+					local failure = {}
+					for f,persist in cb.failure[skill.ID] do
+						if persist then
+							failure[f] = persist
+						end
+					end
+					cb.failure[skill.ID] = failure
+				end
+			end,
+		},
 	}
 
 	-- Metatable for SkillState-class objects
@@ -302,10 +380,11 @@ do
 						RAIL.LogT(60,"Cast of {1} failed after {2}ms; reason = {3}.",
 							skill.Name,GetTick()-parent[key].ticks.begin,reason)
 
-						-- If the skill has a failure callback, fire it
-						if type(skill.Failure) == "function" then
-							skill:Failure(ticks)
-						end
+						-- Fire any failure callback for this skill
+						parent.Callbacks:Fire(skill,false,parent[key].target,ticks)
+
+						-- Clear callbacks for this skill
+						parent.Callbacks:Clear(skill)
 
 						-- Set ticks to GetTick(), so CompletedTime() will return close to 0
 						ticks = GetTick()
@@ -320,10 +399,11 @@ do
 						RAIL.LogT(60,"Cast of {1} succeeded after {2}ms.",
 							skill.Name,GetTick()-parent[key].ticks.begin)
 
-						-- If the skill has a success callback, fire it
-						if type(skill.Success) == "function" then
-							skill:Success(ticks)
-						end
+						-- Fire any success callbacks for this skill
+						parent.Callbacks:Fire(skill,true,parent[key].target,ticks)
+
+						-- Clear callbacks for this skill
+						parent.Callbacks:Clear(skill)
 					end
 
 					-- Set the state and ticks
@@ -332,6 +412,11 @@ do
 				end
 			end
 		end,
+	}
+
+	-- Metatable for generated Callbacks tables
+	local callbacks_mt = {
+		__index = SkillState.Callbacks,
 	}
 
 	-- Get the private Actor class table
@@ -352,25 +437,32 @@ do
 				ticks = {
 					[state_enum.READY] = 0,
 				},
+				callbacks = {
+					success = {},
+					failure = {},
+				},
 			},
 			Update = {},
+			Callbacks = {},
 		}
 
-		-- Set the Update parent table to self.SkillState
+		-- Set the Update and Callbacks parent table to self.SkillState
 		self.SkillState.Update[key] = self.SkillState
+		self.SkillState.Callbacks[key] = self.SkillState
 
 		-- Set metatables
 		setmetatable(self.SkillState,mt)
 		setmetatable(self.SkillState.Update,update_mt)
+		setmetatable(self.SkillState.Callbacks,callbacks_mt)
 
 		-- Override the InitSkillState function with a blank function
 		self.InitSkillState = blank_f
 
 		-- Hook the actor Update() function to also update skill state
 		local update = self.Update
-		self.Update = function(self)
+		self.Update = function(self,...)
 			-- First call the hooked function
-			local ret = update(self)
+			local ret = update(self,unpack(arg))
 
 			-- Then update the skill state
 			self.SkillState:Update(self)

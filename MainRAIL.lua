@@ -1,7 +1,11 @@
 -- Save the global environment that RAIL is loaded from
 RAIL._G = getfenv(0)
 
--- Load State.lua before all others, to allow others to add state validation options
+-- Load the configuration options
+require "Config.lua"
+
+-- Load State.lua before all other code, to allow others to add state
+--	validation options
 require "State.lua"
 
 -- Alphabetical
@@ -9,6 +13,7 @@ require "ActorOpts.lua"
 require "Const.lua"
 require "Debug.lua"
 require "History.lua"
+require "SkillAIs.lua"
 require "Table.lua"
 require "Timeout.lua"
 require "Utils.lua"
@@ -92,9 +97,9 @@ function AI(id)
 	do
 		local update = RAIL.Owner.Update
 		-- An extended variant of Update(), to track HP and SP values
-		RAIL.Owner.Update = function(self)
+		RAIL.Owner.Update = function(self,...)
 			-- First, call the regular update
-			update(self)
+			update(self,unpack(arg))
 
 			-- Update the HP and SP tables
 			History.Update(self.HP,GetV(V_HP,self.ID))
