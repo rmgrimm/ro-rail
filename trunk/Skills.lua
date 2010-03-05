@@ -381,6 +381,7 @@ do
 			CastFunction = "actor",
 			MaxLevel = 10,
 			SPCost = function(level) return 3 + level*1 end,
+			CastDelay = 500,
 			Duration = 30 * 1000,
 		},
 		[8233] = {
@@ -439,33 +440,44 @@ do
 			RAIL.LogT(60,"Casting {1}.",self.Name)
 
 			-- Set the skill state
-			RAIL.Self.SkillState:WaitFor(self)
+			RAIL.Self.SkillState:WaitFor(self,RAIL.Self)
 
 			-- Use the skill
 			SkillObject(RAIL.Self.ID,self.Level,self.ID,RAIL.Self.ID)
 		end,
 		["actor"] = function(self,actor)
+			-- Convert actor to an Actors object
+			actor = Actors[actor]
+
 			-- Log the skill usage against actor
-			RAIL.LogT(60,"Casting {1} against {2}.",self.Name,Actors[actor])
+			RAIL.LogT(60,"Casting {1} against {2}.",self.Name,actor)
 
 			-- Set the skill state
-			RAIL.Self.SkillState:WaitFor(self)
+			RAIL.Self.SkillState:WaitFor(self,actor)
 
 			-- Use the skill
-			SkillObject(RAIL.Self.ID,self.Level,self.ID,actor)
+			SkillObject(RAIL.Self.ID,self.Level,self.ID,actor.ID)
 		end,
 		["ground"] = function(self,x,y)
 			-- Ensure we've got coordinates
 			if RAIL.IsActor(x) then
+				-- Set the skill state
+				RAIL.Self.SkillState:WaitFor(self,x)
+
+				-- Log it
 				RAIL.LogT(60,"Casting {1} against {2}.",self.Name,x)
+
+				-- Get the ground location
 				y = x.Y[0]
 				x = x.X[0]
 			else
+				-- Set the skill state
+				-- TODO
+				--RAIL.Self.SkillState:WaitFor(self,x,y)
+
+				-- Log it
 				RAIL.LogT(60,"Casting {1} on ({2},{3}).",self.Name,x,y)
 			end
-
-			-- Set the skill state
-			RAIL.Self.SkillState:WaitFor(self)
 
 			-- Use the skill
 			SkillGround(RAIL.Self.ID,self.Level,self.ID,x,y)

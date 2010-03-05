@@ -357,7 +357,7 @@ do
 
 					-- Hook the expire function
 					local expire = RAIL.Other.Expire
-					RAIL.Other.Expire = function(self,reason)
+					RAIL.Other.Expire = function(self,...)
 						-- Check if we're still the owner's other
 						if RAIL.Other == self then
 							-- Log it
@@ -371,7 +371,7 @@ do
 						self.Expire = expire
 
 						-- Forward the function call
-						return self:Expire(reason)
+						return self:Expire(unpack(arg))
 					end
 				end
 			end

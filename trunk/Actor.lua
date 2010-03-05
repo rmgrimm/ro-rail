@@ -134,25 +134,6 @@ do
 			AngleTo = {},
 			AngleFrom = {},
 			AnglePlot = {},
-			SkillCallbacks = {
-				-- Generate the skill success and failure callbacks now
-				Success = function(s,ticks)
-					-- Reset skill-failed counter
-					ret.BattleOpts.CastsFailed = 0
-
-					-- Increment skill counter
-					ret.BattleOpts.CastsAgainst = (ret.BattleOpts.CastsAgainst or 0) + 1
-
-					-- And never see this actor as kill-stealing
-					ret.BattleOpts.FreeForAll = true
-				end,
-				Failure = function(s,ticks)
-					-- Increment skill-failed counter
-					ret.BattleOpts.CastsFailed = (ret.BattleOpts.CastsFailed or 0) + 1
-
-					-- TODO: Ignore after a number of consequtive failures
-				end
-			},
 		}
 
 		-- Initialize the type
@@ -1178,8 +1159,8 @@ do
 		-- Send the skill
 		skill:Cast(self.ID)
 
-		-- Set the callbacks for the skill
-		SetSkillCallbacks(skill,self[closures].SkillCallbacks.Success,self[closures].SkillCallbacks.Failure)
+		-- And never see this actor as kill-stealing
+		self.BattleOpts.FreeForAll = true
 	end
 
 	-----------------------
