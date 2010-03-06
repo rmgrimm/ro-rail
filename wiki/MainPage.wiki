@@ -1,0 +1,6 @@
+#summary The main landing page for the RAIL wiki.
+#labels Phase-Requirements
+
+= Introduction =
+
+Rampage AI Lite (RAIL) is a complete rewrite of RampageAI from the ground up. It is written with the intent of being faster and more efficient. In addition, this rewrite takes into account the changes in Ragnarok since the last release of RampageAI (eg, Mercenaries, Alchemist-skill removal, etc).
