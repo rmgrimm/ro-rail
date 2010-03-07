@@ -2,6 +2,7 @@
 RAIL._G = getfenv(0)
 
 -- Save the version of RAIL
+RAIL.Revision = "$Rev$"
 RAIL.Version = "$Id$"
 
 -- Load the configuration options
@@ -34,6 +35,7 @@ RAIL.Validate.Information = {is_subtable = true,
 	OwnerID = {"number", 0},
 	OwnerName = {"string", "unknown"},
 	SelfID = {"number", 0},
+	RAILVersion = {"string", "unknown"},
 }
 
 RAIL.Validate.AcquireWhileLocked = {"boolean",false}
@@ -63,7 +65,8 @@ function AI(id)
 	end
 
 	-- Log the AI initialization
-	RAIL.LogT(0,"RampageAI Lite {1} initializing...",RAIL.Version)
+	RAIL.LogT(0,"RampageAI Lite {1} initializing...",RAIL.Revision)
+	RAIL.LogT(0," --> Full Version ID = {1}",RAIL.Version)
 
 	-- Check for some features of Lua
 	RAIL.LogT(0," --> Lua: _VERSION = {1}; pcall = {2}; debug = {3}; coroutine = {4};",
@@ -77,6 +80,7 @@ function AI(id)
 	RAIL.State.Information.InitTime = GetTick()
 	RAIL.State.Information.OwnerID = GetV(V_OWNER,id)
 	RAIL.State.Information.SelfID = id
+	RAIL.State.Information.RAILVersion = RAIL.Version
 
 	-- Get Owner and Self
 	RAIL.Owner = Actors[GetV(V_OWNER,id)]
