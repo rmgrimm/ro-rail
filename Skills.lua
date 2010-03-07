@@ -472,7 +472,7 @@ do
 				x = x.X[0]
 			else
 				-- Set the skill state
-				-- TODO
+				-- TODO: Allow SkillState:WaitFor to take a ground location
 				--RAIL.Self.SkillState:WaitFor(self,x,y)
 
 				-- Log it
@@ -514,7 +514,8 @@ do
 
 			-- Select the cast and range functions
 			local cast_func = function_or_string(parameters.CastFunction,CastFunctions,function(self,...)
-				-- TODO: Log
+				-- Log
+				RAIL.LogT(0,"Unknown cast type for skill {1}.",self.Name)
 			end)
 			local range_func = function_or_string(parameters.Range,{},function(self)
 				-- Use GetV to determine the range

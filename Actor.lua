@@ -129,7 +129,6 @@ do
 		-- Create tables to hold the closures
 		ret[closures] = {
 			DistanceTo = {},
-			DistancePlot = {},
 			BlocksTo = {},
 			AngleTo = {},
 			AngleFrom = {},
@@ -557,14 +556,15 @@ do
 	Actor.Ignore = function(self,ticks)
 		-- If it's already ignored, do nothing
 		if self:IsIgnored() then
-			-- TODO: Update the time? Max(ticks,self.IgnoreTime)?
+			-- Update the ignore time to whichever is higher
+			self.IgnoreTime = math.max(ticks,self.IgnoreTime)
+
 			return self
 		end
 
 		-- Use default ticks if needed
 		if type(ticks) ~= "number" then
-			-- TODO: default ignore time as option
-			ticks = 10000
+			ticks = self.BattleOpts.DefaultIgnoreTicks
 		end
 
 		RAIL.LogT(20,"{1} ignored for {2} milliseconds.",self,ticks)
@@ -870,7 +870,7 @@ do
 		end
 
 		-- Check if the monster is probably part of a mob-train
-		-- TODO: Moving
+		-- TODO: Check for monster chasing another
 
 		-- Default is not kill-steal
 		return false
@@ -960,52 +960,6 @@ do
 
 		-- Not requesting specific closure, so use 0
 		return Actor.DistanceTo(self,0)(a,b)
-	end
-
-	-- Point along line of self and (x,y)
-	Actor.DistancePlot = function(self,a,b,c)
-		-- Check if a specific closure is requested
-		if type(a) == "number" and c == nil then
-
-			-- Check if a closure already exists
-			if not self[closures].DistancePlot[a] then
-
-				-- Create table to hold the closure
-				local table = {}
-				self[closures].DistancePlot[a] = table
-
-				-- Create closure
-				table.func = function(x,y,dist_delta)
-					-- Main function logic follows
-
-					-- Check if "x" is an actor table
-					if RAIL.IsActor(x) then
-						dist = y
-						y = x.Y[a]
-						x = x.X[a]
-					end
-
-					-- TODO: finish
-					return 0,0
-
-				end -- function(x,y,dist)
-
-				-- Add a timeout to remove the table
-				table.timeout = RAIL.Timeouts:New(closure_timeout,false,function()
-					self[closures].DistancePlot[a] = nil
-				end)
-
-			end -- not self[closures].DistancePlot[a]
-
-			-- Update the timeout
-			self[closures].DistancePlot[a].timeout[2] = GetTick()
-
-			-- Return the requested closure
-			return self[closures].DistancePlot[a].func
-		end
-
-		-- Not requesting specific closure, so use 0
-		return Actor.DistancePlot(self,0)(a,b,c)
 	end
 
 	-- Straight-line Block Distance

@@ -1,6 +1,9 @@
 -- Save the global environment that RAIL is loaded from
 RAIL._G = getfenv(0)
 
+-- Save the version of RAIL
+RAIL.Version = "$Id$"
+
 -- Load the configuration options
 require "Config.lua"
 
@@ -41,8 +44,33 @@ RAIL.Validate.MaxDistance = {"number", 13, 3, 14}
 RAIL.Validate.FollowDistance = {"number", 7, 3, 14}
 
 function AI(id)
+	-- Prevent logging while loading state file the first time
+	RAIL.Log.Disabled = true
+
 	-- Load persistent state data
 	RAIL.State:SetOwnerID(GetV(V_OWNER,id))
+	RAIL.State:Load(true)
+
+	-- Re-enable logging
+	RAIL.Log.Disabled = false
+
+	-- Put some space to signify reload
+	if RAIL.UseTraceAI then
+		TraceAI("\r\n\r\n\r\n")
+	else
+		-- Not translatable
+		RAIL.Log(0,"\n\n\n")
+	end
+
+	-- Log the AI initialization
+	RAIL.LogT(0,"RampageAI Lite {1} initializing...",RAIL.Version)
+
+	-- Check for some features of Lua
+	RAIL.LogT(0," --> Lua: _VERSION = {1}; pcall = {2}; debug = {3}; coroutine = {4};",
+		RAIL._G._VERSION, RAIL._G.pcall, RAIL._G.debug, RAIL._G.coroutine)
+
+	-- Load persistent state data again
+	--	Note: Redundant, but will show up in the log now
 	RAIL.State:Load(true)
 
 	-- Store the initialization time
@@ -53,6 +81,9 @@ function AI(id)
 	-- Get Owner and Self
 	RAIL.Owner = Actors[GetV(V_OWNER,id)]
 	RAIL.LogT(40," --> Owner; Name = {1}",RAIL.State.Information.OwnerName)
+	if RAIL.State.Information.OwnerName ~= "unknown" then
+		RAIL.Owner.BattleOpts.Name = RAIL.State.Information.OwnerName
+	end
 	RAIL.Self  = Actors[id]
 
 	-- Get AI type
@@ -192,7 +223,12 @@ function RAIL.AI(id)
 				-- Check that chasing would be worthwhile
 				if terminate == nil then
 					-- Check if we're following normally
-					if not RAIL.State.RunAhead then
+					if
+						-- Run ahead is disabled for now
+						true or
+
+						not RAIL.State.RunAhead
+					then
 						-- Owner-chase estimation is based on max distance
 						local max_estim = (-1 * math.ceil(RAIL.State.MaxDistance / 4))
 							* RAIL.Owner:EstimateMove()
@@ -379,9 +415,8 @@ function RAIL.AI(id)
 		-- Move
 		if Target.Chase == nil then
 			-- Check chase target history
-			-- TODO: test further
 			if
-				-- Debug toggle
+				-- Debug toggle for chase ignore
 				true and
 
 
@@ -392,15 +427,21 @@ function RAIL.AI(id)
 				local list = History.GetConstList(RAIL.TargetHistory.Chase)
 				local tick_delta = GetTick() - list[list.last][2]
 
-				-- TODO: Make state option for this
-				local ignore_after = 5000
+				-- Get the state option for this actor
+				local actor = Actors[RAIL.TargetHistory.Chase[0]]
+				local ignore_after = actor.BattleOpts.IgnoreAfterChaseFail
+
+				-- Use a minimum value of 2000
+				if ignore_after < 2000 and ignore_after >= 0 then
+					actor.BattleOpts.IgnoreAfterChaseFail = 2000
+					ignore_after = 2000
+				end
 
 				-- Check if we've been chasing this actor for a while
-				if tick_delta >= ignore_after then
+				if tick_delta >= ignore_after and ignore_after ~= -1 then
 					-- Decide if we've been able to get closer
 
 					-- Get our current position
-					local actor = Actors[list[list.last][1]]
 					local x,y = actor.X[0],actor.Y[0]
 
 					-- Check if X coordinate has changed recently
@@ -629,4 +670,6 @@ function RAIL.AI(id)
 end
 
 -- Script is loaded...
-RAIL.LogT(0,"\r\n\r\n\r\nRAIL loaded...")
+if RAIL.UseTraceAI then
+	RAIL.LogT(0,"RAIL loaded...")
+end
