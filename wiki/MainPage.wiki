@@ -7,8 +7,8 @@ Rampage AI Lite (RAIL) is a complete rewrite of RampageAI from the ground up. It
 
 = Installation =
 
-* [FirstTimeInstall First Time Install] - A step-by-step guide of the RAIL install process.
-* [Update RAIL Update] - A step-by-step guide to updating RAIL.
+  * [FirstTimeInstall First Time Install] - A step-by-step guide of the RAIL install process.
+  * [Update RAIL Update] - A step-by-step guide to updating RAIL.
 
 = Configuration =
 
