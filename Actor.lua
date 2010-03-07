@@ -629,8 +629,13 @@ do
 					non_move = motion_list[i+1][2]
 				end
 
-				-- Ensure that the motions are sufficiently far apart
-				if non_move - move >= 100 then
+				-- Ensure that the motions are sufficiently far apart (in time or distance)
+				local move_delta = GetTick() - move
+				local non_move_d = GetTick() - non_move
+				if
+					non_move - move >= 100 or
+					BlockDistance(self.X[non_move_d],self.Y[non_move_d],self.X[move_delta],self.Y[non_move_d]) > 0
+				then
 					-- Use these values
 					break
 				end
@@ -643,11 +648,17 @@ do
 
 		-- If no new moves were found, return from estimate
 		if
+			-- No move found
 			move == nil or
+			-- Move is same as last estimation
 			(move == estimate.last_move and non_move == estimate.last_non_move)
 		then
 			return estimate.speed, estimate.angle
 		end
+
+		-- Store the move and non_move times we're using
+		estimate.last_move = move
+		estimate.last_non_move = non_move
 
 		-- Get the X and Y position lists
 		local x_list = History.GetConstList(self.X)
@@ -727,13 +738,14 @@ do
 		local dist = BlockDistance(x1,y1,x2,y2)
 
 		-- Ensure we're still sane
-		if angle ~= -1 then
+		--	Note: And don't repeat logs for the same angle
+		if angle ~= -1 and angle ~= estimate.angle then
 			-- Store our estimated angle
 			estimate.angle = angle
 
 			-- Log it
-			RAIL.LogT(65,"Movement angle for {1} estimated at {2} degrees.",
-				self,estimate.angle)
+			RAIL.LogT(80,"Movement angle for {1} estimated at {2} degrees.",
+				self,RoundNumber(estimate.angle))
 		end
 
 		-- Check if we've calculated a better speed than before
@@ -752,13 +764,9 @@ do
 			-- Store the time of last estimation
 			estimate.last = GetTick()
 
-			-- Store the move and non_move times used
-			estimate.last_move = move
-			estimate.last_non_move = non_move
-
 			-- Log it
-			RAIL.LogT(65,"Movement speed for {1} estimated at {2}ms/tile (dist={3}).",
-				self,estimate.speed,estimate.dist)
+			RAIL.LogT(80,"Movement speed for {1} estimated at {2}ms/tile (dist={3}).",
+				self,RoundNumber(estimate.speed),estimate.dist)
 		end
 
 		-- And return
