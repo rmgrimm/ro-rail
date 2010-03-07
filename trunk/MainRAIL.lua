@@ -486,7 +486,7 @@ function RAIL.AI(id)
 		-- Attack
 		if Target.Attack ~= nil then
 			-- Log it
-			RAIL.LogT(70,"Using physical attack against {1}.",Target.Attack)
+			RAIL.LogT(75,"Using physical attack against {1}.",Target.Attack)
 
 			-- Send the attack
 			Target.Attack:Attack()
