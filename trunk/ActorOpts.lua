@@ -1,5 +1,3 @@
--- TODO: Clean up this ugly mess
-
 -- Actor options
 RAIL.Validate.ActorOptions = {is_subtable=true}
 RAIL.Validate.ActorOptions.Default = {is_subtable=true,
@@ -8,11 +6,18 @@ RAIL.Validate.ActorOptions.Default = {is_subtable=true,
 	Priority = {"number",0},		-- higher number, higher priority; eg, 10 is higher than 1
 	AttackAllowed = {"boolean",true},
 	DefendOnly = {"boolean",false},
-	SkillsAllowed = {"boolean",false},
+
+	SkillsAllowed = {"boolean",true},
 	MinSkillLevel = {"number",1,1,10},
 	MaxSkillLevel = {"number",5,1,10},
 	TicksBetweenSkills = {"number",0,0},
 	MaxCastsAgainst = {"number",-1,-1},	-- -1 is unlimited
+
+	-- amount of time to ignore the actor
+	DefaultIgnoreTicks = {"number",10000,1000},
+	-- When chasing fails, ignore actor after this many ticks
+	--	(-1 is never; values below 2000 will use 2000 instead)
+	IgnoreAfterChaseFail = {"number",5000,-1},
 }
 RAIL.Validate.ActorOptions.ByType = {is_subtable=true}
 RAIL.Validate.ActorOptions.ByID = {is_subtable=true}
@@ -25,7 +30,7 @@ end
 
 -- Actor Battle Options
 do
-	-- TODO: Optimize Actor Options...
+	-- TODO: Optimize Actor Options... (if it becomes a problem)
 	--
 	--	Actor[id].BattleOpts (metatable; checks ByID, ByType, Default)
 	--	ByID checks ByTypes
@@ -48,6 +53,7 @@ do
 	end
 
 	-- Default special actor types
+	-- TODO: Clean up this ugly mess
 	local SpecialTypes = {}
 	do
 		-- Plants

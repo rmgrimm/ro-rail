@@ -17,10 +17,16 @@
 --
 --	All files will be in your base Ragnarok Online directory (in other words,
 --	the files will not be in your AI or AI\USER_AI directories).
-SingleStateFile = false
+RAIL.SingleStateFile = true
 
 -- If UseTraceAI is set to false, logging will be redirected to a file specified
---	below.
--- Note: This isn't implemented yet.
-UseTraceAI = true
+--	in the state file under the option "DebugFile".
+RAIL.UseTraceAI = true
+
+-- If uncommented, the following line would specify the translation file to use
+--	for logging purposes. Messages not translated by the follow file will
+--	default to en-US.
+-- Note: This is not implemented yet.
+
+-- RAIL.TranslationFile = "./AI/USER_AI/zh-cn.lua"
 

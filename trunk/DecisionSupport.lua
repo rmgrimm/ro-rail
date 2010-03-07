@@ -417,7 +417,6 @@ do
 				local defend_prio = 0
 
 				-- Check to see if we should defend ourself
-				-- TODO: make a state option for priority (PrioritizeSelfDefense,PrioritizeOwnerDefense,PrioritizeFriendDefense)
 				defend_actors,defend_n,defend_prio =
 					prioritization(
 						defend_actors,defend_n,defend_prio,

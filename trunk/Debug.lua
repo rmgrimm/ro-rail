@@ -1,5 +1,6 @@
 -- State validation
 RAIL.Validate.DebugLevel = {"number",50,nil,99}
+RAIL.Validate.DebugFile = {"string","RAIL_Log.txt"}
 RAIL.Validate.ProfileMark = {"number",20000,2000,nil}
 
 -- Log Levels:
@@ -110,6 +111,34 @@ do
 		end
 	end
 
+	-- Log output function
+	local log_out = TraceAI
+
+	-- If not using TraceAI, generate a function to output to a file
+	if not RAIL.UseTraceAI then
+		log_out = function(str)
+			-- Get the filename
+			local filename = RAIL.State.DebugFile
+
+			-- Open the file for appending
+			local file = io.open(filename,"a")
+
+			-- Check for non-nil
+			if file ~= nil then
+				-- Get the date and time
+				local date_t = os.date("!*t")
+
+				-- Write the string, with a date stamp on it too
+				file:write(string.format("%4.4d-%2.2d-%2.2d %2.2d:%2.2d:%2.2d UTC %s\n",
+					date_t.year,date_t.month,date_t.day,date_t.hour,date_t.min,date_t.sec,
+					str))
+
+				-- Close the file
+				file:close()
+			end
+		end
+	end
+
 	-- Generalized log function
 	local antidup = ""
 	local function log(func,t,level,text,...)
@@ -158,17 +187,28 @@ do
 		-- Add the string to the buffer
 		buf:Append(") "):Append(str)
 
-		-- And send it to TraceAI
-		TraceAI(buf:Get())
+		-- And send it to the Log-output function (usually TraceAI)
+		log_out(buf:Get())
 	end
 
 	-- Old-style logging
-	RAIL.Log = function(level,text,...)
-		return log(format,false,level,text,unpack(arg))
-	end
+	RAIL.Log = {
+		-- Hidden flag to disable logging
+		Disabled = false,
+	}
+	setmetatable(RAIL.Log,{
+		__call = function(self,level,text,...)
+			if not self.Disabled then
+				return log(format,false,level,text,unpack(arg))
+			end
+		end,
+	})
+
 	-- New-style logging; translatable
 	RAIL.LogT = function(level,text,...)
-		return log(formatT,true,level,text,unpack(arg))
+		if not RAIL.Log.Disabled then
+			return log(formatT,true,level,text,unpack(arg))
+		end
 	end
 end
 

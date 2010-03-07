@@ -2,6 +2,7 @@
 RAIL.Validate.SkillOptions = {is_subtable = true,
 	AttackPriorityOffset = {"number",0},
 	ProvokePriorityOffset = {"number",0.5},
+	BuffPriority = {"number",40},
 	ChaosHeal = {is_subtable = true,
 		Priority = {"number",50},
 		EstimateFutureTicks = {"number",0,0},
@@ -202,8 +203,7 @@ do
 				-- Check to see if the skill has worn off
 				if GetTick() >= skill[priv_key].NextUse then
 					-- Return the skill priority and the skill
-					-- TODO: priority option
-					return -min_priority,skill,RAIL.Self
+					return RAIL.State.SkillOptions.BuffPriority,skill,RAIL.Self
 				end
 
 				-- Otherwise, return nothing

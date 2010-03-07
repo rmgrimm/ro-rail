@@ -67,6 +67,29 @@ do
 	end
 end
 
+-- Loadfile protection
+do
+	-- Protected loadfile
+	RAIL.ploadfile = function(file)
+		-- Check for pcall
+		if RAIL._G.pcall == nil or type(RAIL._G.pcall) ~= "function" then
+			return RAIL._G.loadfile(file)
+		end
+
+		-- Run a protected call for loadfile
+		local ret1,ret2,ret3 = pcall(RAIL._G.loadfile,file)
+	
+		-- Check for success
+		if ret1 then
+			-- Succeeded
+			return ret2,ret3
+		else
+			-- Failed
+			return nil,ret2
+		end
+	end
+end
+
 -- State protection
 do
 	ProtectedEnvironment = function()
@@ -80,7 +103,7 @@ do
 			__pow = RAIL._G.__pow,
 
 			-- Lua loading
-			loadfile = RAIL._G.loadfile,
+			loadfile = RAIL.ploadfile,
 
 			-- Ragnarok API
 			TraceAI = RAIL._G.TraceAI,
@@ -106,7 +129,7 @@ do
 				return
 			end
 
-			local f = loadfile(file)
+			local f = RAIL.ploadfile(file)
 			if f then
 				_G[private_key][file] = true
 				f()
@@ -273,7 +296,7 @@ do
 	-- Set OwnerID function
 	rawset(RAIL.State,"SetOwnerID",function(self,id)
 		local base = StringBuffer.New():Append("RAIL_State.")
-		if not SingleStateFile then
+		if not RAIL.SingleStateFile then
 			base:Append("%d.")
 		end
 		base = string.format(base:Get(),id)
@@ -294,8 +317,8 @@ do
 	rawset(RAIL.State,"Load",function(self,forced)
 		-- Load file for both ourself and other
 		local from_file = filename
-		local f_self,err_self = loadfile(filename)
-		local f_alt,err_alt = loadfile(alt_filename)
+		local f_self,err_self = RAIL.ploadfile(filename)
+		local f_alt,err_alt = RAIL.ploadfile(alt_filename)
 
 		-- Get the other's name for logging purposes
 		local alt_name = "mercenary"
@@ -389,7 +412,8 @@ do
 			-- See if it left us with a workable rail_state object
 			local rail_state = f_G.rail_state
 			if type(rail_state) ~= "table" then
-				-- TODO: Log invalid state?
+				-- Log an invalid file
+				RAIL.LogT(0,"Error loading state; invalid rail_state object.")
 				return
 			end
 	
@@ -448,7 +472,7 @@ do
 			end
 
 			-- Try to load the MobID file into a function
-			local f,err = loadfile(RAIL.State.MobIDFile)
+			local f,err = RAIL.ploadfile(RAIL.State.MobIDFile)
 
 			if not f then
 				RAIL.LogT(55,"Failed to load MobID file \"{1}\": {2}",RAIL.State.MobIDFile,err)

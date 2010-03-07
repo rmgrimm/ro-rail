@@ -160,7 +160,13 @@ do
 					return state_enum.DELAY,most_recent
 				end
 
-				-- TODO: Check for SP usage; homunculi don't show MOTION_SKILL
+				-- Check for SP usage; homunculi don't show MOTION_SKILL
+				local sp_delta = actor.SP[0] - actor.SP[ticks_in_state]
+
+				if sp_delta < 0 then
+					-- Set state to DELAY_ACK, to reuse code for SP check
+					return state_enum.DELAY_ACK,most_recent
+				end
 
 				-- TODO: Check for uninterruptable skills
 
@@ -186,7 +192,7 @@ do
 				local sp_delta = actor.SP[0] - actor.SP[ticks_in_state]
 
 				if sp_delta < 0 then
-					-- Make sp_delta positive now, for easier comparison between SP costs
+					-- Make sp_delta positive now, for easier comparison to SP costs
 					sp_delta = -sp_delta
 
 					-- Get the skill
