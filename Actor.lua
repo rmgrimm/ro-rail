@@ -574,8 +574,6 @@ do
 
 	-- Estimate Movement Speed (in milliseconds per cell) and Direction
 	local estimate_key = {}
-	local find_non_move = function(v) return v ~= MOTION_MOVE end
-	local find_move = function(v) return v == MOTION_MOVE end
 	Actor.EstimateMove = function(self)
 		-- Ensure we have a place to store estimation data
 		if not self[estimate_key] then
@@ -592,8 +590,13 @@ do
 
 				-- Last time calculated was never
 				last = 0,
-				-- And the distance used to calculate speed was 0
-				dist = 0,
+				last_move = 0,
+				last_non_move = 0,
+
+				-- And the distance used to calculate speed was 1
+				--	Note: Greater or equal distances will recalculate,
+				--		to prevent infinite speeds (0 distance)
+				dist = 1,
 			}
 		end
 
@@ -605,34 +608,46 @@ do
 			return estimate.speed, estimate.angle
 		end
 
-		local move = 0
-		local non_move = 0
+		-- Get the list of motions for the actor
+		local motion_list = History.GetConstList(self.Motion)
 
-		while BlockDistance(self.X[move],self.Y[move],self.X[non_move],self.Y[non_move]) < 1 do
-			-- Find the most recent move
-			move = History.FindMostRecent(self.Motion,find_move,move+10,nil)
+		-- Loop from the most recent to the oldest
+		local move
+		local non_move
+		for i=motion_list.last,motion_list.first,-1 do
+			-- Check for a movement motion
+			if motion_list[i][1] == MOTION_MOVE then
+				-- Get the time of the motion start
+				move = motion_list[i][2]
 
-			-- If there was never motion, return from estimate
-			if move == nil then
-				return estimate.speed, estimate.angle
-			end
+				-- Check if we're at the most recent motion
+				if i == motion_list.last then
+					-- Get the current time
+					non_move = GetTick()
+				else
+					-- Get the time of the more-recent motion start
+					non_move = motion_list[i+1][2]
+				end
 
-			-- Find the most recent non-move that follows the move
-			local non_move = History.FindMostRecent(self.Motion,find_non_move,non_move+10,move)
+				-- Ensure that the motions are sufficiently far apart
+				if non_move - move >= 100 then
+					-- Use these values
+					break
+				end
 
-			if not non_move then
-				non_move = 0
+				-- Don't use these values
+				move = nil
+				non_move = nil
 			end
 		end
 
-		-- Check if there was no non-move (or if the non-move was somehow after the move)
-		if not non_move or non_move >= move then
-			non_move = 0
+		-- If no new moves were found, return from estimate
+		if
+			move == nil or
+			(move == estimate.last_move and non_move == estimate.last_non_move)
+		then
+			return estimate.speed, estimate.angle
 		end
-
-		-- Convert to tick counts, rather than history deltas
-		move = GetTick() - move
-		non_move = GetTick() - non_move
 
 		-- Get the X and Y position lists
 		local x_list = History.GetConstList(self.X)
@@ -693,7 +708,7 @@ do
 
 				-- Check if the distance is great enough
 				local blocks = BlockDistance(x,y,x_list[begin_x][1],y_list[begin_y][1])
-				if blocks >= 4 then
+				if blocks >= 6 then
 					break
 				end
 			end
@@ -715,6 +730,10 @@ do
 		if angle ~= -1 then
 			-- Store our estimated angle
 			estimate.angle = angle
+
+			-- Log it
+			RAIL.LogT(65,"Movement angle for {1} estimated at {2} degrees.",
+				self,estimate.angle)
 		end
 
 		-- Check if we've calculated a better speed than before
@@ -732,6 +751,14 @@ do
 
 			-- Store the time of last estimation
 			estimate.last = GetTick()
+
+			-- Store the move and non_move times used
+			estimate.last_move = move
+			estimate.last_non_move = non_move
+
+			-- Log it
+			RAIL.LogT(65,"Movement speed for {1} estimated at {2}ms/tile (dist={3}).",
+				self,estimate.speed,estimate.dist)
 		end
 
 		-- And return

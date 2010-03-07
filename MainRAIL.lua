@@ -87,9 +87,6 @@ function AI(id)
 		RAIL.LogT(40," --> Skills: {1}",buf:Append(" "):Get())
 	end
 
-	-- Initialize Skill decision making
-	SelectSkill:Init(RAIL.Self.Skills)
-
 	-- Create a bogus Other until homu<->merc communication is established
 	RAIL.Other = RAIL.Self
 
@@ -119,6 +116,9 @@ function AI(id)
 	-- Track skill state for self
 	--	Note: This will hook Update(), so it has to be after SP check hook
 	RAIL.Self:InitSkillState()
+
+	-- Initialize Skill decision making
+	SelectSkill:Init(RAIL.Self.Skills)
 
 	-- Never show up as either enemies or friends
 	RAIL.Owner.IsEnemy  = function() return false end

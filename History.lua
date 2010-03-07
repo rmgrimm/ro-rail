@@ -211,7 +211,6 @@ do
 		local target_after = GetTick() - search_after
 
 		-- Start from the determined beginning entry, and iterate until the oldest entry in the list
-		local i
 		for i=search_before,list.first,-1 do
 			-- Check if the entry in the list is too old
 			if list[i][2] < target_after then
