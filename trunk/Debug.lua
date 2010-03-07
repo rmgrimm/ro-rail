@@ -13,6 +13,7 @@ RAIL.Validate.ProfileMark = {"number",20000,2000,nil}
 --	50 - RAIL.AI Performance logging
 --	55 - MobID save/load
 --	60 - Skill commands (sent to server)
+--	65 - Movement estimation
 --	70 - Attack commands (sent to server)
 --	85 - Move commands (sent to server)
 --	90 - TODO: Actor data tracking
@@ -120,6 +121,7 @@ do
 			return
 		end
 
+		-- TODO: Finish translation support
 		if t and false then
 			local translate_table = {}
 			text = translate_table[text]
