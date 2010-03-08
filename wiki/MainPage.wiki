@@ -12,9 +12,9 @@ Rampage AI Lite (RAIL) is a complete rewrite of RampageAI from the ground up. It
 
 = Configuration =
 
-  * [ConfigurationBasics Configuration Basics] - A broad outline of how to configure RampageAI Lite.
-  * [ConfigLuaFile The Config.lua File] - An explanation of the options contained inside RAIL's Config.lua.
-  * [StateFileIndex State-file Index] - A list (and description) of all options provided by RAIL_State files.
+  * [ConfigurationBasics Configuration Basics] - A broad outline describing how to configure RampageAI Lite.
+  * [ConfigLuaFile The Config.lua File] - An explanation of the options contained inside the Config.lua file.
+  * [StateFileIndex State-file Index] - A list and description of all options provided by RAIL_State files.
 
 = Configuration Examples =
 
