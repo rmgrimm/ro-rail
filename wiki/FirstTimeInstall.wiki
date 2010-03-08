@@ -7,7 +7,6 @@ RampageAI Lite relies on the use of Subversion (SVN) for distribution. To use SV
 
 You may also use other SVN clients; however, this guide will only give example screenshots using TortoiseSVN.
 
-
 = Step-by-Step Install =
 
 == Before You Begin: Locate your Ragnarok Online directory ==
@@ -38,6 +37,8 @@ http://ro-rail.googlecode.com/svn/trunk/
 }}}
 
 After you enter this, make sure that TortoiseSVN displays the _Checkout directory_ as *_xyz_\AI\USER_AI*, where _xyz_ is the location of your Ragnarok Online installation. In the example below, my installation is located at _C:\Users\Robert\Documents\iRO_. Yours will likely be different.
+
+_Note: You may also browse the source of RampageAI Lite online at [http://code.google.com/p/ro-rail/source/browse/trunk]._
 
 http://ro-rail.googlecode.com/svn/wiki/img/install/step-3.png
 
