@@ -15,7 +15,7 @@ Before continuing, you will need to locate the directory that Ragnarok Online is
 
 The following steps will take place in the AI directory, which should be found inside the Ragnarok Online directory.
 
-*Note:* Vista users should not install Ragnarok Online into the _Program Files_ directory, because of complications with User Account Controls (UAC).
+_Note: Vista users should not install Ragnarok Online into the _Program Files_ directory, because of complications with User Account Control (UAC)._
 
 == Step 1: Remove existing scripts ==
 
@@ -48,4 +48,4 @@ Congratulations! RAIL has been downloaded to your computer.
 
 http://ro-rail.googlecode.com/svn/wiki/img/install/step-4.png
 
-To ensure that Ragnarok Online is using RAIL as the AI script, please type `/hoai` (or `/merai` for mercenaries) until Ragnarok tells you that the script has been customized.
+To ensure that Ragnarok Online is using RAIL as the AI script, please type `/hoai` (or `/merai` for mercenaries) until Ragnarok tells you that the script has been customized. `/hoai` and `/merai` changes will take effect the next time the AI is loaded (by teleport/fly wing, map-change, logout-login, etc).
