@@ -1,71 +1,13 @@
--- Before anything else, remove potentially harmful functions
-if os then
-	os.remove = nil
-	os.rename = nil
-end
-
 -- Create a RAIL object (to be populated later)
 if not RAIL then
 	RAIL = {}
-end
-
--- Ensure all RO-supplied requirements are available
-do
-	if not TraceAI then
-		TraceAI = function(str)
-			-- Output to the console
-			print(str);
-		end
-	end
-	if not IsMonster then
-		IsMonster = function()
-			return 0
-		end
-		TraceAI("IsMonster() not supplied, undefined behavior may occur.")
-		--RAIL.CantRun = true
-	end
-	if not GetActors then
-		GetActors = function()
-			return { }
-		end
-		TraceAI("GetActors() not supplied, undefined behavior may occur.")
-		--RAIL.CantRun = true
-	end
-	if not GetMsg then
-		GetMsg = function()
-			return { 0 }
-		end
-		TraceAI("GetMsg() not supplied, undefined behavior may occur.")
-		--RAIL.CantRun = true
-	end
-	if not GetResMsg then
-		GetResMsg = function()
-			return { 0 }
-		end
-		TraceAI("GetResMsg() not supplied, undefined behavior may occur.")
-		--RAIL.CantRun = true
-	end
-	if not GetTick then
-		GetTick = function()
-			return -1
-		end
-		TraceAI("GetTick() not supplied, undefined behavior may occur.")
-		--RAIL.CantRun = true
-	end
-	if not GetV then
-		GetV = function(v,id)
-			return -1
-		end
-		TraceAI("GetV() not supplied, undefined behavior may occur.")
-		--RAIL.CantRun = true
-	end
 end
 
 -- Now auto-detect where RAIL is located
 do
 	local req = require
 
-	FileExists = function(filename)
+	function FileExists(filename)
 		-- Try to open the file
 		local file = io.open(filename)
 		if file then
@@ -75,27 +17,58 @@ do
 		return false
 	end
 
-	local ScriptLocation
+	local function CheckVersion(path,prev_ver,prev_path,prev_env)
+		-- Check for MainRAIL.lua, to ensure Version.lua doesn't come from another script
+		if not FileExists(path .. "MainRAIL.lua") then
+			-- Can't read RAIL from here
+			return -1
+		end
 
-	-- Check the current directory for the main RAIL logic script
-	if FileExists("./MainRAIL.lua") then
-		ScriptLocation = "./"
+		-- Load version file
+		local success,f = pcall(loadfile,path .. "Version.lua")
 
-	-- Check the AI sub directory
-	elseif FileExists("./AI/MainRAIL.lua") then
-		ScriptLocation = "./AI/"
+		-- Check that it loaded okay
+		if not success or not f then return -1 end
 
-	-- Check the USER_AI directory
-	elseif FileExists("./AI/USER_AI/MainRAIL.lua") then
-		ScriptLocation = "./AI/USER_AI/"
+		-- Set environment
+		local env = { ["RAIL"] = {}, ["string"] = string }
+		setfenv(f,env)
+
+		-- Call the function
+		local ver
+		success = pcall(f)
+
+		-- Check if the protected call succeeded
+		if not success then return -1 end
+
+		-- Check for the RAIL object's Version property
+		if not env.RAIL or not env.RAIL.Version then return -1 end
+
+		-- Check against previous version
+		if env.RAIL.Version > prev_ver then
+			return env.RAIL.Version, path, env
+		else
+			return prev_ver, prev_path, prev_env
+		end
+	end
+
+	-- Find the highest version of RAIL
+	local ScriptVersion,ScriptLocation,penv = CheckVersion("./")
+	ScriptVersion,ScriptLocation,penv = CheckVersion("./AI/",ScriptVersion,ScriptLocation,penv)
+	ScriptVersion,ScriptLocation,penv = CheckVersion("./AI/USER_AI/",ScriptVersion,ScriptLocation,penv)
 
 	-- If all else failed, make sure the RO client doesn't crash
-	else
+	if ScriptVersion < 0 then
 		TraceAI("RAIL failed to locate script directory.")
 		RAIL.CantRun = true
 		AI = function() end
 	end
 
+	-- Copy version information from the protected environment (created in CheckVersion)
+	RAIL.Version = penv.RAIL.Version
+	RAIL.FullVersion = penv.RAIL.FullVersion
+
+	-- Replace the require function with one that uses RAIL's autodetected location
 	require = function(filename)
 		if FileExists(filename) then
 			return req(filename)
@@ -105,7 +78,7 @@ do
 	end
 end
 
--- Only continue if autodetection worked and all required API is available
+-- Only continue if autodetection worked
 if not RAIL.CantRun then
 	-- The only difference between AI_M.lua and AI.lua is this following line
 	RAIL.Mercenary = false
