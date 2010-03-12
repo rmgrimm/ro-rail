@@ -139,3 +139,86 @@ do
 		return false
 	end
 end
+
+-- Check for sanity of Ragnarok API environment
+do
+	local function CheckAPI()
+		local sane = true
+
+		-- Check TraceAI logging
+		if not TraceAI then
+			TraceAI = function(str)
+				-- Output to the console
+				print(str);
+			end
+		end
+
+		-- Check user-input
+		if not GetMsg then
+			GetMsg = function()
+				return { 0 }	-- NONE_CMD
+			end
+			TraceAI("GetMsg() not supplied, in-game command may be impossible.")
+		end
+		if not GetResMsg then
+			GetResMsg = function()
+				return { 0 }	-- NONE_CMD
+			end
+			TraceAI("GetResMsg() not supplied, in-game command may be impossible.")
+		end
+
+		-- Check actor-tracking
+		if not GetV then
+			GetV = function(v,id)
+				return -1
+			end
+			TraceAI("GetV() not supplied, undefined behavior may occur.")
+			sane = false
+		end
+		if not GetActors then
+			GetActors = function()
+				return {
+					--id,		-- self
+					--GetV(0,id),	-- owner: GetV(V_OWNER,id)
+				}
+			end
+			TraceAI("GetActors() not supplied, undefined behavior may occur.")
+			sane = false
+		end
+		if not IsMonster then
+			IsMonster = function(actor_id)
+				-- Check a few conditions for non-monsters
+				if
+					actor_id < 0 or
+					--actor_id == id or
+					--actor_id == GetV(0,id) or	-- GetV(V_OWNER,id)
+					false		-- (no other conditions)
+
+					-- Note: Don't check for ID ranges of NPCs, Players, etc,
+					--	IsMonster isn't supplied, so the environment isn't sane anyway...
+				then
+					return 0
+				end
+
+				-- Default all but self and owner to monsters
+				return 1
+			end
+			TraceAI("IsMonster() not supplied, undefined behavior may occur.")
+			sane = false
+		end
+
+		-- Check tick count
+		if not GetTick then
+			GetTick = function()
+				return -1
+			end
+			TraceAI("GetTick() not supplied, undefined behavior may occur.")
+			sane = false
+		end
+
+		-- Is the environment sane?
+		return sane
+	end
+
+	CheckAPI()
+end

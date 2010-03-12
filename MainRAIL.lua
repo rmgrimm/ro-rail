@@ -1,16 +1,12 @@
 -- Save the global environment that RAIL is loaded from
 RAIL._G = getfenv(0)
 
--- Save the version of RAIL
-RAIL.Revision = "$Rev$"
-RAIL.Version = "$Id$"
-
 -- Load the configuration options
 require "Config.lua"
 
--- Load State.lua before all other code, to allow others to add state
---	validation options
-require "State.lua"
+-- Load Utils.lua and State.lua before all other code
+require "Utils.lua"		-- run CheckAPI() before others start using Ragnarok API
+require "State.lua"		-- allow other files to add state validation options
 
 -- Alphabetical
 require "ActorOpts.lua"
@@ -20,7 +16,7 @@ require "History.lua"
 require "SkillAIs.lua"
 require "Table.lua"
 require "Timeout.lua"
-require "Utils.lua"
+--require "Version.lua"		-- Note: Version.lua is pre-loaded by AI.lua and AI_M.lua
 
 -- Load-time Dependency
 require "Actor.lua"		-- depends on History.lua
@@ -65,12 +61,12 @@ function AI(id)
 	end
 
 	-- Log the AI initialization
-	RAIL.LogT(0,"RampageAI Lite {1} initializing...",RAIL.Revision)
-	RAIL.LogT(0," --> Full Version ID = {1}",RAIL.Version)
+	RAIL.LogT(0,"RampageAI Lite v{1} initializing...",RAIL.Version)
+	RAIL.LogT(0," --> Full Version ID = {1}",RAIL.FullVersion)
 
 	-- Check for some features of Lua
-	RAIL.LogT(0," --> Lua: _VERSION = {1}; pcall = {2}; debug = {3}; coroutine = {4};",
-		RAIL._G._VERSION, RAIL._G.pcall, RAIL._G.debug, RAIL._G.coroutine)
+	RAIL.LogT(0," --> Lua: _VERSION = {1}; debug = {2}; coroutine = {3}; collectgarbage = {4}, gcinfo = {5}",
+		RAIL._G._VERSION, RAIL._G.debug, RAIL._G.coroutine, RAIL._G.collectgarbage, RAIL._G.gcinfo)
 
 	-- Load persistent state data again
 	--	Note: Redundant, but will show up in the log now
@@ -570,7 +566,7 @@ function RAIL.AI(id)
 
 				-- Check if the distance between this and last move is about the same
 				if x and y then
-					local last_x,last_y = RAIL.TargetHistory.Move.Y,RAIL.TargetHistory.Move.Y
+					local last_x,last_y = RAIL.TargetHistory.Move.X,RAIL.TargetHistory.Move.Y
 					if PythagDistance(x,y,last_x,last_y) <= 1 then
 						-- Use the old move
 						x,y = last_x,last_y
