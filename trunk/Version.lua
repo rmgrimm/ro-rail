@@ -1,5 +1,9 @@
 -- Version information
 do
+	if not RAIL then
+		RAIL = {}
+	end
+
 	RAIL.FullVersion = "$Id$"
 	RAIL.Version = "$Rev$"
 
@@ -11,7 +15,7 @@ do
 			-- Keyword wasn't updated by SVN; don't know version
 			RAIL.Version = 0
 		else
-			RAIL.Version = tonumber(string.sub(RAIL.Version,5,-2))
+			RAIL.Version = tonumber(string.sub(RAIL.Version,7,-3))
 		end
 	else
 		RAIL.Version = 0

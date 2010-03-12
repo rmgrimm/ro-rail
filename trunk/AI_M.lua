@@ -31,11 +31,10 @@ do
 		if not success or not f then return -1 end
 
 		-- Set environment
-		local env = { ["RAIL"] = {}, ["string"] = string }
+		local env = { ["string"] = string, ["tonumber"] = tonumber }
 		setfenv(f,env)
 
 		-- Call the function
-		local ver
 		success = pcall(f)
 
 		-- Check if the protected call succeeded
@@ -53,28 +52,33 @@ do
 	end
 
 	-- Find the highest version of RAIL
-	local ScriptVersion,ScriptLocation,penv = CheckVersion("./")
+	local ScriptVersion,ScriptLocation,penv = CheckVersion("./",-1)
 	ScriptVersion,ScriptLocation,penv = CheckVersion("./AI/",ScriptVersion,ScriptLocation,penv)
 	ScriptVersion,ScriptLocation,penv = CheckVersion("./AI/USER_AI/",ScriptVersion,ScriptLocation,penv)
 
 	-- If all else failed, make sure the RO client doesn't crash
 	if ScriptVersion < 0 then
-		TraceAI("RAIL failed to locate script directory.")
+		if TraceAI then
+			TraceAI("RAIL failed to locate script directory.")
+		else
+			print("RAIL failed to locate script directory.")
+		end
 		RAIL.CantRun = true
 		AI = function() end
-	end
 
-	-- Copy version information from the protected environment (created in CheckVersion)
-	RAIL.Version = penv.RAIL.Version
-	RAIL.FullVersion = penv.RAIL.FullVersion
+	else
+		-- Copy version information from the protected environment (created in CheckVersion)
+		RAIL.Version = penv.RAIL.Version
+		RAIL.FullVersion = penv.RAIL.FullVersion
 
-	-- Replace the require function with one that uses RAIL's autodetected location
-	require = function(filename)
-		if FileExists(filename) then
-			return req(filename)
+		-- Replace the require function with one that uses RAIL's autodetected location
+		require = function(filename)
+			if FileExists(filename) then
+				return req(filename)
+			end
+
+			return req(ScriptLocation .. filename)
 		end
-
-		return req(ScriptLocation .. filename)
 	end
 end
 
