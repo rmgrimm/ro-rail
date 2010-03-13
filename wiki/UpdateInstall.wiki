@@ -5,7 +5,7 @@
 
 This is a guide to the update process after Rampage AI Lite (RAIL) has already been installed. If you need to install RAIL for the first time, please visit [FirstTimeInstall First Time Install].
 
-To view a list of the most recent changes, view the [http://code.google.com/p/ro-rail/updates/list Project Updates List].
+To view a list of the most recent changes, click [http://code.google.com/p/ro-rail/updates/list Project Updates List].
 
 = Step-by-Step Update =
 
