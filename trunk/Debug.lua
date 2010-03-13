@@ -115,7 +115,9 @@ do
 	local log_out = TraceAI
 
 	-- If not using TraceAI, generate a function to output to a file
-	if not RAIL.UseTraceAI then
+	--	Note: Ragnarok client doesn't provide the "debug" API table,
+	--		so we use this to force lua.exe to output to console.
+	if not RAIL.UseTraceAI and not RAIL._G.debug then
 		log_out = function(str)
 			-- Get the filename
 			local filename = RAIL.State.DebugFile
