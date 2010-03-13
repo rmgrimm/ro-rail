@@ -2,28 +2,28 @@
 RAIL._G = getfenv(0)
 
 -- Load the configuration options
-require "Config.lua"
+require "Config"
 
 -- Load Utils.lua and State.lua before all other code
-require "Utils.lua"		-- run CheckAPI() before others start using Ragnarok API
-require "State.lua"		-- allow other files to add state validation options
+require "Utils"			-- run CheckAPI() before others start using Ragnarok API
+require "State"			-- allow other files to add state validation options
 
 -- Alphabetical
-require "ActorOpts.lua"
-require "Const.lua"
-require "Debug.lua"
-require "History.lua"
-require "SkillAIs.lua"
-require "Table.lua"
-require "Timeout.lua"
---require "Version.lua"		-- Note: Version.lua is pre-loaded by AI.lua and AI_M.lua
+require "ActorOpts"
+require "Const"
+require "Debug"
+require "History"
+require "SkillAIs"
+require "Table"
+require "Timeout"
+--require "Version"		-- Note: Version.lua is pre-loaded by AI.lua and AI_M.lua
 
 -- Load-time Dependency
-require "Actor.lua"		-- depends on History.lua
-require "Commands.lua"		-- depends on Table.lua
-require "DecisionSupport.lua"	-- depends on Table.lua
-require "Skills.lua"		-- depends on Table.lua
-require "SkillSupport.lua"	-- depends on Actor.lua
+require "Actor"			-- depends on History.lua
+require "Commands"		-- depends on Table.lua
+require "DecisionSupport"	-- depends on Table.lua
+require "Skills"		-- depends on Table.lua
+require "SkillSupport"		-- depends on Actor.lua
 
 -- State validation options
 RAIL.Validate.Information = {is_subtable = true,
@@ -72,8 +72,8 @@ function AI(id)
 	RAIL.LogT(0," --> Full Version ID = {1}",RAIL.FullVersion)
 
 	-- Check for some features of Lua
-	RAIL.LogT(0," --> Lua: _VERSION = {1}; debug = {2}; coroutine = {3}; collectgarbage = {4}",
-		RAIL._G._VERSION, RAIL._G.debug, RAIL._G.coroutine, RAIL._G.collectgarbage)
+	RAIL.LogT(0," --> Lua: _VERSION = {1}; _LOADED = {2}; coroutine = {3};",
+		RAIL._G._VERSION, RAIL._G._LOADED, RAIL._G.coroutine)
 
 	-- Load persistent state data again
 	--	Note: Redundant, but will show up in the log now
@@ -168,16 +168,20 @@ function AI(id)
 	RAIL.Owner.ExpireTimeout[1] = false
 	RAIL.Self.ExpireTimeout[1] = false
 
-	-- Periodically save state data
-	RAIL.Timeouts:New(2500,true,function()
-		-- Only load data if the "update" flag is on in the file
-		RAIL.State:Load(false)
+	-- Check for the global variable "debug" (should be a table), to determine
+	--	if we're running inside lua.exe or ragexe.exe
+	if not RAIL._G.debug then
+		-- Periodically save state data
+		RAIL.Timeouts:New(2500,true,function()
+			-- Only load data if the "update" flag is on in the file
+			RAIL.State:Load(false)
+	
+			-- Save data (if any data was loaded, it won't be dirty and won't save)
+			RAIL.State:Save()
+		end)
+	end
 
-		-- Save data (if any data was loaded, it won't be dirty and won't save)
-		RAIL.State:Save()
-	end)
-
-	-- Profile the AI() function
+	-- Profile the AI() function (and include memory information)
 	AI = ProfilingHook("RAIL.AI",RAIL.AI,50,true)
 
 	-- Get memory usage after initialization

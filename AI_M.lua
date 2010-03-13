@@ -5,8 +5,6 @@ end
 
 -- Now auto-detect where RAIL is located
 do
-	local req = require
-
 	function FileExists(filename)
 		-- Try to open the file
 		local file = io.open(filename)
@@ -71,14 +69,8 @@ do
 		RAIL.Version = penv.RAIL.Version
 		RAIL.FullVersion = penv.RAIL.FullVersion
 
-		-- Replace the require function with one that uses RAIL's autodetected location
-		require = function(filename)
-			if FileExists(filename) then
-				return req(filename)
-			end
-
-			return req(ScriptLocation .. filename)
-		end
+		-- Set LUA_PATH to include the autodetected location
+		LUA_PATH = ScriptLocation .. "?;" .. ScriptLocation .. "?.lua;?;?.lua"
 	end
 end
 
@@ -86,5 +78,5 @@ end
 if not RAIL.CantRun then
 	-- The only difference between AI_M.lua and AI.lua is this following line
 	RAIL.Mercenary = true
-	require "MainRAIL.lua"
+	require "MainRAIL"
 end
