@@ -42,6 +42,13 @@ RAIL.Validate.MaxDistance = {"number", 13, 3, 14}
 RAIL.Validate.FollowDistance = {"number", 7, 3, 14}
 
 function AI(id)
+	-- Get memory usage before initialization
+	local mem_before,thresh_before = gcinfo()
+
+	-- Double the threshold for now
+	--	(to prevent a garbage collection while we're initializing)
+	collectgarbage(thresh_before * 2)
+
 	-- Prevent logging while loading state file the first time
 	RAIL.Log.Disabled = true
 
@@ -65,8 +72,8 @@ function AI(id)
 	RAIL.LogT(0," --> Full Version ID = {1}",RAIL.FullVersion)
 
 	-- Check for some features of Lua
-	RAIL.LogT(0," --> Lua: _VERSION = {1}; debug = {2}; coroutine = {3}; collectgarbage = {4}, gcinfo = {5}",
-		RAIL._G._VERSION, RAIL._G.debug, RAIL._G.coroutine, RAIL._G.collectgarbage, RAIL._G.gcinfo)
+	RAIL.LogT(0," --> Lua: _VERSION = {1}; debug = {2}; coroutine = {3}; collectgarbage = {4}",
+		RAIL._G._VERSION, RAIL._G.debug, RAIL._G.coroutine, RAIL._G.collectgarbage)
 
 	-- Load persistent state data again
 	--	Note: Redundant, but will show up in the log now
@@ -170,7 +177,17 @@ function AI(id)
 		RAIL.State:Save()
 	end)
 
-	AI = ProfilingHook("RAIL.AI",RAIL.AI,50)
+	-- Profile the AI() function
+	AI = ProfilingHook("RAIL.AI",RAIL.AI,50,true)
+
+	-- Get memory usage after initialization
+	local mem_after,thresh_after = gcinfo()
+
+	-- Log memory change from initialization
+	RAIL.LogT(0,"RAIL initialization complete; memory usage increase of {1}kb.",mem_after - mem_before)
+	RAIL.LogT(0," --> Mem before: {1}kb; Mem after: {2}kb; Threshold before: {3}kb; Threshold after: {4}kb",mem_before,mem_after,thresh_before,thresh_after)
+
+	-- Run the first cycle of AI
 	AI(id)
 end
 
@@ -422,7 +439,8 @@ function RAIL.AI(id)
 
 				RAIL.TargetHistory.Chase[0] ~= -1 and
 				RAIL.TargetHistory.Chase[0] ~= RAIL.TargetHistory.Attack and
-				RAIL.TargetHistory.Chase[0] ~= RAIL.Owner.ID
+				RAIL.TargetHistory.Chase[0] ~= RAIL.Owner.ID and
+				RAIL.Self:DistanceTo(Actors[RAIL.TargetHistory.Chase[0]]) > 2
 			then
 				local list = History.GetConstList(RAIL.TargetHistory.Chase)
 				local tick_delta = GetTick() - list[list.last][2]
@@ -441,7 +459,7 @@ function RAIL.AI(id)
 				if tick_delta >= ignore_after and ignore_after ~= -1 then
 					-- Decide if we've been able to get closer
 
-					-- Get our current position
+					-- Get the actor's current position
 					local x,y = actor.X[0],actor.Y[0]
 
 					-- Check if X coordinate has changed recently

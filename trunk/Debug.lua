@@ -250,6 +250,12 @@ do
 					RoundNumber(self.TicksSpent / self.CyclesRun),
 					RoundNumber(self.TicksBetween / self.CyclesRun)
 				)
+				if self.include_mem then
+					RAIL.LogT(self.level,
+						"		--> memory usage: {1}kb; gc threshold: {2}kb",
+						gcinfo()
+					)
+				end
 
 				self.TicksLongest = 0
 				self.TicksSpent = 0
@@ -262,12 +268,13 @@ do
 		end,
 	}
 
-	ProfilingHook = function(n,f,l)
+	ProfilingHook = function(n,f,l,inc_mem)
 		local ret = {
 			name = n,
 			func = f,
 			level = l,
 			last_output = GetTick(),
+			include_mem = inc_mem,
 			TicksBetween = 0,
 			TicksSpent = 0,
 			TicksLongest = 0,

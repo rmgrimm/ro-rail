@@ -341,7 +341,7 @@ do
 
 		-- Update the expiration timeout
 		self.ExpireTimeout[2] = GetTick()
-		if not self.ExpireTimeout[1] then
+		if not self.ExpireTimeout[1] and not self.Active then
 			self.ExpireTimeout[1] = true
 			RAIL.Timeouts:Insert(self.ExpireTimeout)
 		end
@@ -554,17 +554,17 @@ do
 
 	-- Ignore the actor for a specific amount of time
 	Actor.Ignore = function(self,ticks)
+		-- Use default ticks if needed
+		if type(ticks) ~= "number" then
+			ticks = self.BattleOpts.DefaultIgnoreTicks
+		end
+
 		-- If it's already ignored, do nothing
 		if self:IsIgnored() then
 			-- Update the ignore time to whichever is higher
 			self.IgnoreTime = math.max(ticks,self.IgnoreTime)
 
 			return self
-		end
-
-		-- Use default ticks if needed
-		if type(ticks) ~= "number" then
-			ticks = self.BattleOpts.DefaultIgnoreTicks
 		end
 
 		RAIL.LogT(20,"{1} ignored for {2} milliseconds.",self,ticks)

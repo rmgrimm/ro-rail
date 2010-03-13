@@ -22,5 +22,6 @@ do
 	end
 end
 
--- 2010-03-13 -- First commit of Version.lua
+-- 2010-03-13 -- Fixed ignore actor triggering while close enough to attack
+--	-- First commit of Version.lua
 
