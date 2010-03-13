@@ -1,5 +1,5 @@
 #summary A step-by-step guide to updating RAIL.
-#labels Phase-Deploy
+#labels Phase-Deploy,Featured
 
 = Introduction =
 
