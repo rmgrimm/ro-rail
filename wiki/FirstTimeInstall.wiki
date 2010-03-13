@@ -19,13 +19,13 @@ _Note: Vista users should not install Ragnarok Online into the _Program Files_ d
 
 == Step 1: Remove existing scripts ==
 
-To avoid complications with existing custom AI files, it is recommended to remove any existing USER_AI directory. We will shortly add it back through TortoiseSVN.
+To avoid complications with existing custom AI files, it is recommended to remove any existing _USER`_`AI_ directory. We will shortly add it back through TortoiseSVN.
 
 http://ro-rail.googlecode.com/svn/wiki/img/install/step-1.png
 
 == Step 2: Start TortoiseSVN checkout ==
 
-Right click on an open area in your Ragnarok install's AI folder, and select "SVN Checkout". This will start the TortoiseSVN client program.
+Right click on an open area in your Ragnarok install's AI folder, and select "`SVN Checkout`". This will start the TortoiseSVN client program.
 
 http://ro-rail.googlecode.com/svn/wiki/img/install/step-2.png
 
