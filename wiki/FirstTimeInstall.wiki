@@ -25,7 +25,7 @@ http://ro-rail.googlecode.com/svn/wiki/img/install/step-1.png
 
 == Step 2: Start TortoiseSVN checkout ==
 
-Right click on an open area in your folder, and select "SVN Checkout". This will start the TortoiseSVN client program.
+Right click on an open area in your Ragnarok install's AI folder, and select "SVN Checkout". This will start the TortoiseSVN client program.
 
 http://ro-rail.googlecode.com/svn/wiki/img/install/step-2.png
 
