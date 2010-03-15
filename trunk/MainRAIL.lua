@@ -441,60 +441,9 @@ function RAIL.AI(id)
 
 		-- Move
 		if Target.Chase == nil then
-			-- Check chase target history
-			if
-				-- Debug toggle for chase ignore
-				true and
-
-
-				RAIL.TargetHistory.Chase[0] ~= -1 and
-				RAIL.TargetHistory.Chase[0] ~= RAIL.TargetHistory.Attack and
-				RAIL.TargetHistory.Chase[0] ~= RAIL.Owner.ID and
-				RAIL.Self:DistanceTo(Actors[RAIL.TargetHistory.Chase[0]]) > 2
-			then
-				local list = History.GetConstList(RAIL.TargetHistory.Chase)
-				local tick_delta = GetTick() - list[list.last][2]
-
-				-- Get the state option for this actor
-				local actor = Actors[RAIL.TargetHistory.Chase[0]]
-				local ignore_after = actor.BattleOpts.IgnoreAfterChaseFail
-
-				-- Use a minimum value of 2000
-				if ignore_after < 2000 and ignore_after >= 0 then
-					actor.BattleOpts.IgnoreAfterChaseFail = 2000
-					ignore_after = 2000
-				end
-
-				-- Check if we've been chasing this actor for a while
-				if tick_delta >= ignore_after and ignore_after ~= -1 then
-					-- Decide if we've been able to get closer
-
-					-- Get the actor's current position
-					local x,y = actor.X[0],actor.Y[0]
-
-					-- Check if X coordinate has changed recently
-					local x_changed_f = function(v) return v ~= x end
-					local most_recent_x = History.FindMostRecent(actor.X,x_changed_f,nil,tick_delta)
-
-					-- If it hasn't, then check Y
-					if not most_recent_x or most_recent_x > 2000 then
-						local y_changed_f = function(v) return v ~= y end
-						local most_recent_y = History.FindMostRecent(actor.Y,y_changed_f,nil,tick_delta)
-
-						-- If it hasn't, ignore the actor
-						if not most_recent_y or most_recent_y > 2000 then
-							-- Log it
-							RAIL.LogT(20,"Failed to get closer to {1} (closest = {2}); ignoring.",
-								actor,RAIL.Self:DistanceTo(actor))
-
-							-- Ignore the actor
-							actor:Ignore()
-
-							-- Also remove from the potential chase
-							Potential.Chase[actor.ID] = nil
-						end
-					end
-				end
+			-- Check if we're chasing, but unable to get closer
+			if CheckChaseTimeAndDistance() then
+				Potential.Chase[RAIL.TargetHistory.Chase[0]] = nil
 			end
 
 			-- Check to see if we should add our attack target to the chase list as well
@@ -504,6 +453,11 @@ function RAIL.AI(id)
 
 			-- Find highest priority monster to move toward
 			Target.Chase = SelectTarget.Chase(Potential.Chase,Friends)
+
+			-- If we're chasing the same target that we're attacking, don't chase
+			if Target.Chase == Target.Attack then
+				Target.Chase = nil
+			end
 		end
 
 		-- Check if we should attack while chasing
