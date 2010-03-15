@@ -16,6 +16,10 @@ do
 			SPCost = function(level) return 15 + level*5 end,
 			CastDelay = 35 * 1000,
 			Duration = function(level) return (45 - level*5) * 1000 end,
+			Condition = function(_G)
+				-- Always use urgent escape if it's available
+				return true
+			end,
 		},
 		[8003] = {
 			Name = "Brain Surgery",
@@ -42,6 +46,7 @@ do
 			MaxLevel = 5,
 			SPCost = function(level) return 15 + level*5 end,
 			Duration = function(level) return (45 - level*5) * 1000 end,
+			Condition = "defending",
 		},
 		[8007] = {
 			Name = "Adamantium Skin",
@@ -82,6 +87,7 @@ do
 				end
 			end,
 			Duration = function(level) return (65 - level*5) * 1000 end,
+			Condition = "attacking",
 		},
 		[8011] = {
 			Name = "Accelerated Flight",
@@ -94,6 +100,7 @@ do
 					return 120 * 1000
 				end
 			end,
+			Condition = "defending_self",
 		},
 		[8012] = {
 			Name = "S.B.R.44",
@@ -160,6 +167,7 @@ do
 			MaxLevel = 10,
 			SPCost = 50,
 			Duration = function(level) return (10 + level*5) * 1000 end,
+			Condition = "defending_self",
 		},
 		[8205] = {
 			Name = "Shield Reflect",
@@ -168,6 +176,7 @@ do
 			SPCost = function(level) return 30 + level*5 end,
 			CastDelay = 1 * 1000,
 			Duration = 300 * 1000,
+			Condition = "defending_self",
 		},
 		[8206] = {
 			Name = "Frenzy",
@@ -276,6 +285,11 @@ do
 			SPCost = 30,
 			CastDelay = 1 * 1000,
 			Duration = 180 * 1000,
+			Condition = function(_G)
+				-- TODO: Check if we're being attacked from range
+
+				return false
+			end,
 		},
 		[8220] = {
 			Name = "Guard",
@@ -283,6 +297,7 @@ do
 			MaxLevel = 10,
 			SPCost = function(level) return 10 + level*2 end,
 			Duration = 300 * 1000,
+			Condition = "defending_self",
 		},
 		[8221] = {
 			Name = "Sacrifice",
@@ -303,6 +318,14 @@ do
 			CastTime = 4 * 1000,
 			CastDelay = 2 * 1000,
 			Duration = function(level) return (15 + level*15) * 1000 end,
+			Condition = function(_G)
+				-- Check if the owner is not at full SP
+				if _G.RAIL.Owner.SP[0] < _G.RAIL.Owner:GetMaxSP() then
+					return true
+				end
+
+				return false
+			end,
 		},
 		[8223] = {
 			Name = "Weapon Quicken",
@@ -316,6 +339,7 @@ do
 				end
 			end,
 			Duration = function(level) return (level*30) * 1000 end,
+			Condition = "attacking",
 		},
 		[8224] = {
 			Name = "Sight",
@@ -484,6 +508,39 @@ do
 		end,
 	}
 
+	-- Standard Cast Conditions
+	local CastConditions = {
+		["attacking"] = function(_G)
+			-- Check if we're attacking
+			local target = _G.RAIL.TargetHistory.Attack
+			if _G.Actors[target].Active then
+				return true
+			end
+
+			return false
+		end,
+		["defending"] = function(_G)
+			-- Check if owner or self are being attacked
+			if
+				_G.RAIL.Owner.TargetOf:GetN() > 0 or
+				_G.RAIL.Self.TargetOf:GetN() > 0
+			then
+				return true
+			end
+
+
+			return false
+		end,
+		["defending_self"] = function(_G)
+			-- Check if we're being attacked
+			if _G.RAIL.Self.TargetOf:GetN() > 0 then
+				return true
+			end
+
+			return false
+		end,
+	}
+
 	local function_or_number = function(f,arg)
 		if type(f) == "function" then
 			return f(arg)
@@ -522,6 +579,11 @@ do
 				return GetV(V_SKILLATTACKRANGE,RAIL.Self.ID,self.ID)
 			end)
 
+			local condition_func = function_or_string(parameters.Condition,CastConditions,function(_G)
+				-- Unspecified condition; just use the skill
+				return true
+			end)
+
 			-- Build the skill-level tables
 			for i=1,parameters.MaxLevel do
 				-- Build the table
@@ -540,6 +602,7 @@ do
 					CastTime = function_or_number(parameters.CastTime,i),
 					CastDelay = function_or_number(parameters.CastDelay,i),
 					Duration = function_or_number(parameters.Duration,i),
+					Condition = condition_func,
 				}
 			end
 
@@ -583,7 +646,7 @@ do
 				}
 			elseif id == ARCHER04 then
 				return {
-					AlwaysBuff = AllSkills[8222][1],-- magnificat
+					Buff = AllSkills[8222][1],	-- magnificat
 					AllSkills[8237][1],		-- sense
 					Recover = AllSkills[8227][1],	-- tender
 				}
@@ -746,7 +809,7 @@ do
 			if id == LIF or id == LIF2 or id == LIF_H or id == LIF_H2 then
 				return {
 					HealHands = AllSkills[8001],	-- healing hands
-					AlwaysBuff = AllSkills[8002],	-- urgent escape
+					Buff = AllSkills[8002],		-- urgent escape
 					--AllSkills[8003],		-- brain surgery (passive)
 					AllSkills[8004],		-- mental charge
 				}

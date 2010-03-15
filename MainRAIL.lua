@@ -10,6 +10,7 @@ require "State"			-- allow other files to add state validation options
 
 -- Alphabetical
 require "ActorOpts"
+require "Base64"
 require "Const"
 require "Debug"
 require "History"
@@ -83,7 +84,7 @@ function AI(id)
 	RAIL.State.Information.InitTime = GetTick()
 	RAIL.State.Information.OwnerID = GetV(V_OWNER,id)
 	RAIL.State.Information.SelfID = id
-	RAIL.State.Information.RAILVersion = RAIL.Version
+	RAIL.State.Information.RAILVersion = RAIL.FullVersion
 
 	-- Get Owner and Self
 	RAIL.Owner = Actors[GetV(V_OWNER,id)]
@@ -143,6 +144,11 @@ function AI(id)
 			return self
 		end
 		RAIL.Self.Update = RAIL.Owner.Update
+
+		RAIL.Owner.GetMaxHP = function(self) return GetV(V_MAXHP,self.ID) end
+		RAIL.Owner.GetMaxSP = function(self) return GetV(V_MAXSP,self.ID) end
+		RAIL.Self.GetMaxHP = RAIL.Owner.GetMaxHP
+		RAIL.Self.GetMaxSP = RAIL.Owner.GetMaxSP
 
 		-- Use the maximum values as default, but don't calculate sub-update values
 		RAIL.Owner.HP = History.New(GetV(V_MAXHP,RAIL.Owner.ID),false)

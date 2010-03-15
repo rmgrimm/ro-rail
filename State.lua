@@ -2,8 +2,11 @@
 --	(based loosely on http://www.lua.org/pil/12.1.2.html)
 do
 	BasicSerialize = {
-		string = function(val)
+		["string"] = function(val)
 			return string.format("%q",val)
+		end,
+		["function"] = function(val)
+			return string.format("\"base64:%s\"",RAIL.Base64:Encode(string.dump(val)))
 		end,
 	}
 	setmetatable(BasicSerialize,{
@@ -88,6 +91,26 @@ do
 			return nil,ret2
 		end
 	end
+
+	-- Protected loadstring
+	RAIL.ploadstring = function(string)
+		-- Check for pcall
+		if RAIL._G.pcall == nil or type(RAIL._G.pcall) ~= "function" then
+			return RAIL._G.loadstring(string)
+		end
+
+		-- Run a protected call for loadstring
+		local ret1,ret2,ret3 = pcall(RAIL._G.loadstring,string)
+
+		-- Check for success
+		if ret1 then
+			-- Succeeded
+			return ret2,ret3
+		else
+			-- Failed
+			return nil,ret2
+		end
+	end
 end
 
 -- State protection
@@ -149,31 +172,54 @@ do
 		-- Subtable = {is_subtable = true}
 	}
 
-	setmetatable(RAIL.Validate,{
-		__call = function(self,data,validate)
-			-- Verify the validation info
-			if type(validate) ~= "table" or (validate[1] == nil and validate.is_subtable == nil) then
+	local types = {
+		["function"] = function(data,validate)
+			local t = type(data)
+			local pregenerated = false
+
+			-- If it's a function return it
+			if t == "function" then
 				return data
 			end
 
-			-- Verify the type
-			local t = type(data)
-			if
-				(not validate.is_subtable and t ~= validate[1]) or
-				(validate.is_subtable and t ~= "table")
-			then
-				-- If it should be a table, return a brand new table
-				if validate.is_subtable then
-					return {}
-				end
+			-- If it's not a string, return the default
+			if t ~= "string" then
+				return validate[2]
+			end
 
+			-- Check if the function is base64 encoded
+			if string.sub(data,1,7) == "base64:" then
+				-- Decode it
+				data = RAIL.Base64:Decode(string.sub(data,8))
+				pregenerated = true
+			end
+
+			-- Attempt to convert it to a function
+			data = RAIL.ploadstring(data)
+
+			-- Check if its nil
+			if data == nil then
 				-- Return default
 				return validate[2]
 			end
 
-			-- Non-numericals are now valid
-			if t ~= "number" then
-				return data
+			-- Check if we need to generate a function
+			if not pregenerated then
+				data = data()
+
+				-- And again check sanity
+				if type(data) ~= "function" then
+					return validate[2]
+				end
+			end
+
+			return data
+		end,
+		number = function(data,validate)
+			-- Check that the data is a number
+			if type(data) ~= "number" then
+				-- Not a number, so use default instead
+				return validate[2]
 			end
 
 			-- Validate that the number is greater or equal to the minimum
@@ -190,6 +236,42 @@ do
 
 			-- Return the number, it's in range
 			return data
+		end,
+		table = function(data,validate)
+			if type(data) ~= "table" then
+				return {}
+			end
+
+			return data
+		end,
+		default = function(data,validate)
+			if type(data) ~= validate[1] then
+				return validate[2]
+			end
+
+			return data
+		end,
+	}
+	setmetatable(types,{
+		__index = function(t,key)
+			return t.default
+		end,
+	})
+
+	setmetatable(RAIL.Validate,{
+		__call = function(self,data,validate)
+			-- Verify the validation info
+			if type(validate) ~= "table" or (validate[1] == nil and validate.is_subtable == nil) then
+				-- Validation impossible
+				return data
+			end
+
+			-- Use specialized functions to verify data
+			if validate.is_subtable then
+				return types.table(data,validate)
+			else
+				return types[validate[1]](data,validate)
+			end
 		end,
 	})
 end

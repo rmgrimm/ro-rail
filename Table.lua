@@ -172,6 +172,45 @@ do
 		return t
 	end
 --]]
+
+	do
+		local function do_copy(v)
+			local t = type(v)
+			if t == "table" then
+				-- Deep copy the table
+				return Table.DeepCopy(v)
+			elseif t == "function" then
+				-- Make a full copy of the function
+				return loadstring(string.dump(v))
+			else
+				-- Everything else
+				return v
+			end
+		end
+
+		function Table.DeepCopy(t,into,overwrite)
+			-- Create a copy table
+			local copy = into or {}
+
+			-- Loop through all elements of the table
+			for k,v in t do
+				local new_k = do_copy(k)
+
+				if copy[new_k] == nil or overwrite then
+					copy[new_k] = do_copy(v)
+				end
+			end
+
+			-- Check for a metatable
+			local mt = getmetatable(t)
+			if type(mt) == "table" then
+				setmetatable(copy,Table.DeepCopy(mt))
+			end
+
+			-- Return the copy
+			return copy
+		end
+	end
 end
 
 -- List
