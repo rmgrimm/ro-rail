@@ -35,6 +35,7 @@ do
 		CASTING = 2,		-- Waiting for cast time to finish
 		DELAY_ACK = 3,		-- Waiting for server to acknolwedge skill
 		DELAY = 4,		-- Waiting for cast delay to finish
+		CASTING_UNK = 5,	-- Waiting for cast time of unknown skill
 	}
 	setmetatable(state_enum,{
 		__newindex = function(self,idx,value)
@@ -95,6 +96,8 @@ do
 				return state_enum.CASTING
 			elseif state == state_enum.DELAY_ACK then
 				return state_enum.DELAY
+			elseif state == state_enum.CASTING_UNK then
+				return state_enum.CASTING
 			else
 				return state
 			end
@@ -109,8 +112,12 @@ do
 			[state_enum.READY] = function(self,ticks_in_state)
 				-- Ready; nothing to update
 
-				-- TODO: Check for casting motion, and properly handle it
-				--		(timed out cast started?)
+				-- Check for casting motion, and properly handle it
+				--		(timed out cast started? user casted non-targeted?)
+				if self[key].actor.Motion[0] == MOTION_CASTING then
+					return state_enum.CASTING_UNK,0
+				end
+
 
 				-- Don't change state
 				return
@@ -127,7 +134,7 @@ do
 					return state_enum.CASTING,most_recent
 				else
 					-- Check if the skill timed out
-					if tick_delta >= self[key].timeout then
+					if ticks_in_state >= self[key].timeout then
 						-- Failed, return to ready state
 						return state_enum.READY,ticks_in_state,"timeout"
 					end
@@ -165,7 +172,7 @@ do
 
 				if sp_delta < 0 then
 					-- Set state to DELAY_ACK, to reuse code for SP check
-					return state_enum.DELAY_ACK,most_recent
+					return state_enum.DELAY_ACK,ticks_in_state
 				end
 
 				-- TODO: Check for uninterruptable skills
@@ -236,6 +243,13 @@ do
 
 				-- Don't change state
 				return
+			end,
+			[state_enum.CASTING_UNK] = function(self,ticks_in_state)
+				-- Wait until we aren't casting anymore
+
+				if self[key].actor.Motion[0] ~= MOTION_CASTING then
+					return state_enum.READY,0
+				end
 			end,
 		},
 
@@ -375,8 +389,16 @@ do
 
 				-- Check for a state change
 				if state ~= nil then
+					-- Log it
+					RAIL.LogT(65,"Skill state changed from {1} to {2} after {3}ms.",
+						parent[key].state, state, GetTick()-parent[key].ticks.begin)
+
 					-- Check for success/failure
-					if state == state_enum.READY and parent[key].state ~= state_enum.DELAY then
+					if
+						state == state_enum.READY and
+						parent[key].state ~= state_enum.DELAY and
+						parent[key].state ~= state_enum.CASTING_UNK
+					then
 						-- Failure!
 
 						-- Get the skill
@@ -410,6 +432,12 @@ do
 
 						-- Clear callbacks for this skill
 						parent.Callbacks:Clear(skill)
+
+					elseif state == state_enum.CASTING_UNK then
+						-- Casting unknown skill started
+
+						-- Log it
+						RAIL.LogT(60,"Cast of unknown skill started.")
 					end
 
 					-- Set the state and ticks

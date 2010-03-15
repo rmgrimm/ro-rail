@@ -14,6 +14,7 @@ RAIL.Validate.ProfileMark = {"number",20000,2000,nil}
 --	50 - RAIL.AI Performance logging
 --	55 - MobID save/load
 --	60 - Skill commands (sent to server)
+--	65 - Skill state tracking
 --	75 - Attack commands (sent to server)
 --	80 - Movement estimation
 --	85 - Move commands (sent to server)

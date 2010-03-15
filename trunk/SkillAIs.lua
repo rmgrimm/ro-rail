@@ -1,8 +1,28 @@
 -- Options
 RAIL.Validate.SkillOptions = {is_subtable = true,
-	AttackPriorityOffset = {"number",0},
 	ProvokePriorityOffset = {"number",0.5},
-	BuffPriority = {"number",40},
+	Attacks = {is_subtable = true,
+		BySkillID = {is_subtable = true,
+			default = {is_subtable = true,
+				PriorityOffset = {"number",0},
+			},
+		},
+	},
+	Buffs = {is_subtable = true,
+		BasePriority = {"number",40},
+		BySkillID = {is_subtable = true,
+			default = {is_subtable = true,
+				PriorityOffset = {"number",0},
+				NextCastTime = {"number",0},
+
+				-- Condition takes a function in the form of "function(_G)",
+				--	where the global environment is accessed through _G.
+				-- Note: Be careful to never use upvalues, as they cannot be
+				--	serialized
+				Condition = {"function",nil},	-- (default set by Buff Init function)
+			},
+		},
+	},
 	ChaosHeal = {is_subtable = true,
 		Priority = {"number",50},
 		EstimateFutureTicks = {"number",0,0},
@@ -27,6 +47,10 @@ do
 		-- Reuse this table to hold skill AIs
 		Attack = {
 			Init = function(skill)
+				-- Generate a validation table based on the default Attacks validation table
+				local validate_byID = RAIL.Validate.SkillOptions.Attacks.BySkillID
+				validate_byID[skill.ID] = Table.DeepCopy(validate_byID.default)
+
 				priv_key.AttackSieve = Table.New()
 
 				-- Copy the attack target sieve, but drop retargeting
@@ -111,7 +135,7 @@ do
 					local prio = target.BattleOpts.Priority
 
 					-- And offset it based on options
-					prio = prio + RAIL.State.SkillOptions.AttackPriorityOffset
+					prio = prio + RAIL.State.SkillOptions.Attacks.BySkillID[skill.ID].PriorityOffset
 
 					-- Set the callbacks for the skill
 					RAIL.Self.SkillState.Callbacks:Add(
@@ -128,26 +152,26 @@ do
 				return
 			end,
 		},
-		AlwaysBuff = {
-			-- Just copy from Buff, but don't check for targets
-			Init = function(skill)
-				-- Use Buff's init callback
-				skills_key.Buff.Init(skill)
-
-				-- But set TargetsOnScreen to true
-				skill[priv_key].TargetsOnScreen = true
-
-				-- And copy the Select function to our own
-				skills_key.AlwaysBuff.Select = skills_key.Buff.Select
-			end,
-		},
 		Buff = {
 			Init = function(skill)
+				-- Add to the state validation options
+				do
+					-- Generate the table, based off of default options
+					local validate_byID = RAIL.Validate.SkillOptions.Buffs.BySkillID
+					validate_byID[skill.ID] = Table.DeepCopy(validate_byID.default)
+
+					-- Set the default condition
+					validate_byID[skill.ID].Condition[2] = skill.Condition
+				end
+
+				-- Ensure that the NextCastTime is sane
+				if RAIL.State.Information.InitTime < RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].NextCastTime then
+					RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].NextCastTime = 0
+				end
+
 				-- Set the private key to hold the next time the skill should be used
 				skill[priv_key] = {
-					NextUse = 0,
 					Failures = 0,
-					TargetsOnScreen = false,
 				}
 
 				-- Add callbacks to the skill
@@ -157,8 +181,9 @@ do
 						-- Reset the failure count
 						skill[priv_key].Failures = 0
 
-						-- Set the next use time
-						skill[priv_key].NextUse = GetTick() + self.Duration - ticks
+						-- Set the next time we can use the buff
+						RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].NextCastTime =
+							GetTick() + skill.Duration - ticks
 					end,
 					function(self,target,ticks)
 						-- Increment the failure count
@@ -167,20 +192,6 @@ do
 					-- Persistent
 					true
 				)
-			end,
-			CycleBegin = function(skill)
-				-- Assume no targets are on screen
-				skill[priv_key].TargetsOnScreen = false
-			end,
-			ActorCheck = function(skill,actor)
-				-- Check if the actor is an enemy, and we're attacking
-				if
-					actor:IsEnemy() and
-					not actor:IsIgnored() and
-					RAIL.TargetHistory.Attack ~= -1
-				then
-					skill[priv_key].TargetsOnScreen = true
-				end
 			end,
 			Select = function(skill)
 				-- Check to see if the skill has failed 10 times in a row
@@ -195,15 +206,16 @@ do
 					return
 				end
 
-				-- Don't use the buff if no targets are on the screen
-				if not skill[priv_key].TargetsOnScreen then
+				-- Don't use the buff if it's still active
+				if GetTick() < RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].NextCastTime then
 					return
 				end
 
-				-- Check to see if the skill has worn off
-				if GetTick() >= skill[priv_key].NextUse then
+				-- Check the custom condition of the buff
+				if RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].Condition(RAIL._G) then
 					-- Return the skill priority and the skill
-					return RAIL.State.SkillOptions.BuffPriority,skill,RAIL.Self
+					return RAIL.State.SkillOptions.Buffs.BasePriority + RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].PriorityOffset
+					,skill,RAIL.Self
 				end
 
 				-- Otherwise, return nothing
@@ -219,11 +231,11 @@ do
 				-- Check if we're going for percentages
 				local owner_cur_hp = RAIL.Owner.HP[advance_heal]
 				if RAIL.State.SkillOptions.ChaosHeal.OwnerHPisPercent then
-					owner_cur_hp = math.floor(owner_cur_hp * 100 / GetV(V_MAXHP,RAIL.Owner.ID))
+					owner_cur_hp = math.floor(owner_cur_hp * 100 / RAIL.Owner:GetMaxHP())
 				end
 				local self_cur_hp = RAIL.Self.HP[advance_heal]
 				if RAIL.State.SkillOptions.ChaosHeal.SelfHPisPercent then
-					self_cur_hp = math.floor(self_cur_hp * 100 / GetV(V_MAXHP,RAIL.Self.ID))
+					self_cur_hp = math.floor(self_cur_hp * 100 / RAIL.Self:GetMaxHP())
 				end
 
 				-- Check to see if we should try healing our owner
