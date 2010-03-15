@@ -165,7 +165,9 @@ do
 				end
 
 				-- Ensure that the NextCastTime is sane
-				if RAIL.State.Information.InitTime < RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].NextCastTime then
+				if RAIL.State.Information.InitTime + skill.Duration <
+					RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].NextCastTime
+				then
 					RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].NextCastTime = 0
 				end
 
@@ -202,9 +204,11 @@ do
 				end
 
 				-- Don't use the buff if we don't have enough SP
-				if RAIL.Self.SP[0] < skill.SPCost then
-					return
-				end
+				-- Note: Disabled; will not use until we have enough SP,
+				--	but will prevent lower priority skills from being used
+				--if RAIL.Self.SP[0] < skill.SPCost then
+				--	return
+				--end
 
 				-- Don't use the buff if it's still active
 				if GetTick() < RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].NextCastTime then
