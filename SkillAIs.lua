@@ -1,42 +1,40 @@
 -- Options
 RAIL.Validate.SkillOptions = {is_subtable = true,
 	BuffBasePriority = {"number",40},
-	ByID = {is_subtable = true,
-		atks_default = {is_subtable = true,
-			Enabled = {"boolean",true},
-			Name = {"string",nil},			-- (default set by init function)
-			PriorityOffset = {"number",0},
-		},
-		buff_default = {is_subtable = true,
-			Enabled = {"boolean",true},
-			Name = {"string",nil},			-- (default set by init function)
-			MaxFailures = {"number",10,1},
-			PriorityOffset = {"number",0},
-			NextCastTime = {"number",0},
+	atks_default = {is_subtable = true,
+		Enabled = {"boolean",true},
+		Name = {"string",nil},			-- (default set by init function)
+		PriorityOffset = {"number",0},
+	},
+	buff_default = {is_subtable = true,
+		Enabled = {"boolean",true},
+		Name = {"string",nil},			-- (default set by init function)
+		MaxFailures = {"number",10,1},
+		PriorityOffset = {"number",0},
+		NextCastTime = {"number",0},
 
-			-- Condition takes a function in the form of "function(_G)",
-			--	where the global environment is accessed through _G.
-			-- Note: Be careful to never use upvalues, as they cannot be
-			--	serialized
-			Condition = {"function",nil},		-- (default set by Buff init function)
-		},
-		-- Chaotic Blessings
-		[8014] = {is_subtable = true,
-			Enabled = {"boolean",true},
-			Name = {"string",nil},			-- (default set by init function)
-			Priority = {"number",50},
-			EstimateFutureTicks = {"number",0,0},
-			OwnerHP = {"number",50,0},
-			OwnerHPisPercent = {"boolean",true},
-			SelfHP = {"number",0,0},
-			SelfHPisPercent = {"boolean",false},
-		},
-		-- Provoke
-		[8232] = {is_subtable = true,
-			Enabled = {"boolean",true},
-			Name = {"string",nil},			-- (default set by init function)
-			PriorityOffset = {"number",0.5},
-		},
+		-- Condition takes a function in the form of "function(_G)",
+		--	where the global environment is accessed through _G.
+		-- Note: Be careful to never use upvalues, as they cannot be
+		--	serialized
+		Condition = {"function",nil},		-- (default set by Buff init function)
+	},
+	-- Chaotic Blessings
+	[8014] = {is_subtable = true,
+		Enabled = {"boolean",true},
+		Name = {"string",nil},			-- (default set by init function)
+		Priority = {"number",50},
+		EstimateFutureTicks = {"number",0,0},
+		OwnerHP = {"number",50,0},
+		OwnerHPisPercent = {"boolean",true},
+		SelfHP = {"number",0,0},
+		SelfHPisPercent = {"boolean",false},
+	},
+	-- Provoke
+	[8232] = {is_subtable = true,
+		Enabled = {"boolean",true},
+		Name = {"string",nil},			-- (default set by init function)
+		PriorityOffset = {"number",0.5},
 	},
 }
 
@@ -56,7 +54,7 @@ do
 			Init = function(skill)
 				-- Generate a validation table based on the default Attacks validation table
 				do
-					local validate_byID = RAIL.Validate.SkillOptions.ByID
+					local validate_byID = RAIL.Validate.SkillOptions
 					validate_byID[skill.ID] = Table.DeepCopy(validate_byID.atks_default)
 				end
 
@@ -143,7 +141,7 @@ do
 					local prio = target.BattleOpts.Priority
 
 					-- And offset it based on options
-					prio = prio + RAIL.State.SkillOptions.ByID[skill.ID].PriorityOffset
+					prio = prio + RAIL.State.SkillOptions[skill.ID].PriorityOffset
 
 					-- Set the callbacks for the skill
 					RAIL.Self.SkillState.Callbacks:Add(
@@ -165,7 +163,7 @@ do
 				-- Add to the state validation options
 				do
 					-- Generate the table, based off of default options
-					local validate_byID = RAIL.Validate.SkillOptions.ByID
+					local validate_byID = RAIL.Validate.SkillOptions
 					validate_byID[skill.ID] = Table.DeepCopy(validate_byID.buff_default)
 
 					-- Set the default condition
@@ -174,9 +172,9 @@ do
 
 				-- Ensure that the NextCastTime is sane
 				if RAIL.State.Information.InitTime + skill.Duration <
-					RAIL.State.SkillOptions.ByID[skill.ID].NextCastTime
+					RAIL.State.SkillOptions[skill.ID].NextCastTime
 				then
-					RAIL.State.SkillOptions.ByID[skill.ID].NextCastTime = 0
+					RAIL.State.SkillOptions[skill.ID].NextCastTime = 0
 				end
 
 				-- Set the private key to hold the next time the skill should be used
@@ -192,7 +190,7 @@ do
 						skill[priv_key].Failures = 0
 
 						-- Set the next time we can use the buff
-						RAIL.State.SkillOptions.ByID[skill.ID].NextCastTime =
+						RAIL.State.SkillOptions[skill.ID].NextCastTime =
 							GetTick() + skill.Duration - ticks
 					end,
 					function(self,target,ticks)
@@ -205,7 +203,7 @@ do
 			end,
 			Select = function(skill)
 				-- Get the state table
-				local state = RAIL.State.SkillOptions.ByID[skill.ID]
+				local state = RAIL.State.SkillOptions[skill.ID]
 
 				-- Check to see if the skill has failed 10 times in a row
 				if skill[priv_key].Failures >= state.MaxFailures then
@@ -239,7 +237,7 @@ do
 		ChaosHeal = {
 			Select = function(skill)
 				-- Get the state skill options table
-				local state = RAIL.State.SkillOptions.ByID[8014]
+				local state = RAIL.State.SkillOptions[8014]
 
 				-- Get some skill options for use later
 				local priority = state.Priority
@@ -347,7 +345,7 @@ do
 			end,
 			Select = function(skill,friends)
 				-- Get the state file options table
-				local state = RAIL.State.SkillOptions.ByID[8232]
+				local state = RAIL.State.SkillOptions[8232]
 
 				-- Run the sieve and find an enemy target
 				local target = priv_key.ProvokeSieve(skill[priv_key].Targets,skill[priv_key].Friends)
@@ -392,14 +390,14 @@ do
 	local skillEnabled = function(skill)
 		-- If no validate options are set for this skill, assume its enabled
 		if
-			not RAIL.Validate.SkillOptions.ByID[skill.ID] or
-			not RAIL.Validate.SkillOptions.ByID[skill.ID].Enabled
+			not RAIL.Validate.SkillOptions[skill.ID] or
+			not RAIL.Validate.SkillOptions[skill.ID].Enabled
 		then
 			return true
 		end
 
 		-- If validate options are set, use the state value for enabled
-		return RAIL.State.SkillOptions.ByID[skill.ID].Enabled
+		return RAIL.State.SkillOptions[skill.ID].Enabled
 	end
 
 
@@ -411,7 +409,7 @@ do
 			local cyclebegin,actorcheck,select = false,false,false
 
 			-- Validate options table base
-			local byID = RAIL.Validate.SkillOptions.ByID
+			local byID = RAIL.Validate.SkillOptions
 
 			for ai_type,skill in skills do
 				-- Check if we can handle this AI type
@@ -438,7 +436,7 @@ do
 
 							-- And rework the skill to now use the name from state file
 							AllSkills[skill.ID].GetName = function(self)
-								return RAIL.State.SkillOptions.ByID[self.ID].Name
+								return RAIL.State.SkillOptions[self.ID].Name
 							end
 						end
 					end
