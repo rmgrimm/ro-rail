@@ -177,8 +177,8 @@ do
 
 				-- TODO: Check for uninterruptable skills
 
-				-- Set the state to ready, the skill was interrupted
-				return state_enum.READY,ticks_in_state,"cast interrupted"
+				-- Set the state to ready, the skill was interrupted (or failed)
+				return state_enum.READY,ticks_in_state,"cast interrupted or failed"
 			end,
 			[state_enum.DELAY_ACK] = function(self,ticks_in_state)
 				-- Check for SP usage or MOTION_SKILL (as server acknowledgement)
@@ -213,7 +213,7 @@ do
 						-- Check if the new level is less than current
 						if 0 < new_level and new_level < skill.Level then
 							RAIL.LogT(60,"Cast of {1} seems to have used level {2}; SP used = {3}.",
-								skill.Name,new_level,sp_delta)
+								skill,new_level,sp_delta)
 
 							-- Replace it, so delay time will be more accurate
 							self[key].skill = AllSkills[skill.ID][new_level]
@@ -406,7 +406,7 @@ do
 
 						-- Log it
 						RAIL.LogT(60,"Cast of {1} failed after {2}ms; reason = {3}.",
-							skill.Name,GetTick()-parent[key].ticks.begin,reason)
+							skill,GetTick()-parent[key].ticks.begin,reason)
 
 						-- Fire any failure callback for this skill
 						parent.Callbacks:Fire(skill,false,parent[key].target,ticks)
@@ -425,7 +425,7 @@ do
 
 						-- Log it
 						RAIL.LogT(60,"Cast of {1} succeeded after {2}ms.",
-							skill.Name,GetTick()-parent[key].ticks.begin)
+							skill,GetTick()-parent[key].ticks.begin)
 
 						-- Fire any success callbacks for this skill
 						parent.Callbacks:Fire(skill,true,parent[key].target,ticks)

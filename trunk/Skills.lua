@@ -326,12 +326,25 @@ do
 			CastDelay = 2 * 1000,
 			Duration = function(level) return (15 + level*15) * 1000 end,
 			Condition = function(_G)
-				-- Check if the owner is not at full SP
-				if _G.RAIL.Owner.SP[0] < _G.RAIL.Owner:GetMaxSP() then
-					return true
+				-- Check if the owner is at full SP
+				if _G.RAIL.Owner.SP[0] >= _G.RAIL.Owner:GetMaxSP() then
+					-- No point to Magnificat
+					return false
 				end
 
-				return false
+				-- Check if we're being attacked
+				if _G.RAIL.Self.TargetOf:GetN() > 0 then
+					-- It'll likely be interrupted, don't cast yet
+					return false
+				end
+
+				-- Check if our owner is moving
+				if _G.RAIL.Owner.Motion[0] == _G.MOTION_MOVE then
+					-- We might need to chase to stay on screen; don't cast
+					return false
+				end
+
+				return true
 			end,
 		},
 		[8223] = {
@@ -468,7 +481,7 @@ do
 	local CastFunctions = {
 		["self"] = function(self)
 			-- Log the skill usage.
-			RAIL.LogT(60,"Casting {1}.",self.Name)
+			RAIL.LogT(60,"Casting {1}.",self)
 
 			-- Set the skill state
 			RAIL.Self.SkillState:WaitFor(self,RAIL.Self)
@@ -481,7 +494,7 @@ do
 			actor = Actors[actor]
 
 			-- Log the skill usage against actor
-			RAIL.LogT(60,"Casting {1} against {2}.",self.Name,actor)
+			RAIL.LogT(60,"Casting {1} against {2}.",self,actor)
 
 			-- Set the skill state
 			RAIL.Self.SkillState:WaitFor(self,actor)
@@ -496,7 +509,7 @@ do
 				RAIL.Self.SkillState:WaitFor(self,x)
 
 				-- Log it
-				RAIL.LogT(60,"Casting {1} against {2}.",self.Name,x)
+				RAIL.LogT(60,"Casting {1} against {2}.",self,x)
 
 				-- Get the ground location
 				y = x.Y[0]
@@ -507,7 +520,7 @@ do
 				--RAIL.Self.SkillState:WaitFor(self,x,y)
 
 				-- Log it
-				RAIL.LogT(60,"Casting {1} on ({2},{3}).",self.Name,x,y)
+				RAIL.LogT(60,"Casting {1} on ({2},{3}).",self,x,y)
 			end
 
 			-- Use the skill
@@ -572,14 +585,15 @@ do
 		local AllSkills_rebuild = { }
 		for id,parameters in AllSkills do
 			-- Create a skill table
+			local name = parameters.Name
 			local skill = {
-				Name = parameters.Name,
+				GetName = function(self) return tostring(name) end,
 			}
 
 			-- Select the cast and range functions
 			local cast_func = function_or_string(parameters.CastFunction,CastFunctions,function(self,...)
 				-- Log
-				RAIL.LogT(0,"Unknown cast type for skill {1}.",self.Name)
+				RAIL.LogT(0,"Unknown cast type for skill {1}.",self)
 			end)
 			local range_func = function_or_string(parameters.Range,{},function(self)
 				-- Use GetV to determine the range
@@ -595,12 +609,14 @@ do
 			for i=1,parameters.MaxLevel do
 				-- Build the table
 				skill[i] = {
-					Name = StringBuffer.New()
-						:Append(parameters.Name)
-						:Append(" (level ")
-						:Append(i)
-						:Append(")")
-						:Get(),
+					GetName = function(self)
+						return StringBuffer.New()
+							:Append(skill:GetName())
+							:Append(" (level ")
+							:Append(i)
+							:Append(")")
+						:Get()
+					end,
 					ID = id,
 					Level = i,
 					Cast = cast_func,
@@ -611,16 +627,25 @@ do
 					Duration = function_or_number(parameters.Duration,i),
 					Condition = condition_func,
 				}
+				-- Set the metatable
+				setmetatable(skill[i],{
+					__tostring = function(self)
+						return self:GetName()
+					end,
+				})
 			end
 
 			-- Skills that have a max level of 1 don't need to specify level
 			if parameters.MaxLevel == 1 then
-				skill[1].Name = skill.Name
+				skill[1].GetName = skill.GetName
 			end
 
 			-- Default the skill to using the highest level
 			setmetatable(skill,{
 				__index = skill[parameters.MaxLevel],
+				__tostring = function(self)
+					return self:GetName()
+				end,
 			})
 
 			-- Add the skill to the skill-table rebuild
