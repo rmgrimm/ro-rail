@@ -113,19 +113,6 @@ function AI(id)
 	-- Log extra information about self
 	RAIL.LogT(40," --> Self; AI_Type = {2}; Attack Range = {3}",RAIL.Self,RAIL.Self.AI_Type,RAIL.Self.AttackRange)
 
-	-- Extra info about skills
-	do
-		local buf = StringBuffer.New()
-		for skill_type,skill in pairs(RAIL.Self.Skills) do
-			buf:Append(skill.Name)
-			if type(skill_type) == "string" then
-				buf:Append(" as AI's \""):Append(skill_type):Append("\"")
-			end
-			buf:Append("; ")
-		end
-		RAIL.LogT(40," --> Skills: {1}",buf:Append(" "):Get())
-	end
-
 	-- Create a bogus Other until homu<->merc communication is established
 	RAIL.Other = RAIL.Self
 
@@ -163,6 +150,19 @@ function AI(id)
 
 	-- Initialize Skill decision making
 	SelectSkill:Init(RAIL.Self.Skills)
+
+	-- Extra info about skills
+	do
+		local buf = StringBuffer.New()
+		for skill_type,skill in pairs(RAIL.Self.Skills) do
+			buf:Append(skill)
+			if type(skill_type) == "string" then
+				buf:Append(" as AI's \""):Append(skill_type):Append("\"")
+			end
+			buf:Append("; ")
+		end
+		RAIL.LogT(40," --> Skills: {1}",buf:Append(" "):Get())
+	end
 
 	-- Never show up as either enemies or friends
 	RAIL.Owner.IsEnemy  = function() return false end
@@ -405,7 +405,7 @@ function RAIL.AI(id)
 
 		-- Check if its due to an emergency skill
 		elseif type(terminate) == "table" and type(terminate[1]) == "table" and terminate[1].Cast then
-			RAIL.LogT(7, "Urgently casting {1}; cycle terminating after data collection.",terminate[1].Name)
+			RAIL.LogT(7,"Urgently casting {1}; cycle terminating after data collection.",terminate[1])
 
 			terminate[1]:Cast(terminate[2],terminate[3])
 

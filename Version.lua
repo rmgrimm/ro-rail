@@ -26,6 +26,7 @@ end
 --	Note: View the subversion commit notes for more full changelog.
 --		(This is maintained to regularly bump version number.)
 
+-- 2010-03-16 -- Changes to skill state-file options
 -- 2010-03-16 -- Minor changes to AI and AI_M files; modification to urgent escape usage
 -- 2010-03-15 -- Small fixes to actor ignore and buff skills
 -- 2010-03-15 -- Reworked Buff skill AIs; added Base64 and function support to State

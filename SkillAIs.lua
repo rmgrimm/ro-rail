@@ -1,35 +1,42 @@
 -- Options
 RAIL.Validate.SkillOptions = {is_subtable = true,
-	ProvokePriorityOffset = {"number",0.5},
-	Attacks = {is_subtable = true,
-		BySkillID = {is_subtable = true,
-			default = {is_subtable = true,
-				PriorityOffset = {"number",0},
-			},
+	BuffBasePriority = {"number",40},
+	ByID = {is_subtable = true,
+		atks_default = {is_subtable = true,
+			Enabled = {"boolean",true},
+			Name = {"string",nil},			-- (default set by init function)
+			PriorityOffset = {"number",0},
 		},
-	},
-	Buffs = {is_subtable = true,
-		BasePriority = {"number",40},
-		BySkillID = {is_subtable = true,
-			default = {is_subtable = true,
-				PriorityOffset = {"number",0},
-				NextCastTime = {"number",0},
+		buff_default = {is_subtable = true,
+			Enabled = {"boolean",true},
+			Name = {"string",nil},			-- (default set by init function)
+			MaxFailures = {"number",10,1},
+			PriorityOffset = {"number",0},
+			NextCastTime = {"number",0},
 
-				-- Condition takes a function in the form of "function(_G)",
-				--	where the global environment is accessed through _G.
-				-- Note: Be careful to never use upvalues, as they cannot be
-				--	serialized
-				Condition = {"function",nil},	-- (default set by Buff Init function)
-			},
+			-- Condition takes a function in the form of "function(_G)",
+			--	where the global environment is accessed through _G.
+			-- Note: Be careful to never use upvalues, as they cannot be
+			--	serialized
+			Condition = {"function",nil},		-- (default set by Buff init function)
 		},
-	},
-	ChaosHeal = {is_subtable = true,
-		Priority = {"number",50},
-		EstimateFutureTicks = {"number",0,0},
-		OwnerHP = {"number",50,0},
-		OwnerHPisPercent = {"boolean",true},
-		SelfHP = {"number",0,0},
-		SelfHPisPercent = {"boolean",false},
+		-- Chaotic Blessings
+		[8014] = {is_subtable = true,
+			Enabled = {"boolean",true},
+			Name = {"string",nil},			-- (default set by init function)
+			Priority = {"number",50},
+			EstimateFutureTicks = {"number",0,0},
+			OwnerHP = {"number",50,0},
+			OwnerHPisPercent = {"boolean",true},
+			SelfHP = {"number",0,0},
+			SelfHPisPercent = {"boolean",false},
+		},
+		-- Provoke
+		[8232] = {is_subtable = true,
+			Enabled = {"boolean",true},
+			Name = {"string",nil},			-- (default set by init function)
+			PriorityOffset = {"number",0.5},
+		},
 	},
 }
 
@@ -48,8 +55,10 @@ do
 		Attack = {
 			Init = function(skill)
 				-- Generate a validation table based on the default Attacks validation table
-				local validate_byID = RAIL.Validate.SkillOptions.Attacks.BySkillID
-				validate_byID[skill.ID] = Table.DeepCopy(validate_byID.default)
+				do
+					local validate_byID = RAIL.Validate.SkillOptions.ByID
+					validate_byID[skill.ID] = Table.DeepCopy(validate_byID.atks_default)
+				end
 
 				priv_key.AttackSieve = Table.New()
 
@@ -116,7 +125,6 @@ do
 				end
 			end,
 			Select = function(skill,friends)
-
 				-- Run the sieve and find a target
 				local target = priv_key.AttackSieve(skill[priv_key].Targets,skill[priv_key].Friends)
 
@@ -135,7 +143,7 @@ do
 					local prio = target.BattleOpts.Priority
 
 					-- And offset it based on options
-					prio = prio + RAIL.State.SkillOptions.Attacks.BySkillID[skill.ID].PriorityOffset
+					prio = prio + RAIL.State.SkillOptions.ByID[skill.ID].PriorityOffset
 
 					-- Set the callbacks for the skill
 					RAIL.Self.SkillState.Callbacks:Add(
@@ -157,8 +165,8 @@ do
 				-- Add to the state validation options
 				do
 					-- Generate the table, based off of default options
-					local validate_byID = RAIL.Validate.SkillOptions.Buffs.BySkillID
-					validate_byID[skill.ID] = Table.DeepCopy(validate_byID.default)
+					local validate_byID = RAIL.Validate.SkillOptions.ByID
+					validate_byID[skill.ID] = Table.DeepCopy(validate_byID.buff_default)
 
 					-- Set the default condition
 					validate_byID[skill.ID].Condition[2] = skill.Condition
@@ -166,9 +174,9 @@ do
 
 				-- Ensure that the NextCastTime is sane
 				if RAIL.State.Information.InitTime + skill.Duration <
-					RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].NextCastTime
+					RAIL.State.SkillOptions.ByID[skill.ID].NextCastTime
 				then
-					RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].NextCastTime = 0
+					RAIL.State.SkillOptions.ByID[skill.ID].NextCastTime = 0
 				end
 
 				-- Set the private key to hold the next time the skill should be used
@@ -184,7 +192,7 @@ do
 						skill[priv_key].Failures = 0
 
 						-- Set the next time we can use the buff
-						RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].NextCastTime =
+						RAIL.State.SkillOptions.ByID[skill.ID].NextCastTime =
 							GetTick() + skill.Duration - ticks
 					end,
 					function(self,target,ticks)
@@ -196,9 +204,11 @@ do
 				)
 			end,
 			Select = function(skill)
+				-- Get the state table
+				local state = RAIL.State.SkillOptions.ByID[skill.ID]
+
 				-- Check to see if the skill has failed 10 times in a row
-				--	TODO: option for max failures
-				if skill[priv_key].Failures >= 10 then
+				if skill[priv_key].Failures >= state.MaxFailures then
 					-- We probably don't actually have this skill; stop trying
 					return
 				end
@@ -211,14 +221,14 @@ do
 				--end
 
 				-- Don't use the buff if it's still active
-				if GetTick() < RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].NextCastTime then
+				if GetTick() < state.NextCastTime then
 					return
 				end
 
 				-- Check the custom condition of the buff
-				if RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].Condition(RAIL._G) then
+				if state.Condition(RAIL._G) then
 					-- Return the skill priority and the skill
-					return RAIL.State.SkillOptions.Buffs.BasePriority + RAIL.State.SkillOptions.Buffs.BySkillID[skill.ID].PriorityOffset
+					return RAIL.State.SkillOptions.BuffBasePriority + state.PriorityOffset
 					,skill,RAIL.Self
 				end
 
@@ -228,27 +238,30 @@ do
 		},
 		ChaosHeal = {
 			Select = function(skill)
+				-- Get the state skill options table
+				local state = RAIL.State.SkillOptions.ByID[8014]
+
 				-- Get some skill options for use later
-				local priority = RAIL.State.SkillOptions.ChaosHeal.Priority
-				local advance_heal = -RAIL.State.SkillOptions.ChaosHeal.EstimateFutureTicks
+				local priority = state.Priority
+				local advance_heal = -state.EstimateFutureTicks
 
 				-- Check if we're going for percentages
 				local owner_cur_hp = RAIL.Owner.HP[advance_heal]
-				if RAIL.State.SkillOptions.ChaosHeal.OwnerHPisPercent then
+				if state.OwnerHPisPercent then
 					owner_cur_hp = math.floor(owner_cur_hp * 100 / RAIL.Owner:GetMaxHP())
 				end
 				local self_cur_hp = RAIL.Self.HP[advance_heal]
-				if RAIL.State.SkillOptions.ChaosHeal.SelfHPisPercent then
+				if state.SelfHPisPercent then
 					self_cur_hp = math.floor(self_cur_hp * 100 / RAIL.Self:GetMaxHP())
 				end
 
 				-- Check to see if we should try healing our owner
-				if owner_cur_hp <= RAIL.State.SkillOptions.ChaosHeal.OwnerHP then
+				if owner_cur_hp <= state.OwnerHP then
 					-- Heal our owner
 					--	Note: level 3 has 50% chance to heal owner
 					return priority,skill[3],RAIL.Owner
 
-				elseif self_cur_hp <= RAIL.State.SkillOptions.ChaosHeal.SelfHP then
+				elseif self_cur_hp <= state.SelfHP then
 					-- Heal our homunculus
 					--	Note: level 4 has a 60% chance to heal self
 					return priority,skill[4],RAIL.Self
@@ -333,6 +346,8 @@ do
 				end
 			end,
 			Select = function(skill,friends)
+				-- Get the state file options table
+				local state = RAIL.State.SkillOptions.ByID[8232]
 
 				-- Run the sieve and find an enemy target
 				local target = priv_key.ProvokeSieve(skill[priv_key].Targets,skill[priv_key].Friends)
@@ -344,7 +359,7 @@ do
 					prio = target.BattleOpts.Priority
 
 					-- And offset it based on options
-					prio = prio + RAIL.State.SkillOptions.ProvokePriorityOffset
+					prio = prio + state.PriorityOffset
 				end
 
 				-- TODO: Check for provoke against friendly targets
@@ -369,8 +384,23 @@ do
 		},
 	}
 
+	-- Add support for Buff2, Attack2, etc
+	--	TODO: clean this up, so they don't count targets twice, etc
+	skills_key.Attack2 = skills_key.Attack
+	skills_key.Buff2 = skills_key.Buff
 
-	-- TODO: Add support for Buff2, Attack2, etc
+	local skillEnabled = function(skill)
+		-- If no validate options are set for this skill, assume its enabled
+		if
+			not RAIL.Validate.SkillOptions.ByID[skill.ID] or
+			not RAIL.Validate.SkillOptions.ByID[skill.ID].Enabled
+		then
+			return true
+		end
+
+		-- If validate options are set, use the state value for enabled
+		return RAIL.State.SkillOptions.ByID[skill.ID].Enabled
+	end
 
 
 	SelectSkill = {
@@ -379,6 +409,9 @@ do
 		Init = function(self,skills)
 			-- Types that we have
 			local cyclebegin,actorcheck,select = false,false,false
+
+			-- Validate options table base
+			local byID = RAIL.Validate.SkillOptions.ByID
 
 			for ai_type,skill in skills do
 				-- Check if we can handle this AI type
@@ -395,6 +428,20 @@ do
 					if skills_key[ai_type].CycleBegin then cyclebegin = true end
 					if skills_key[ai_type].ActorCheck then actorcheck = true end
 					if skills_key[ai_type].Select then select = true end
+
+					-- Set validation options
+					if byID[skill.ID] then
+						-- Skill Name
+						if byID[skill.ID].Name then
+							-- Set the default name
+							byID[skill.ID].Name[2] = AllSkills[skill.ID]:GetName()
+
+							-- And rework the skill to now use the name from state file
+							AllSkills[skill.ID].GetName = function(self)
+								return RAIL.State.SkillOptions.ByID[self.ID].Name
+							end
+						end
+					end
 				end
 			end
 
@@ -419,8 +466,14 @@ do
 			for skill,ai_obj in self[skills_key] do
 				-- Call the skill AI's cycle-begin function
 				local urgent
-				if ai_obj.CycleBegin then
-					urgent = ai_obj.CycleBegin(skill)
+				if skillEnabled(skill) then
+					if ai_obj.CycleBegin then
+						urgent = ai_obj.CycleBegin(skill)
+					end
+				else
+					-- To prevent Select functions from giving an error if they
+					--	depend on something from CycleBegin
+					ai_obj.wait_for_next_cycle = true
 				end
 
 				-- Check if an urgent skill was selected
@@ -438,7 +491,11 @@ do
 
 			-- Loop through each skill
 			for skill,ai_obj in self[skills_key] do
-				if ai_obj.ActorCheck then
+				if
+					ai_obj.ActorCheck and
+					skillEnabled(skill) and
+					not ai_obj.wait_for_next_cycle
+				then
 					ai_obj.ActorCheck(skill,actor)
 				end
 			end
@@ -453,7 +510,11 @@ do
 			local best_prio,best_skill,best_target_x,best_target_y = min_priority
 			for skill_obj,ai_obj in self[skills_key] do
 				local prio,skill,target_x,target_y = best_prio,nil,nil
-				if ai_obj.Select then
+				if
+					ai_obj.Select and
+					skillEnabled(skill_obj) and
+					not ai_obj.wait_for_next_cycle
+				then
 					prio,skill,target_x,target_y = ai_obj.Select(skill_obj)
 
 					if prio == nil then
@@ -464,6 +525,9 @@ do
 				if prio > best_prio then
 					best_prio,best_skill,best_target_x,best_target_y = prio,skill,target_x,target_y
 				end
+
+				-- Take off the wait for next cycle flag (if it's off, nothing happens)
+				ai_obj.wait_for_next_cycle = nil
 			end
 
 			-- Ensure a skill was selected
@@ -472,7 +536,9 @@ do
 			end
 
 			-- Check if we don't have enough SP for the skill
-			if RAIL.Self.SP[0] < best_skill.SPCost then
+			-- Note: Skills don't seem to actually work unless they'll leave
+			--	the homunculus/mercenary at above 0 sp.
+			if RAIL.Self.SP[0] < best_skill.SPCost + 1 then
 				-- Don't use a skill yet
 				return nil
 			end
