@@ -56,11 +56,7 @@ do
 
 	-- If all else failed, make sure the RO client doesn't crash
 	if ScriptVersion < 0 then
-		if TraceAI then
-			TraceAI("RAIL failed to locate script directory.")
-		else
-			print("RAIL failed to locate script directory.")
-		end
+		(TraceAI or print)("RAIL failed to locate script directory.")
 		RAIL.CantRun = true
 		AI = function() end
 

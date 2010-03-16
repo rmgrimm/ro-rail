@@ -17,8 +17,15 @@ do
 			CastDelay = 35 * 1000,
 			Duration = function(level) return (45 - level*5) * 1000 end,
 			Condition = function(_G)
-				-- Always use urgent escape if it's available
-				return true
+				-- Use only if owner is moving, or we're chasing something
+				if
+					_G.RAIL.Owner.Motion[0] == _G.MOTION_MOVE or
+					_G.RAIL.TargetHistory.Chase[0] ~= -1
+				then
+					return true
+				end
+
+				return false
 			end,
 		},
 		[8003] = {
