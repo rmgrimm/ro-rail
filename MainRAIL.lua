@@ -386,7 +386,7 @@ function RAIL.AI(id)
 		end
 
 		-- Process any input command
-		RAIL.Cmd.ProcessInput[msg[1]](shift,msg)
+		RAIL.Cmd.ProcessInput(shift,msg)
 
 	end
 
@@ -481,7 +481,7 @@ function RAIL.AI(id)
 		end
 
 		-- Chase
-		if Target.Chase then
+		if Target.Chase and Target.Chase.ID then
 			History.Update(RAIL.TargetHistory.Chase,Target.Chase.ID)
 		else
 			History.Update(RAIL.TargetHistory.Chase,-1)

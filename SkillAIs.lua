@@ -3,12 +3,12 @@ RAIL.Validate.SkillOptions = {is_subtable = true,
 	BuffBasePriority = {"number",40},
 	atks_default = {is_subtable = true,
 		Enabled = {"boolean",true},
-		Name = {"string",nil},			-- (default set by init function)
+		Name = {"string",nil},				-- (default set by init function)
 		PriorityOffset = {"number",0},
 	},
 	buff_default = {is_subtable = true,
 		Enabled = {"boolean",true},
-		Name = {"string",nil},			-- (default set by init function)
+		Name = {"string",nil},				-- (default set by init function)
 		MaxFailures = {"number",10,1},
 		PriorityOffset = {"number",0},
 		NextCastTime = {"number",0},
@@ -17,12 +17,12 @@ RAIL.Validate.SkillOptions = {is_subtable = true,
 		--	where the global environment is accessed through _G.
 		-- Note: Be careful to never use upvalues, as they cannot be
 		--	serialized
-		Condition = {"function",nil},		-- (default set by Buff init function)
+		Condition = {"function",nil,unsaved=true},	-- (default set by init function)
 	},
 	-- Chaotic Blessings
 	[8014] = {is_subtable = true,
 		Enabled = {"boolean",true},
-		Name = {"string",nil},			-- (default set by init function)
+		Name = {"string",nil},				-- (default set by init function)
 		Priority = {"number",50},
 		EstimateFutureTicks = {"number",0,0},
 		OwnerHP = {"number",50,0},
@@ -165,9 +165,6 @@ do
 					-- Generate the table, based off of default options
 					local validate_byID = RAIL.Validate.SkillOptions
 					validate_byID[skill.ID] = Table.DeepCopy(validate_byID.buff_default)
-
-					-- Set the default condition
-					validate_byID[skill.ID].Condition[2] = skill.Condition
 				end
 
 				-- Ensure that the NextCastTime is sane
@@ -438,6 +435,12 @@ do
 							AllSkills[skill.ID].GetName = function(self)
 								return RAIL.State.SkillOptions[self.ID].Name
 							end
+						end
+
+						-- Condition
+						if byID[skill.ID].Condition then
+							-- Set the default condition
+							byID[skill.ID].Condition[2] = AllSkills[skill.ID].Condition
 						end
 					end
 				end

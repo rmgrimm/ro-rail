@@ -204,7 +204,8 @@ do
 			-- Check for a metatable
 			local mt = getmetatable(t)
 			if type(mt) == "table" then
-				setmetatable(copy,Table.DeepCopy(mt))
+				local deep_mt = getmetatable(copy)
+				setmetatable(copy,Table.DeepCopy(mt,deep_mt,overwrite))
 			end
 
 			-- Return the copy

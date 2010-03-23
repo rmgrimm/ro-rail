@@ -613,7 +613,7 @@ do
 						return StringBuffer.New()
 							:Append(skill:GetName())
 							:Append(" (level ")
-							:Append(i)
+							:Append(self.Level)
 							:Append(")")
 						:Get()
 					end,
