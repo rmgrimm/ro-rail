@@ -28,6 +28,41 @@ if not RAIL.Mercenary then
 	RAIL.Validate.ActorOptions.Default.MaxSkillLevel[4] = 5
 end
 
+-- Set metatables to create validation options for IDs as they're referenced
+do
+	-- Create the metatable
+	local mt = {
+		__index = function(self,idx)
+			-- Ensure its a number
+			-- Note: Without this, ByType.optional and ByID.optional will be tables; etc
+			if type(idx) ~= "number" then
+				return nil
+			end
+
+			-- Copy from the default table
+			local ret = Table.DeepCopy(RAIL.Validate.ActorOptions.Default)
+
+			-- Loop through, adding optional to all values
+			for k,v in ret do
+				if type(v) == "table" then
+					v.optional = true
+				end
+			end
+			ret.unsaved = true
+
+			-- Add the return value to the validate table
+			rawset(self,idx,ret)
+
+			-- And return it
+			return ret
+		end,
+	}
+
+	-- Set the metatable for both ByType and ByID
+	setmetatable(RAIL.Validate.ActorOptions.ByType,mt)
+	setmetatable(RAIL.Validate.ActorOptions.ByID,mt)
+end
+
 -- Actor Battle Options
 do
 	-- TODO: Optimize Actor Options... (if it becomes a problem)
@@ -41,16 +76,6 @@ do
 	--
 	--	Called almost every cycle...
 	--
-
-	-- Defaults
-	do
-		BattleOptsDefaults = { }
-		setmetatable(BattleOptsDefaults,{
-			__index = function(t,key)
-				return RAIL.State.ActorOptions.Default[key]
-			end
-		})
-	end
 
 	-- Default special actor types
 	-- TODO: Clean up this ugly mess
@@ -193,140 +218,6 @@ do
 			end
 		end
 		SpecialTypes = SpecialTypes_redo
-	end
-
-	-- By Type
-	do
-		-- Private key to access each type
-		local type_key = {}
-
-		-- Private key to access the default table
-		local default_key = {}
-
-		-- Auto-generated subtables will use this metatable
-		local mt = {
-			__index = function(t,key)
-				-- Check the RAIL.State.ActorOptions.ByType table
-				local ByType = RAIL.State.ActorOptions.ByType
-				local type_num = t[type_key]
-				if type(ByType[type_num]) ~= "table" then
-					ByType[type_num] = { }
-				end
-
-				-- Use value from ByType table if non-nil
-				local value = ByType[type_num][key]
-				if value ~= nil then
-					local validated = RAIL.Validate(value,RAIL.Validate.ActorOptions.Default[key])
-
-					-- Check to see if it was changed during validation
-					if value ~= validated then
-						-- Save the updated version
-						ByType[id_num][key] = validated
-
-						-- TODO: set dirty flag
-					end
-
-					return validated
-				end
-
-				-- Otherwise, use default
-				return t[default_key][key]
-			end
-		}
-
-		BattleOptsByType = {
-			-- Mercenaries will use default options against actors of unknown type
-			[-2] = BattleOptsDefaults
-		}
-
-		-- Generate subtables for each type requested
-		setmetatable(BattleOptsByType,{
-			__index = function(t,key)
-				-- Make sure there are options for it
-				if RAIL.State.ActorOptions.ByType[key] == nil then
-					-- Check for special types
-					local special = SpecialTypes[key]
-					if special then
-						return special
-					end
-
-					return nil
-				end
-
-				local ret = {
-					[type_key] = key,
-					[default_key] = BattleOptsDefaults,
-				}
-
-				-- Check for special types
-				local special = SpecialTypes[key]
-				if special then
-					ret[default_key] = special
-				end
-
-				setmetatable(ret,mt)
-				t[key] = ret
-
-				return ret
-			end
-		})
-	end
-
-	-- By ID
-	do
-		-- Private key to access each ID
-		local id_key = {}
-
-		local mt = {
-			__index = function(t,key)
-				-- Check the RAIL.State.ActorOptions.ByID table
-				local ByID = RAIL.State.ActorOptions.ByID
-				local id_num = t[id_key]
-				if type(ByID[id_num]) ~= "table" then
-					ByID[id_num] = { }
-				end
-
-				-- Use value from ByID table if non-nil
-				local value = ByID[id_num][key]
-				if value ~= nil then
-					local validated = RAIL.Validate(value,RAIL.Validate.ActorOptions.Default[key])
-
-					-- Check to see if it was changed during validation
-					if value ~= validated then
-						-- Save the updated version
-						ByID[id_num][key] = validated
-
-						-- TODO: set dirty flag
-					end
-
-					return validated
-				end
-
-				-- Otherwise, use ByType table
-				local t = BattleOptsByType[Actors[id_num].Type]
-					or BattleOptsDefaults
-				return t[key]
-			end
-		}
-
-		BattleOptsByID = { }
-		setmetatable(BattleOptsByID,{
-			__index = function(t,key)
-				-- Make sure there are options for it
-				if RAIL.State.ActorOptions.ByID[key] == nil then
-					return nil
-				end
-
-				local ret = {
-					[id_key] = key,
-				}
-
-				setmetatable(ret,mt)
-				t[key] = ret
-
-				return ret
-			end
-		})
 	end
 
 end

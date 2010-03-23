@@ -1,3 +1,4 @@
+-- GetMsg command processing
 do
 	RAIL.Cmd = {
 		Queue = List:New(),
@@ -8,19 +9,23 @@ do
 			end,
 
 			-- "alt+right click" on ground
+			--	("alt+left click" for mercenaries)
 			[MOVE_CMD] = function(shift,msg)
 				-- Clear queue if shift isn't depressed
 				if not shift then
 					RAIL.Cmd.Queue:Clear()
 				end
 
-				-- TODO: Check for under-target attack command
-
-				-- Add to queue
-				RAIL.Cmd.Queue:PushRight(msg)
+				-- Check for under-target attack command / advanced movement commands
+				if not RAIL.AdvMove(shift,msg[2],msg[3]) then
+					-- If it didn't turn out to be an advanced command,
+					-- add movement to the queue
+					RAIL.Cmd.Queue:PushRight(msg)
+				end
 			end,
 
 			-- "alt+right click" on enemy, twice
+			--	("alt+left click" twice for mercenaries)
 			[ATTACK_OBJECT_CMD] = function(shift,msg)
 				-- Clear queue if shift isn't depressed
 				if not shift then
@@ -203,6 +208,10 @@ do
 			-- Any command that wasn't recognized will be logged
 			return UnknownProcessInput
 		end,
+		__call = function(self,shift,msg)
+			-- Call the relevant subfunction
+			self[msg[1]](shift,msg)
+		end,
 	})
 
 	local function UnknownProcessEvaluate(msg,skill,atk,chase)
@@ -243,4 +252,145 @@ do
 			return UnknownProcessEvaluate
 		end,
 	})
+end
+
+-- Advanced movement commands
+do
+	RAIL.AdvMove = {}
+
+	local function false_ret()
+		return false
+	end
+	local x_mt = {
+		__index = function(self,idx)
+			-- Ensure the idx is a number
+			if type(idx) ~= "number" then
+				return nil
+			end
+
+			-- Return a blank function
+			return false_ret
+		end,
+	}
+
+	setmetatable(RAIL.AdvMove,{
+		__index = function(self,idx)
+			-- Ensure the idx is a number
+			if type(idx) ~= "number" then
+				return nil
+			end
+
+			-- Ensure that the subtable for the X-idx exists
+			if rawget(self,idx) == nil then
+				rawset(self,idx,{})
+				setmetatable(self[idx],x_mt)
+			end
+
+			return self[idx]
+		end,
+		__newindex = function(self,idx,val)
+			-- Don't allow new indexes to be created
+		end,
+		__call = function(self,shift,x,y)
+			-- Find the closest actor to the location
+			local closest,x_delt,y_delt,blocks
+			do
+				local actors = GetActors()
+				for i,a in actors do
+					local actor = Actors[a]
+					local b = actor:BlocksTo(x,y)
+	
+					if not blocks or b < blocks then
+						closest = actor
+						x_delt = x - actor.X[0]
+						y_delt = y - actor.Y[0]
+						blocks = b
+					end
+				end
+			end
+
+			-- If there are no actors at all, do nothing
+			if not closest then
+				return false
+			end
+
+			-- Call the relevant function
+			return self[x_delt][y_delt](shift,closest)
+		end,
+	})
+
+
+	-- Under-target attack
+	RAIL.AdvMove[0][0] = function(shift,target)
+		-- Process the attack object command
+		RAIL.Cmd.ProcessInput(shift,{ATTACK_OBJECT_CMD,target.ID})
+
+		-- Return true, because we've used an advanced command
+		return true
+	end
+
+	-- 1-tile left of a target: delete friend
+	RAIL.AdvMove[-1][0] = function(shift,target)
+		-- Ensure the target is a player
+		if target.ActorType ~= "Player" then
+			return false
+		end
+
+		-- Check if the target is our owner
+		if target == RAIL.Owner then
+			-- TODO: Remove all players on screen from friend list.
+			return true
+		end
+
+		-- Check if the target is a friend
+		if target:IsFriend(true) then
+			-- Log it
+			RAIL.LogT(1,"{1} removed from friend list.",target)
+
+			-- Remove it from friend list
+			target:SetFriend(false)
+
+			-- Intercept movement command; advanced command accepted
+			return true
+		end
+
+		-- Log it
+		RAIL.LogT(1,"{1} not marked as friend; can't remove friend status.",target)
+
+		-- Don't intercept movement command
+		return false
+	end
+
+	-- 1-tile right of a target: add friend
+	RAIL.AdvMove[1][0] = function(shift,target)
+		-- Check for a player
+		if target.ActorType ~= "Player" then
+			-- Can't set non-players as friend, don't use as advanced command
+			return false
+		end
+
+		-- Check if the target is our owner
+		if target == RAIL.Owner then
+			-- TODO: Set all players on screen as friend.
+			return true
+		end
+
+		-- Check if the target is already a friend (not including temporary friends)
+		if not target:IsFriend(true) then
+			-- Log it
+			RAIL.LogT(1,"{1} marked as friend.",target)
+
+			-- Set the target as a friend
+			target:SetFriend(true)
+
+			-- Return true, to indicate that we used an advanced movement command
+			return true
+		end
+
+		-- Log it
+		RAIL.LogT(1,"{1} is already marked as a friend.",target)
+
+		-- Didn't actually do anything, don't interrupt command
+		return false
+	end
 end

@@ -289,7 +289,9 @@ do
 
 	-- Private keys to data and validation tables
 	local data_t = {}
+	local unsaved_t = {}
 	local vali_t = {}
+	local unsaved_tree = {}
 
 	-- Metatable (built after ProxyTable)
 	local metatable = {}
@@ -298,6 +300,7 @@ do
 	local ProxyTable = function(d,v)
 		local ret = {
 			[data_t] = d,
+			[unsaved_t] = {},
 			[vali_t] = v,
 		}
 
@@ -309,29 +312,52 @@ do
 	-- Metatable
 	metatable.__index = function(t,key)
 		-- Get the data from proxied table
-		local data = t[data_t][key]
+		local data_table = rawget(t,data_t)
+		local unsaved_table = rawget(t,unsaved_t)
 
-		-- Validate it
+		local data = unsaved_table[key] or data_table[key]
+
+		-- Get the validation information
 		local valid = rawget(t,vali_t)
-		if valid ~= nil then
+		if type(valid) == "table" and type(valid[key]) == "table" then
 			valid = valid[key]
 		else
 			-- No validating for this
 			return data
 		end
+
+		-- Check if it's optional
+		if data == nil and valid.optional then
+			return nil
+		end
+
+		-- Validate the data
 		local v = RAIL.Validate(data,valid)
 
 		-- Check if the validated data is different
 		if v ~= data then
-			-- Save new data, and set dirty
-			t[data_t][key] = v
-			dirty = true
+			-- Check if the data was nil and unsaved flag is set
+			if data_table[key] == nil and valid.unsaved then
+				t[unsaved_t][key] = v
+			else
+				-- Save new data, and set dirty
+				t[data_t][key] = v
+				dirty = true
+			end
 		end
 
 		-- Check if it's a table
 		if type(v) == "table" then
 			-- Proxy it
-			return ProxyTable(v,valid)
+			rawset(t,key,ProxyTable(v,valid))
+
+			-- Check if it's an unsaved table
+			if t[unsaved_t][key] == v or rawget(t,unsaved_tree) then
+				-- Set the unsaved tree information
+				rawset(t[key],unsaved_tree,{t,key})
+			end
+
+			return t[key]
 		end
 
 		-- Return validated data
@@ -339,7 +365,7 @@ do
 	end
 	metatable.__newindex = function(t,key,value)
 		-- Don't do anything if the value stays the same
-		if t[data_t][key] == value then
+		if t[key] == value then
 			return
 		end
 
@@ -348,6 +374,30 @@ do
 
 		-- Set the value
 		t[data_t][key] = value
+
+		-- Check if we have unsaved tree information to convert to saved
+		while true do
+			-- Get tree info for the current table
+			local tree_info = rawget(t,unsaved_tree)
+
+			-- Check if it doesn't exist (aka, it's not unsaved)
+			if not tree_info then
+				-- Stop looping
+				break
+			end
+
+			-- Remove tree info from table
+			rawset(t,unsaved_tree,nil)
+
+			-- Go up a step
+			t = tree_info[1]
+
+			-- Convert to saved
+			if t[unsaved_t][tree_info[2]] then
+				t[data_t][tree_info[2]] = t[unsaved_t][tree_info[2]]
+				t[unsaved_t][tree_info[2]] = nil
+			end
+		end
 	end
 
 	-- Setup RAIL.State
@@ -373,7 +423,7 @@ do
 		RAIL.Log(3,"Saved state to %q",filename)
 	end)
 
-	local KeepInState = { SetOwnerID = true, Load = true, Save = true, [data_t] = true, [vali_t] = true }
+	local KeepInState = { SetOwnerID = true, Load = true, Save = true, [data_t] = true, [unsaved_t] = true, [vali_t] = true }
 
 	-- Set OwnerID function
 	rawset(RAIL.State,"SetOwnerID",function(self,id)
@@ -526,6 +576,9 @@ do
 						RAIL.State[k] = nil
 					end
 				end
+
+				-- Remove all unsaved values
+				RAIL.State[unsaved_t] = {}
 			end
 
 		end

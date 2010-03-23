@@ -38,7 +38,7 @@ do
 				buf:Append(", Type:"):Append(self.Type)
 			end
 
-			if self.BattleOpts.Name ~= BattleOptsDefaults.Name then
+			if self.BattleOpts.Name ~= RAIL.State.ActorOptions.Default.Name then
 				buf:Append(", Name:"):Append(self.BattleOpts.Name)
 			end
 
@@ -63,6 +63,24 @@ do
 		return false
 	end
 
+	-- BattleOpts metatable
+	local battleopts_parent = {}
+	local battleopts_mt = {
+		__index = function(self,key)
+			self = self[battleopts_parent]
+			if self.Type ~= -2 then
+				return
+					RAIL.State.ActorOptions.ByID[self.ID][key] or
+					RAIL.State.ActorOptions.ByType[self.Type][key] or
+					RAIL.State.ActorOptions.Default[key]
+			else
+				return
+					RAIL.State.ActorOptions.ByID[self.ID][key] or
+					RAIL.State.ActorOptions.Default[key]
+			end
+		end,
+	}
+
 	-- Initialize a new Actor
 	Actor.New = function(self,ID)
 		local ret = { }
@@ -78,29 +96,10 @@ do
 		ret.TargetOf = Table:New()	-- Other Actors that are targeting this one
 		ret.IgnoreTime = -1		-- Actor isn't currently ignored
 		ret.BattleOpts = { }		-- Battle options
+		ret.BattleOpts[battleopts_parent] = ret
 
 		-- Set defaults for battle options
-		setmetatable(ret.BattleOpts,{
-			__index = function(self,key)
-				local t =
-					BattleOptsByID[ret.ID] or
-					BattleOptsByType[ret.Type] or
-					BattleOptsDefaults or
-					{
-						Friend = false,
-						Priority = 0,
-						AttackAllowed = true,
-						DefendOnly = false,
-						SkillsAllowed = false,
-						MinSkillLevel = 1,
-						MaxSkillLevel = 5,
-						TicksBetweenSkills = 0,
-						MaxCastsAgainst = 0,
-					}
-
-				return t[key]
-			end,
-		})
+		setmetatable(ret.BattleOpts,battleopts_mt)
 
 		-- The following have their histories tracked
 		ret.Target = History.New(-1,false)
@@ -453,10 +452,10 @@ do
 		RAIL.LogT(40,"Clearing history for {1} due to {2}.",self,reason)
 
 		-- Unset any per-actor battle options
-		local k,v
 		for k,v in pairs(self.BattleOpts) do
 			self.BattleOpts[k] = nil
 		end
+		self.BattleOpts[battleopts_parent] = self
 
 		-- Clear the histories
 		History.Clear(self.Motion)
@@ -513,14 +512,14 @@ do
 	end
 
 	-- Check if the actor is a friend
-	Actor.IsFriend = function(self)
+	Actor.IsFriend = function(self,no_temp)
 		-- Make sure only players are counted as friends
 		if self.ActorType ~= "Player" then
 			return false
 		end
 
 		-- Check for temporary friends (players within <opt> range of owner)
-		if RAIL.Owner:DistanceTo(self) <= RAIL.State.TempFriendRange then
+		if not no_temp or RAIL.Owner:DistanceTo(self) <= RAIL.State.TempFriendRange then
 			return true
 		end
 

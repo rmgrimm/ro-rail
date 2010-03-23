@@ -170,7 +170,11 @@ do
 		-- Check actor-tracking
 		if not GetV then
 			GetV = function(v,id)
-				return -1
+				if id == -1 then
+					return -1,-1
+				else
+					return 0,0
+				end
 			end
 			TraceAI("GetV() not supplied, undefined behavior may occur.")
 			sane = false
@@ -178,6 +182,8 @@ do
 		if not GetActors then
 			GetActors = function()
 				return {
+					0,
+					1,
 					--id,		-- self
 					--GetV(0,id),	-- owner: GetV(V_OWNER,id)
 				}
