@@ -9,7 +9,6 @@ require "Utils"			-- run CheckAPI() before others start using Ragnarok API
 require "State"			-- allow other files to add state validation options
 
 -- Alphabetical
-require "ActorOpts"
 require "Base64"
 require "Const"
 require "Debug"
@@ -20,11 +19,12 @@ require "Timeout"
 --require "Version"		-- Note: Version.lua is pre-loaded by AI.lua and AI_M.lua
 
 -- Load-time Dependency
-require "Actor"			-- depends on History.lua
-require "Commands"		-- depends on Table.lua
-require "DecisionSupport"	-- depends on Table.lua
-require "Skills"		-- depends on Table.lua
-require "SkillSupport"		-- depends on Actor.lua
+require "Actor"			-- depends on History
+require "ActorOpts"		-- depends on Table
+require "Commands"		-- depends on Table
+require "DecisionSupport"	-- depends on Table
+require "Skills"		-- depends on Table
+require "SkillSupport"		-- depends on Actor
 
 -- State validation options
 RAIL.Validate.Information = {is_subtable = true,
@@ -69,12 +69,12 @@ function AI(id)
 	end
 
 	-- Log the AI initialization
-	RAIL.LogT(0,"RampageAI Lite v{1} initializing...",RAIL.Version)
+	RAIL.LogT(0,"RampageAI Lite r{1} initializing...",RAIL.Version)
 	RAIL.LogT(0," --> Full Version ID = {1}",RAIL.FullVersion)
 
 	-- Check for some features of Lua
-	RAIL.LogT(0," --> Lua: _VERSION = {1}; _LOADED = {2}; coroutine = {3};",
-		RAIL._G._VERSION, RAIL._G._LOADED, RAIL._G.coroutine)
+	RAIL.LogT(0," --> Lua: _VERSION = {1}; coroutine = {2};",
+		RAIL._G._VERSION, RAIL._G.coroutine)
 
 	-- Load persistent state data again
 	--	Note: Redundant, but will show up in the log now

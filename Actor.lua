@@ -68,16 +68,23 @@ do
 	local battleopts_mt = {
 		__index = function(self,key)
 			self = self[battleopts_parent]
-			if self.Type ~= -2 then
-				return
-					RAIL.State.ActorOptions.ByID[self.ID][key] or
-					RAIL.State.ActorOptions.ByType[self.Type][key] or
-					RAIL.State.ActorOptions.Default[key]
-			else
-				return
-					RAIL.State.ActorOptions.ByID[self.ID][key] or
-					RAIL.State.ActorOptions.Default[key]
+
+			-- First, check ByID table
+			local ret = RAIL.State.ActorOptions.ByID[self.ID][key]
+			if ret ~= nil then
+				return ret
 			end
+
+			-- Then, check ByType table
+			if self.Type ~= -2 then
+				ret = RAIL.State.ActorOptions.ByType[self.Type][key]
+				if ret ~= nil then
+					return ret
+				end
+			end
+
+			-- If all else fails, use the defaults
+			return RAIL.State.ActorOptions.Default[key]
 		end,
 	}
 
@@ -519,7 +526,7 @@ do
 		end
 
 		-- Check for temporary friends (players within <opt> range of owner)
-		if not no_temp or RAIL.Owner:DistanceTo(self) <= RAIL.State.TempFriendRange then
+		if not no_temp and RAIL.Owner:DistanceTo(self) <= RAIL.State.TempFriendRange then
 			return true
 		end
 

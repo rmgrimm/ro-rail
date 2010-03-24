@@ -119,14 +119,22 @@ do
 		-- Create a table for the environment
 		local env = {
 			-- Environment
+			_VERSION = RAIL._G._VERSION,
 			getfenv = RAIL._G.getfenv,
 			setfenv = RAIL._G.setfenv,
+
+			-- Memory
+			gcinfo = RAIL._G.gcinfo,
+			collectgarbage = RAIL._G.collectgarbage,
 
 			-- The ^ operator function
 			__pow = RAIL._G.__pow,
 
 			-- Lua loading
+			_LOADED = {},
 			loadfile = RAIL.ploadfile,
+			loadstring = RAIL.ploadstring,
+			require = nil,	-- set later
 
 			-- Ragnarok API
 			TraceAI = RAIL._G.TraceAI,
@@ -144,18 +152,18 @@ do
 		}
 
 		-- Create a new require function so setfenv on the original function won't result in strange behavior
-		local private_key = {}
-		env[private_key] = {}
 		env.require = function(file)
 			local _G = getfenv(0)
-			if _G[private_key][file] then
-				return
+			if _G._LOADED[file] then
+				return _G._LOADED[file]
 			end
+
+			-- TODO: Make this function aware of LUA_PATH
 
 			local f = RAIL.ploadfile(file)
 			if f then
-				_G[private_key][file] = true
-				f()
+				_G._LOADED[file] = f() or true
+				return _G._LOADED[file]
 			end
 		end
 		setfenv(env.require,env)
@@ -315,7 +323,10 @@ do
 		local data_table = rawget(t,data_t)
 		local unsaved_table = rawget(t,unsaved_t)
 
-		local data = unsaved_table[key] or data_table[key]
+		local data = unsaved_table[key]
+		if data == nil then
+			data = data_table[key]
+		end
 
 		-- Get the validation information
 		local valid = rawget(t,vali_t)
