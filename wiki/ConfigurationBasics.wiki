@@ -11,7 +11,7 @@ The options in the Config.lua file will affect all users of RAIL, regardless of 
 
 = The State File =
 
-The second file, called the state-file, is generated and verified by Rampage AI Lite. This file will be created in the Ragnarok Online directory _(*not* in the _USER`_`AI_ directory)_. It is separate from the rest of the RAIL files to discourage accidental modification of core RAIL files. The Rampage AI Lite state-files will be named _RAIL`_`State._xxx_.lua_, where _xxx_ indicates the type of AI: "merc" for mercenary, or "homu" for homunculus. Additionally, RAIL can be set (in the Config.lua file) to include the character ID in the state-file filename, which allows separate settings between characters.
+The second file, called the state-file, is generated and verified by Rampage AI Lite. This file will be created in the Ragnarok Online directory _(*not* in the _USER`_`AI_ directory)_. It is separate from the rest of the RAIL files to discourage accidental modification of core RAIL files. The Rampage AI Lite state-files will be named _RAIL`_`State._xyz_.lua_, where _xyz_ indicates the type of AI: "merc" for mercenary, or "homu" for homunculus. Additionally, RAIL can be set (in the Config.lua file) to include the character ID in the state-file filename, which allows separate settings between characters.
 
 In addition to settings for the AI, the state-file also contains information such as the owner's ID, the homunculus/mercenary's ID, the time that buffs will wear off, etc. This file is both read-from and written-to regularly, which allows interaction with GUI programs and mercenary-homunculus interaction for alchemists. Further, it allows updates to the settings without resetting the entire AI (via teleport, map-change, etc).
 
