@@ -3,7 +3,7 @@
 
 = Introduction =
 
-Rampage AI Lite (RAIL) is a complete rewrite of RampageAI from the ground up. It is written with the intent of being faster and more efficient. In addition, this rewrite takes into account the changes in Ragnarok since the last release of RampageAI (eg, Mercenaries, Alchemist-skill removal, etc). More information can be found on the [http://code.google.com/p/ro-rail/ Project Home] page.
+Rampage AI Lite (RAIL) is a complete rewrite of Rampage AI from the ground up. It is written with the intent of being faster and more efficient. In addition, this rewrite takes into account the changes in Ragnarok since the last release of Rampage AI (eg, Mercenaries, Alchemist-skill removal, etc). More information can be found on the [http://code.google.com/p/ro-rail/ Project Home] page.
 
 = Installation =
 
@@ -12,7 +12,7 @@ Rampage AI Lite (RAIL) is a complete rewrite of RampageAI from the ground up. It
 
 = Configuration =
 
-  * [ConfigurationBasics Configuration Basics] - A broad outline describing how to configure RampageAI Lite.
+  * [ConfigurationBasics Configuration Basics] - A broad outline describing how to configure Rampage AI Lite.
   * [ConfigLuaFile The Config.lua File] - An explanation of the options contained inside the Config.lua file.
   * [StateFileIndex State-file Index] - A list and description of all options provided by RAIL_State files.
 
