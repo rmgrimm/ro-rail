@@ -26,6 +26,7 @@ end
 --	Note: View the subversion commit notes for more full changelog.
 --		(This is maintained to regularly bump version number.)
 
+-- 2010-03-24 -- Reimplement logic to default plants at 1 priority below other default monsters; Small fixes
 -- 2010-03-23 -- Rework of actor options setup; Updates to state file handling; Include AMCs; Bug fixes.
 -- 2010-03-16 -- Changes to skill state-file options
 -- 2010-03-16 -- Minor changes to AI and AI_M files; modification to urgent escape usage
