@@ -78,11 +78,11 @@ do
 			end,
 		},
 		Evaluate = {
-			[MOVE_CMD] = function(msg,skill,atk,chase)
+			[MOVE_CMD] = function(msg)
 				-- Check if we've already arrived
 				if RAIL.Self:DistanceTo(msg[2],msg[3]) < 1 then
 					-- Remove the command and don't modify any targets
-					return false,skill,atk,chase
+					return false
 				end
 
 				-- Check if the move would be out of range
@@ -90,38 +90,39 @@ do
 					-- TODO: Move to the closest spot that is in range
 
 					-- Set no targets, and don't interrupt processing
-					return false,skill,atk,chase
+					return false
 				end
 
 				-- Set the chase target and stop processing
-				return true,skill,atk,msg
+				RAIL.Target.Chase = msg
+				return true
 			end,
-			[ATTACK_OBJECT_CMD] = function(msg,skill,atk,chase)
+			[ATTACK_OBJECT_CMD] = function(msg)
 				-- Check for valid, active actor
 				local actor = Actors[msg[2]]
 				if not actor.Active then
 					-- Invalid actor; don't interrupt processing; don't set targets
-					return false,skill,atk,chase
+					return false
 				end
 
 				if RAIL.Self:DistanceTo(actor) <= RAIL.Self.AttackRange then
 					-- If close enough, attack the monster
-					atk = actor
+					RAIL.Target.Attack = actor
 				else
 					-- Otherwise, chase the monster
-					chase = actor
+					RAIL.Target.Chase = actor
 				end
 
 				-- Interrupt processing after changing one of the targets
-				return true,skill,atk,chase
+				return true
 			end,
-			[SKILL_OBJECT_CMD] = function(msg,skill,atk,chase)
+			[SKILL_OBJECT_CMD] = function(msg)
 				-- Check if a skill is usable now
 				if RAIL.Self.SkillState:Get() == RAIL.Self.SkillState.Enum.READY then
 					-- Check if we've already used this command
 					if msg.CmdUsed then
 						-- Remove the command and don't modify targets
-						return false,skill,atk,chase
+						return false
 					end
 
 					-- Get the skill and actor from msg
@@ -130,49 +131,52 @@ do
 
 					-- Ensure the actor hasn't timed out or died
 					if not actor.Active then
-						return false,skill,atk,chase
+						return false
 					end
 
 					-- Check if the target is out of range
 					if RAIL.Self:DistanceTo(actor) > skill_obj:GetRange() then
 						-- Chase the target
-						return true,skill,atk,actor
+						RAIL.Target.Chase = actor
+						return true
 					else
 						-- Set a flag that the skill is used now
 						msg.CmdUsed = true
 
 						-- Stop processing, and set the skill target
-						return true,{ skill_obj, actor },atk,chase
+						RAIL.Target.Skill = { skill_obj, actor }
+						return true
 					end
 				end
 
 				-- Don't continue processing, but don't modify targets
-				return true,skill,atk,chase
+				return true
 			end,
-			[SKILL_AREA_CMD] = function(msg,skill,atk,chase)
+			[SKILL_AREA_CMD] = function(msg)
 				-- Check if a skill is usable now
 				if RAIL.Self.SkillState:Get() == RAIL.Self.SkillState.Enum.READY then
 					-- Check if we've already used this command
 					if msg.CmdUsed then
 						-- Remove the command and don't modify targets
-						return false,skill,atk,chase
+						return false
 					end
 
 					-- Check if the target is out of range
 					if RAIL.Self:DistanceTo(msg[3],msg[4]) < msg[2]:GetRange() then
 						-- Remove the command and don't modify targets
-						return false,skill,atk,chase
+						return false
 					else
 						-- Set a flag that the skill is used now
 						msg.CmdUsed = true
 
 						-- Stop processing, and set the skill target
-						return true,{ msg[2], msg[3], msg[4] },atk,chase
+						RAIL.Target.Skill = { msg[2], msg[3], msg[4] }
+						return true
 					end
 				end
 
-				-- Don't continue processing, but don't modify targets
-				return true,skill,atk,chase
+				-- Don't continue processing
+				return true
 			end,
 		},
 	}
@@ -214,7 +218,7 @@ do
 		end,
 	})
 
-	local function UnknownProcessEvaluate(msg,skill,atk,chase)
+	local function UnknownProcessEvaluate(msg)
 		-- For simplicity, send it to UnknownProcessInput for logging
 		UnknownProcessInput(false,msg,"evaluate")
 
@@ -222,11 +226,11 @@ do
 		RAIL.Cmd.Queue:PopLeft()
 
 		-- Continue processing
-		return true,skill,atk,chase
+		return true
 	end
 
 	setmetatable(RAIL.Cmd.Evaluate,{
-		__call = function(self,skill,atk,chase)
+		__call = function(self)
 			-- Loop as long as there are commands to process (or a command signals to break
 			local break_sig = false
 			while RAIL.Cmd.Queue:Size() > 0 and not break_sig do
@@ -237,15 +241,13 @@ do
 				local f = self[msg[1]]
 
 				-- Process the command
-				break_sig,skill,atk,chase = f(msg,skill,atk,chase)
+				break_sig = f(msg)
 
 				if not break_sig then
 					-- Remove the command
 					RAIL.Cmd.Queue:PopLeft()
 				end
 			end
-
-			return skill,atk,chase
 		end,
 		__index = function(self,cmd_id)
 			-- Any command that wasn't recognized will be logged
@@ -261,6 +263,7 @@ do
 	local function false_ret()
 		return false
 	end
+	local default_ret = { false_ret, false_ret }
 	local x_mt = {
 		__index = function(self,idx)
 			-- Ensure the idx is a number
@@ -268,8 +271,8 @@ do
 				return nil
 			end
 
-			-- Return a blank function
-			return false_ret
+			-- Return the default command table
+			return default_ret
 		end,
 	}
 
@@ -295,15 +298,18 @@ do
 			-- Find the closest actor to the location
 			local closest,x_delt,y_delt,blocks
 			do
-				local actors = GetActors()
-				for i,a in actors do
-					local actor = Actors[a]
+				for id,actor in RAIL.ActorLists.All do
 					local b = actor:BlocksTo(x,y)
-	
-					if not blocks or b < blocks then
+					local x_d = x - actor.X[0]
+					local y_d = y - actor.Y[0]
+
+					if
+						(not blocks or b < blocks) and
+						self[x_d][y_d][2](shift,actor)
+					then
 						closest = actor
-						x_delt = x - actor.X[0]
-						y_delt = y - actor.Y[0]
+						x_delt = x_d
+						y_delt = y_d
 						blocks = b
 					end
 				end
@@ -315,35 +321,39 @@ do
 			end
 
 			-- Call the relevant function
-			return self[x_delt][y_delt](shift,closest)
+			return self[x_delt][y_delt][1](shift,closest)
 		end,
 	})
 
 
 	-- Under-target attack
-	RAIL.AdvMove[0][0] = function(shift,target)
-		-- Process the attack object command
-		RAIL.Cmd.ProcessInput(shift,{ATTACK_OBJECT_CMD,target.ID})
+	RAIL.AdvMove[0][0] = {
+		function(shift,target)
+			-- Process the attack object command
+			RAIL.Cmd.ProcessInput(shift,{ATTACK_OBJECT_CMD,target.ID})
+	
+			-- Return true, because we've used an advanced command
+			return true
+		end,
+		function(shift,target)
+			-- This command is only usable against enemies
+			if target:IsEnemy() then
+				return true
+			end
 
-		-- Return true, because we've used an advanced command
-		return true
-	end
+			return false
+		end,
+	}
 
 	-- 1-tile left of a target: delete friend
-	RAIL.AdvMove[-1][0] = function(shift,target)
-		-- Ensure the target is a player
-		if target.ActorType ~= "Player" then
-			return false
-		end
+	RAIL.AdvMove[-1][0] = {
+		function(shift,target)
+			-- Check if the target is our owner
+			if target == RAIL.Owner then
+				-- TODO: Remove all players on screen from friend list.
+				return true
+			end
 
-		-- Check if the target is our owner
-		if target == RAIL.Owner then
-			-- TODO: Remove all players on screen from friend list.
-			return true
-		end
-
-		-- Check if the target is a friend
-		if target:IsFriend(true) then
 			-- Log it
 			RAIL.LogT(1,"{1} removed from friend list.",target)
 
@@ -352,31 +362,31 @@ do
 
 			-- Intercept movement command; advanced command accepted
 			return true
-		end
+		end,
+		function(shift,target)
+			-- Non-players aren't allowed
+			if target.ActorType ~= "Player" then
+				return false
+			end
 
-		-- Log it
-		RAIL.LogT(1,"{1} not marked as friend; can't remove friend status.",target)
+			-- Non-friends can't be removed
+			if not target:IsFriend(true) then
+				return false
+			end
 
-		-- Don't intercept movement command
-		return false
-	end
+			return true
+		end,
+	}
 
 	-- 1-tile right of a target: add friend
-	RAIL.AdvMove[1][0] = function(shift,target)
-		-- Check for a player
-		if target.ActorType ~= "Player" then
-			-- Can't set non-players as friend, don't use as advanced command
-			return false
-		end
-
-		-- Check if the target is our owner
-		if target == RAIL.Owner then
-			-- TODO: Set all players on screen as friend.
-			return true
-		end
-
-		-- Check if the target is already a friend (not including temporary friends)
-		if not target:IsFriend(true) then
+	RAIL.AdvMove[1][0] = {
+		function(shift,target)
+			-- Check if the target is our owner
+			if target == RAIL.Owner then
+				-- TODO: Set all players on screen as friend.
+				return true
+			end
+	
 			-- Log it
 			RAIL.LogT(1,"{1} marked as friend.",target)
 
@@ -385,12 +395,19 @@ do
 
 			-- Return true, to indicate that we used an advanced movement command
 			return true
-		end
+		end,
+		function(shift,target)
+			-- Non-players aren't allowed
+			if target.ActorType ~= "Player" then
+				return false
+			end
 
-		-- Log it
-		RAIL.LogT(1,"{1} is already marked as a friend.",target)
+			-- Friends can't be added again
+			if target:IsFriend(true) then
+				return false
+			end
 
-		-- Didn't actually do anything, don't interrupt command
-		return false
-	end
+			return true
+		end,
+	}
 end

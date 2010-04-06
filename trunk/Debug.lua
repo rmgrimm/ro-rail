@@ -1,6 +1,6 @@
 -- State validation
 RAIL.Validate.DebugLevel = {"number",50,nil,99}
-RAIL.Validate.DebugFile = {"string","RAIL_Log.txt"}
+RAIL.Validate.DebugFile = {"string","RAIL_Log.{2}.txt"}
 RAIL.Validate.ProfileMark = {"number",20000,2000,nil}
 
 -- Log Levels:
@@ -81,7 +81,7 @@ do
 	end
 
 	-- Function to format using {arg1}, {arg2}, ..., {argn} instead of %d %s %q
-	local function formatT(base,...)
+	RAIL.formatT = function(base,...)
 		local front = nil
 		local back = 0
 		local buf = StringBuffer.New()
@@ -120,8 +120,16 @@ do
 	--		so we use this to force lua.exe to output to console.
 	if not RAIL.UseTraceAI and not RAIL._G.debug then
 		log_out = function(str)
-			-- Get the filename
-			local filename = RAIL.State.DebugFile
+			-- Get the filename base
+			local base = RAIL.State.DebugFile
+
+			local ai_type = "homu"
+			if RAIL.Mercenary then
+				ai_type = "merc"
+			end
+
+			-- Format filename
+			local filename = RAIL.formatT(base,RAIL.Owner.ID,ai_type,RAIL.Version)
 
 			-- Open the file for appending
 			local file = io.open(filename,"a")
@@ -210,7 +218,7 @@ do
 	-- New-style logging; translatable
 	RAIL.LogT = function(level,text,...)
 		if not RAIL.Log.Disabled then
-			return log(formatT,true,level,text,unpack(arg))
+			return log(RAIL.formatT,true,level,text,unpack(arg))
 		end
 	end
 end

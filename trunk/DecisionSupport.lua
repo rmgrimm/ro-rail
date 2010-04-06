@@ -1,4 +1,5 @@
 -- Validation options
+RAIL.Validate.AcquireWhileLocked = {"boolean",false}
 RAIL.Validate.Aggressive = {"boolean",false}
 RAIL.Validate.AssistOwner = {"boolean",false}
 RAIL.Validate.AssistOther = {"boolean",false}
@@ -9,7 +10,11 @@ RAIL.Validate.DefendOptions = {is_subtable = true,
 	SelfThreshold = {"number",5,0},
 	FriendThreshold = {"number",4,0},
 }
+RAIL.Validate.FollowDistance = {"number", 7, 3, 14}
 RAIL.Validate.InterceptAlgorithm = {"string","normal"}
+RAIL.Validate.MaxDistance = {"number", 13, 3, 14}
+RAIL.Validate.RunAhead = {"boolean",false}
+
 
 -- Minimum priority (not an option)
 local min_priority = -10000
@@ -36,6 +41,11 @@ do
 			if dist > range then
 				-- Plot a point that's within range of the target
 				x,y = target:AnglePlot(ticks)(angle,range)
+
+				-- Double-check that the point is closer than current
+				if target:DistanceTo(ticks)(x,y) > dist then
+					x,y = nil,nil
+				end
 			else
 				-- Don't move
 				x,y = nil,nil
@@ -77,6 +87,11 @@ do
 			if dist > range then
 				-- Plot a point that's closer to it
 				x,y = PlotCircle(x,y,angle,range)
+
+				-- Double-check that the point is closer than current
+				if target:DistanceTo(ticks)(x,y) > dist then
+					x,y = nil,nil
+				end
 			else
 				-- Don't move
 				x,y = nil,nil
@@ -87,70 +102,8 @@ do
 
 		-- Should be accurate, but more processor intensive
 		advanced = function(target,range)
-			-- TODO: This is all fuckered up. Unusable in current form.
-			--		Fix it.
-
-
-			-- Gather positions, estimated move speeds, movement angles, etc
-			local s_x,s_y = RAIL.Self.X[0],RAIL.Self.Y[0]
-			local s_speed = RAIL.Self:EstimateMove()
-	
-			local t_x,t_y = target.X[0],target.Y[0]
-			local t_speed,t_move_angle = target:EstimateMove()
-	
-			local t_to_s_angle,t_dist = GetAngle(t_x,t_y,s_x,s_y)
-
-			-- In a triangle,
-			--
-			--	A
-			--	 \
-			--	  B-------C
-			--
-			-- Use Law of Sines to find the optimal movement angle
-			--	(Side-Side-Angle: s_speed, t_speed, t_angle_in_triangle)
-			--	(Result will be s_angle_in_triangle)
-			--
-
-			-- Start working in a triangle now
-			local t_angle_in_triangle = math.abs(t_move_angle - t_to_s_angle)
-			if t_angle_in_triangle > 180 then
-				t_angle_in_triangle = t_angle_in_triangle - 180
-			end
-
-			-- Invert speeds, such that high numbers are faster
-			s_speed = 1 / s_speed
-			t_speed = 1 / t_speed
-
-			-- Solve for s_angle_in_triangle
-			local law_of_sines_ratio = s_speed / math.sin(t_angle_in_triangle)
-			local s_angle_in_triangle = math.asin(1 / (law_of_sines_ratio / t_speed))
-
-			-- Complete the triangle
-			local x_angle_in_triangle = 180 - (s_angle_in_triangle + t_angle_in_triangle)
-			local x_speed = law_of_sines_ratio * math.sin(x_angle_in_triangle)
-
-			-- Find destination angle on angle side
-			local s_to_t_angle = math.mod(t_to_s_angle + 180,360)
-			local s_move_angle
-
-			if CompareAngle(t_to_s_angle,t_move_angle,-180) then
-				s_move_angle = math.mod(s_to_t_angle + s_angle_in_triangle,360)
-			else
-				s_move_angle = s_to_t_angle - s_angle_in_triangle
-				while s_move_angle < 0 do
-					s_move_angle = s_move_angle + 360
-				end
-			end
-
-			-- Return the speeds to ticks per tile
-			s_speed = 1 / s_speed
-			x_speed = 1 / x_speed
-	
-			-- Determine the distance to move
-			local radius = t_dist * (s_speed / x_speed)
-	
-			-- Plot the point
-			return PlotCircle(s_x,s_y,s_move_angle,radius)
+			-- Use normal until advanced is written
+			return CalculateIntercept.normal(target,range)
 		end,
 	}
 
@@ -197,11 +150,17 @@ do
 	-- The metatable to run subtables
 	local st_metatable = {
 		__index = Table,
-		__call = function(self,potentials,friends)
+		__call = function(self,potentials,...)
 			-- Count the number of potential targets
 			local n=0
 			for i in potentials do
 				n=n+1
+			end
+
+			-- Get the name of the sieve table
+			local sieveType = "Unknown"
+			if self.SieveType ~= nil then
+				sieveType = tostring(self.SieveType)
 			end
 
 			-- List of actors that should be protected from non-aggro removal
@@ -219,13 +178,15 @@ do
 
 				-- Call the function
 				if type(f) == "function" then
-					local sieveType = "Unknown"
-					if self == SelectTarget.Attack then
-						sieveType = "Attack"
-					elseif self == SelectTarget.Chase then
-						sieveType = "Chase"
+					local n_before = n
+
+					potentials,n,protected = f(potentials,n,protected,unpack(arg))
+
+					-- Log it
+					if n ~= n_before then
+						RAIL.LogT(95,"Sieve Table \"{1}\"'s \"{2}\" removed {3} actors; before={4}, after={5}.",
+							sieveType,t[1],n_before-n,n_before,n)
 					end
-					potentials,n,protected = f(potentials,n,friends,protected)
 				end
 			end
 
@@ -246,73 +207,83 @@ do
 	-- Physical attack targeting
 	do
 		SelectTarget.Attack = Table.New()
+		SelectTarget.Attack.SieveType = "Attack"
 		setmetatable(SelectTarget.Attack,st_metatable)
 
-		-- Assist owner or other as first priority
+		-- Make sure targets are within range
+		SelectTarget.Attack:Append{"AttackAllowedAndRange",function(potentials,n,protected)
+			local ret,ret_n = {},0
+
+			for id,actor in potentials do
+				if
+					actor:IsAttackAllowed() and
+					RAIL.Self:DistanceTo(actor) < RAIL.Self.AttackRange
+				then
+					ret[id] = actor
+					ret_n = ret_n + 1
+				end
+			end
+
+			return ret,ret_n,protected
+		end}
+
+		-- Assist owner or other
 		do
 			-- A helper function for most recent offensive motion
-			local offensive_motion = function(v) return
+			local function offensive_motion(v) return
 				v == MOTION_ATTACK or
 				v == MOTION_ATTACK2 or
 				v == MOTION_SKILL or
 				v == MOTION_CASTING or
 				false
 			end
-			SelectTarget.Attack:Append{"AssistOwner",function(potentials,n,protected)
-				-- If we're not supposed to assist the owner, don't modify anything
-				if not RAIL.State.AssistOwner then
-					return potentials,n,protected
+
+			-- A helper function to generate sieve to assist a target
+			local function generate_assist(assist,allowed)
+				return function(potentials,n,protected)
+						-- Get the target to assist
+						local assist = assist()
+
+						-- Check assist target and the allowed function
+						if not assist or not allowed() then
+							return potentials,n,protected
+						end
+
+						-- Get the most recent offensive move
+						local most_recent = History.FindMostRecent(assist.Motion,offensive_motion,nil,3000)
+
+						-- Ensure most_recent isn't nil
+						if most_recent ~= nil then
+							-- Check the target of that offensive motion
+							local target = assist.Target[most_recent]
+
+							-- Check if that target is an option
+							if RAIL.IsActor(potentials[target]) then
+								-- Return only that actor
+								local ret = { [target] = potentials[target] }
+
+								-- Note: return this table twice, to protect from being removed by non-aggro sieve
+								return ret,1,ret
+							end
+						end
+
+						-- Don't modify potential targets
+						return potentials,n,protected
 				end
+			end
 
-				-- Get the owner's most recent offensive move
-				local most_recent = History.FindMostRecent(RAIL.Owner.Motion,offensive_motion,nil,1250)
-
-				-- Ensure most_recent isn't nil
-				if most_recent ~= nil then
-					-- Check the target of that offensive motion
-					local target = RAIL.Owner.Target[most_recent]
-
-					-- Check if that target is an option
-					if RAIL.IsActor(potentials[target]) then
-						-- Return only that actor
-						local ret = { [target] = potentials[target] }
-						-- Note: return this table twice, to protect from being removed by non-aggro sieve
-						return ret,1,ret
-					end
-				end
-
-				-- Don't modify the potential targets
-				return potentials,n,protected
-			end}
-
-			-- Assist owner's merc/homu
-			SelectTarget.Attack:Append{"AssistOther",function(potentials,n,friends,protected)
-				-- If we're not supposed to assist the other, don't modify anything
-				if not RAIL.State.AssistOther or RAIL.Other == RAIL.Self then
-					return potentials,n,protected
-				end
-
-				-- Get the other's most recent offensive move
-				local most_recent = History.FindMostRecent(RAIL.Other.Motion,offensive_motion,nil,1250)
-
-				-- Ensure the motion isn't nil
-				if most_recent ~= nil then
-					-- Check the target of that offensive motion
-					local target = RAIL.Other.Target[most_recent]
-
-					-- Check if that target is an option
-					if RAIL.IsActor(potentials[target]) then
-						-- Return only that actor
-						local ret = { [target] = potentials[target] }
-						return ret,1,ret
-					end
-				end
-
-				-- TODO: Setup a mechanism to communicate target and attack status
-
-				-- Don't modify the potential targets
-				return potentials,n,protected
-			end}
+			SelectTarget.Attack
+				:Append{"AssistOwner",generate_assist(
+					function() return RAIL.Owner end,
+					function() return RAIL.State.AssistOwner end
+				)}
+				:Append{"AssistOther",generate_assist(
+					function()
+						if RAIL.Other == RAIL.Self then return nil end
+						return RAIL.Other
+					end,
+					function() return RAIL.State.AssistOther end
+				)}
 		end
 
 		-- Defend owner, other, and friends
@@ -367,7 +338,7 @@ do
 				return 0
 			end
 
-			SelectTarget.Attack:Append{"Defend",function(potentials,n,friends,protected)
+			SelectTarget.Attack:Append{"Defend",function(potentials,n,protected)
 				if not RAIL.State.Aggressive then
 					-- If not aggressive, and not defending while passive, don't modify the list
 					if not RAIL.State.DefendOptions.DefendWhilePassive then
@@ -392,7 +363,7 @@ do
 						friends_actors:Append(RAIL.Other)
 					end
 	
-					for id,actor in friends do
+					for id,actor in RAIL.ActorLists.Friends do
 						local n = getN(actor,potentials)
 	
 						if n > friends_n then
@@ -456,7 +427,7 @@ do
 		end
 
 		-- Sieve out monsters that would be Kill Stolen
-		SelectTarget.Attack:Append{"KillSteal",function(potentials,n,friends,protected)
+		SelectTarget.Attack:Append{"KillSteal",function(potentials,n,protected)
 			local ret,ret_n = {},0
 			for id,actor in potentials do
 				if not actor:WouldKillSteal() or protected[id] then
@@ -468,20 +439,23 @@ do
 		end}
 
 		-- If not aggressive, sieve out monsters that aren't protected
-		SelectTarget.Attack:Append{"Aggressive",function(potentials,n,friends,protected)
+		SelectTarget.Attack:Append{"Aggressive",function(potentials,n,protected)
 			-- If aggressive, don't modify the list
 			if RAIL.State.Aggressive then
 				return potentials,n,protected
 			end
 
 			-- Count the number of protected
-			local ret_n = 0
+			local ret,ret_n = {},0
 			for id,actor in protected do
-				ret_n = ret_n + 1
+				if potentials[id] then
+					ret[id] = actor
+					ret_n = ret_n + 1
+				end
 			end
 
 			-- Return only monsters that have been protected by previous functions
-			return protected,ret_n,protected
+			return ret,ret_n,ret
 		end}
 
 		-- Select the highest priority set of monsters
@@ -510,7 +484,7 @@ do
 		end}
 	
 		-- Check to see if the previous target is still in this list
-		SelectTarget.Attack:Append{"Retarget",function(potentials,n,friends,protected)
+		SelectTarget.Attack:Append{"Retarget",function(potentials,n,protected)
 			local id = RAIL.TargetHistory.Attack
 
 			-- Check if a target was acquired, and is in the list
@@ -525,8 +499,8 @@ do
 		end}
 
 		-- Find the closest actors
-		SelectTarget.Attack:Append{"Closest",function(potentials,n,friends,protected)
-			local ret,ret_n,ret_dist = {},0,RAIL.State.MaxDistance+1
+		SelectTarget.Attack:Append{"Closest",function(potentials,n,protected)
+			local ret,ret_n,ret_dist = {},0,1000
 
 			for id,actor in potentials do
 				-- Calculate the distance to the actor
@@ -551,13 +525,69 @@ do
 		end}
 	end
 
+	-- Target sieve generator
+	SelectTarget.GenerateSieve = function(sieveType)
+		local ret = Table.New()
+		ret.SieveType = sieveType
+		setmetatable(ret,st_metatable)
+
+		-- Copy all the sieves from Attack sieve, except AttackRange and Retarget
+		for i=1,SelectTarget.Attack:GetN() do
+			local sieve = SelectTarget.Attack[i]
+
+			if sieve[1] == "AttackAllowedAndRange" then
+				-- Don't add
+			elseif sieve[1] == "Retarget" then
+				-- Don't add
+			else
+				-- Add it
+				ret:Append(sieve)
+			end
+		end
+
+		return ret
+	end
+
 	-- Chase targeting
 	do
-		SelectTarget.Chase = Table.New()
-		setmetatable(SelectTarget.Chase,st_metatable)
+		SelectTarget.Chase = SelectTarget.GenerateSieve("Chase")
 
-		-- First, ensure we won't move outside of RAIL.State.MaxDistance
-		SelectTarget.Chase:Append{"MaxDistance",function(potentials,n,friends,protected)
+		-- Sieve out targets that are not attack-allowed or skill-allowed
+		SelectTarget.Chase:Insert(1,{"NotAllowed",function(potentials,n,protected)
+			local ret,ret_n = {},0
+			for id,actor in potentials do
+				if actor:IsAttackAllowed() or actor:IsSkillAllowed(1) then
+					ret[id] = actor
+					ret_n = ret_n + 1
+				end
+			end
+
+			return ret,ret_n,protected
+		end})
+
+		-- Sieve out targets that are already within range
+		SelectTarget.Chase:Insert(1,{"TooClose",function(potentials,n,protected)
+			-- Get attack range
+			local range = RAIL.Self.AttackRange
+
+			-- Sieve out actors that are too close
+			local ret,ret_n = {},0
+			for id,actor in potentials do
+				if
+					RAIL.Self:DistanceTo(actor) > range or
+					-- Don't sieve current target if not acquiring while locked
+					(not RAIL.State.AcquireWhileLocked and RAIL.Target.Attack == actor)
+				then
+					ret[id] = actor
+					ret_n = ret_n + 1
+				end
+			end
+
+			return ret,ret_n,protected
+		end})
+
+		-- Ensure we won't move outside of RAIL.State.MaxDistance
+		SelectTarget.Chase:Insert(2,{"MaxDistance",function(potentials,n,protected)
 			-- MaxDistance is in block tiles, but attack range is in pythagorean distance...
 			local max_dist = RAIL.State.MaxDistance
 
@@ -601,21 +631,24 @@ do
 			end
 
 			return ret,ret_n,protected
+		end})
+
+		-- As last part of sieve, don't chase attack target
+		SelectTarget.Chase:Append{"UnduplicateAttack",function(potentials,n,protected)
+			if
+				RAIL.Target.Attack ~= nil and
+				potentials[RAIL.Target.Attack.ID] ~= nil
+			then
+				-- Remove from the potential table
+				potentials[RAIL.Target.Attack.ID] = nil
+				n = n - 1
+			end
+
+			return potentials,n,protected
 		end}
 
-		-- Then, chase targeting is mostly the same as attack targeting
-		--	Note: Don't copy the attack-target locking
-		do
-			local max = SelectTarget.Attack:GetN()
-			for i=1,max do
-				if SelectTarget.Attack[i][1] ~= "Retarget" then
-					SelectTarget.Chase:Append(SelectTarget.Attack[i])
-				end
-			end
-		end
-
 		-- Check to see if the previous target is still in this list
-		SelectTarget.Chase:Append{"Retarget",function(potentials,n,friends,protected)
+		SelectTarget.Chase:Append{"Retarget",function(potentials,n,protected)
 			local id = RAIL.TargetHistory.Chase[0]
 
 			-- Check if a target was acquired, and is in the list
@@ -629,6 +662,132 @@ do
 			return potentials,n,protected
 		end}
 	end
+end
+
+-- Chase Owner
+do
+	local private = {
+		Override = false,
+	}
+
+	local mt = {
+		__index = function(self,idx)
+			-- Check if we're overriding the state-file's RunAhead option
+			if private.Override ~= nil then
+				return rawget(self,private.Override)[idx]
+			end
+
+			-- Return an value based on the RunAhead flag
+			return rawget(self,RAIL.State.RunAhead)[idx]
+		end,
+		__newindex = function(self,idx,val)
+			-- Check if we're overriding the state-file's RunAhead option
+			if private.Override ~= nil then
+				return rawget(self,private.Override)[idx]
+			end
+
+			-- Save a value based on the RunAhead flag
+			rawget(self,private.Override or RAIL.State.RunAhead)[idx] = val
+		end,
+	}
+
+	ChaseOwner = {
+		-- Run ahead
+		[true] = {
+			Check = function(self)
+				-- TODO: Fix this
+
+				if
+					RAIL.Owner.Motion[0] == MOTION_MOVE or
+					(RAIL.TargetHistory.Chase[0] == RAIL.Owner.ID and
+					math.abs(RAIL.Self:DistanceTo(RAIL.Owner) - RAIL.State.FollowDistance) > 1)
+				then
+					return true
+				end
+			end,
+			Calculate = function(self)
+				-- TODO: Fix this
+
+				-- Check if we're chasing owner
+				if RAIL.Target.Chase == RAIL.Owner then
+					-- Set range to follow distance
+					range = RAIL.State.FollowDistance
+
+					-- Check if we're supposed to run ahead
+					if RAIL.State.RunAhead then
+						-- Estimate the owner's walking speed
+						local owner_speed,angle = RAIL.Owner:EstimateMove()
+
+						-- Plot a point ahead of them
+						x,y = RAIL.Owner:AnglePlot(angle,RAIL.State.FollowDistance)
+					end
+				end
+
+			end,
+		},
+
+		-- Follow behind
+		[false] = {
+			Check = function(self)
+				local max
+				local moving = false
+
+				-- Check if we were already chasing our owner
+				if RAIL.TargetHistory.Chase[0] == RAIL.Owner.ID then
+					-- Already chasing owner
+
+					max = RAIL.State.FollowDistance
+
+					if History.FindMostRecent(RAIL.Owner.Motion,MOTION_MOVE,nil,500) then
+						moving = true
+					end
+				else
+					-- Not already chasing owner
+
+					max = RAIL.State.MaxDistance
+
+					if
+						RAIL.Owner.Motion[0] == MOTION_MOVE and
+						RAIL.Self:DistanceTo(-500)(RAIL.Owner) > RAIL.Self:DistanceTo(RAIL.Owner)
+					then
+						moving = true
+					end
+				end
+
+				-- Check if blocks to owner is too great
+				if RAIL.Self:BlocksTo(RAIL.Owner) > max then
+					-- Chase
+					return true
+				end
+
+				-- Check if owner is moving
+				if moving then
+					-- Estimate the movement speed of the owner
+					local speed = RAIL.Owner:EstimateMove()
+
+					-- Determine a fraction of the distance to estimate ahead
+					local tiles = math.ceil(max / 4)
+
+					-- Estimate if the homu/merc will be off-screen after moving for the time
+					--	it would take to move this number of tiles
+					-- Note: Negative values project into the future
+					if RAIL.Self:BlocksTo(-1 * tiles * speed)(RAIL.Owner) > max then
+						-- Chase
+						return true
+					end
+				end
+
+				-- Don't chase
+				return false
+			end,
+			Calculate = function(self)
+				-- Use calculate intercept algorithm
+				return CalculateIntercept(RAIL.Owner,RAIL.State.FollowDistance)
+			end,
+		},
+	}
+
+	setmetatable(ChaseOwner,mt)
 end
 
 -- Chase Ignore

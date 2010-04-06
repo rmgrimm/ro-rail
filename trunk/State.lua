@@ -438,14 +438,22 @@ do
 
 	-- Set OwnerID function
 	rawset(RAIL.State,"SetOwnerID",function(self,id)
-		local base = StringBuffer.New():Append("RAIL_State.")
-		if not RAIL.SingleStateFile then
-			base:Append("%d.")
-		end
-		base = string.format(base:Get(),id)
+		--local base = StringBuffer.New():Append("RAIL_State.")
+		--if not RAIL.SingleStateFile then
+		--	base:Append("%d.")
+		--end
+		--base = string.format(base:Get(),id)
 
-		local homu = base .. "homu.lua"
-		local merc = base .. "merc.lua"
+		--local homu = base .. "homu.lua"
+		--local merc = base .. "merc.lua"
+
+		local base = RAIL.StateFile
+		if type(base) ~= "string" then
+			base = "RAIL_State.{2}.lua"
+		end
+
+		local homu = RAIL.formatT(base,id,"homu",RAIL.Version)
+		local merc = RAIL.formatT(base,id,"merc",RAIL.Version)
 
 		if RAIL.Mercenary then
 			filename = merc
@@ -490,7 +498,8 @@ do
 		end
 
 		-- First, load alternate state, to see if we can find RAIL.Other's ID
-		if f_alt ~= nil then
+		-- Note: No reason to search for RAIL.Other if we don't have RAIL.Owner yet
+		if f_alt ~= nil and RAIL.Owner then
 			-- Get a clean, safe environment to load into
 			local f_G = ProtectedEnvironment()
 			setfenv(f_alt,f_G)
@@ -503,6 +512,8 @@ do
 			if
 				type(f_G.rail_state) == "table" and
 				type(f_G.rail_state.Information) == "table" and 
+				type(f_G.rail_state.Information.OwnerID) == "number" and
+				f_G.rail_state.Information.OwnerID == RAIL.Owner.ID and
 				type(f_G.rail_state.Information.SelfID) == "number"
 			then
 				id = f_G.rail_state.Information.SelfID
@@ -598,8 +609,15 @@ end
 
 -- MobID
 do
-	-- Mob ID file
+	-- Mob ID state-file options
 	RAIL.Validate.MobIDFile = {"string","./AI/USER_AI/Mob_ID.lua"}
+	if not RAIL.Mercenary then
+		-- Available options are "overwrite" and "update"
+		-- 	Overwrite will start fresh on each load
+		--	Update will load the existing file and update it as monsters are seen
+		--		* use this mode for teleporting around a map
+		RAIL.Validate.MobIDMode = {"string","overwrite"}
+	end
 
 	-- Update-time private key
 	local priv_key = {}
@@ -609,49 +627,52 @@ do
 		[priv_key] = 0,
 	}
 
-	if RAIL.Mercenary then
-		-- Mercenaries load the Mob ID file
-		MobID.Update = function(self)
-			-- Check if it's too soon to update
-			if math.abs(self[priv_key] - GetTick()) < 100 then
-				return
-			end
-
-			-- Try to load the MobID file into a function
-			local f,err = RAIL.ploadfile(RAIL.State.MobIDFile)
-
-			if not f then
-				RAIL.LogT(55,"Failed to load MobID file \"{1}\": {2}",RAIL.State.MobIDFile,err)
-				return
-			end
-
-			-- Protect RAIL from any unwanted code
-			local env = ProtectedEnvironment()
-			setfenv(f,env)
-
-			-- Run the MobID function
-			f()
-
-			-- Check for the creation of a MobID table
-			if type(env.MobID) ~= "table" then
-				RAIL.LogT(55,"MobID file \"{1}\" failed to load MobID table.",RAIL.State.MobIDFile)
-				return
-			end
-
-			-- Log it
-			RAIL.LogT(55,"MobID table loaded from \"{1}\".",RAIL.State.MobIDFile)
-
-			-- Add RAIL's MobID update function
-			env.MobID.Update = self.Update
-
-			-- Set the update time
-			env.MobID[priv_key] = GetTick()
-
-			-- Save it as our own MobID
-			MobID = env.MobID
+	-- Mercenaries load the Mob ID file
+	MobID.Update = function(self,forced)
+		-- Check if it's too soon to update
+		if not forced and math.abs(self[priv_key] - GetTick()) < 100 then
+			return
 		end
-	else
-		-- And homunculi save the MobID file
+
+		-- Try to load the MobID file into a function
+		local f,err = RAIL.ploadfile(RAIL.State.MobIDFile)
+
+		if not f then
+			RAIL.LogT(55,"Failed to load MobID file \"{1}\": {2}",RAIL.State.MobIDFile,err)
+			return
+		end
+
+		-- Protect RAIL from any unwanted code
+		local env = ProtectedEnvironment()
+		setfenv(f,env)
+
+		-- Run the MobID function
+		f()
+
+		-- Check for the creation of a MobID table
+		if type(env.MobID) ~= "table" then
+			RAIL.LogT(55,"MobID file \"{1}\" failed to load MobID table.",RAIL.State.MobIDFile)
+			return
+		end
+
+		-- Log it
+		RAIL.LogT(55,"MobID table loaded from \"{1}\".",RAIL.State.MobIDFile)
+
+		-- Add RAIL's MobID update function
+		env.MobID.Update = self.Update
+
+		-- Set the update time
+		env.MobID[priv_key] = GetTick()
+
+		-- Save it as our own MobID
+		MobID = env.MobID
+	end
+
+	if not RAIL.Mercenary then
+		-- Copy the mercenary's version of Update to "Load"
+		MobID.Load = MobID.Update
+
+		-- Homunculi save the MobID file
 		MobID.Update = function(self)
 			-- Check if the MobID file needs to be saved
 			if not self.Save then
