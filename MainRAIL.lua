@@ -16,7 +16,7 @@ require "History"
 require "SkillAIs"
 require "Table"
 require "Timeout"
---require "Version"		-- Note: Version.lua is pre-loaded by AI.lua and AI_M.lua
+require "Version"		-- Note: Version.lua is pre-loaded by AI.lua and AI_M.lua
 
 -- Load-time Dependency
 require "Actor"			-- depends on History
@@ -34,15 +34,13 @@ RAIL.Validate.Information = {is_subtable = true,
 	SelfID = {"number", 0},
 	RAILVersion = {"string", "unknown"},
 }
-
-RAIL.Validate.AcquireWhileLocked = {"boolean",false}
 RAIL.Validate.AttackWhileChasing = {"boolean",false}
 
-RAIL.Validate.RunAhead = {"boolean",false}
-RAIL.Validate.MaxDistance = {"number", 13, 3, 14}
-RAIL.Validate.FollowDistance = {"number", 7, 3, 14}
-
 function AI(id)
+	-- Create temporary fake actors, until properly initialized
+	RAIL.Owner = { ID = GetV(V_OWNER,id) }
+	RAIL.Self = { ID = id }
+
 	-- Get memory usage before initialization
 	local mem_before,thresh_before = gcinfo()
 
@@ -54,7 +52,7 @@ function AI(id)
 	RAIL.Log.Disabled = true
 
 	-- Load persistent state data
-	RAIL.State:SetOwnerID(GetV(V_OWNER,id))
+	RAIL.State:SetOwnerID(RAIL.Owner.ID)
 	RAIL.State:Load(true)
 
 	-- Re-enable logging
@@ -80,9 +78,19 @@ function AI(id)
 	--	Note: Redundant, but will show up in the log now
 	RAIL.State:Load(true)
 
+	-- Check if we're homunculus, tracking MobID, and should update (instead of overwrite)
+	if not RAIL.Mercenary and RAIL.State.UseMobID and RAIL.State.MobIDMode == "update" then
+		-- Load the MobID file
+		-- Note: Since the Load function only maintains Update, this will only work once
+		MobID:Load(true)
+	else
+		-- Remove the Load function, as it's not needed
+		MobID.Load = nil
+	end
+
 	-- Store the initialization time
 	RAIL.State.Information.InitTime = GetTick()
-	RAIL.State.Information.OwnerID = GetV(V_OWNER,id)
+	RAIL.State.Information.OwnerID = RAIL.Owner.ID
 	RAIL.State.Information.SelfID = id
 	RAIL.State.Information.RAILVersion = RAIL.FullVersion
 
@@ -185,6 +193,15 @@ function AI(id)
 			-- Save data (if any data was loaded, it won't be dirty and won't save)
 			RAIL.State:Save()
 		end)
+
+		-- Homunculi should periodically save MobID file
+		if not RAIL.Mercenary then
+			RAIL.Timeouts:New(500,true,function()
+				if RAIL.State.UseMobID then
+					MobID:Update()
+				end
+			end)
+		end
 	end
 
 	-- Profile the AI() function (and include memory information)
@@ -214,19 +231,22 @@ RAIL.TargetHistory = {
 
 function RAIL.AI(id)
 	-- Potential targets
-	local Potential = {
-		Attack = {},
-		Chase = {},
+	RAIL.ActorLists = {
+		All = {
+			[RAIL.Owner.ID] = RAIL.Owner,
+			[RAIL.Self.ID] = RAIL.Self,
+		},
+		Targets = {},
+		Friends = {},
+		Other = {},
 	}
 
 	-- Decided targets
-	local Target = {
+	RAIL.Target = {
 		Skill = nil,
 		Attack = nil,
 		Chase = nil,
 	}
-
-	local Friends = {}
 
 	-- Flag to terminate processing after data collection
 	local terminate = nil
@@ -247,47 +267,8 @@ function RAIL.AI(id)
 		if not terminate then
 			-- Determine if we need to chase our owner
 			do
-				-- Check that chasing would be worthwhile
-				if terminate == nil then
-					-- Check if we're following normally
-					if
-						-- Run ahead is disabled for now
-						true or
-
-						not RAIL.State.RunAhead
-					then
-						-- Owner-chase estimation is based on max distance
-						local max_estim = (-1 * math.ceil(RAIL.State.MaxDistance / 4))
-							* RAIL.Owner:EstimateMove()
-
-						if
-							RAIL.Self:BlocksTo(0)(
-								-- Guess some tiles ahead, so homu/merc isn't off screen when finally decides to move
-								RAIL.Owner.X[max_estim],
-								RAIL.Owner.Y[max_estim]
-							) > RAIL.State.MaxDistance or
-
-							-- Continue following
-							(RAIL.TargetHistory.Chase[0] == RAIL.Owner.ID and
-							RAIL.Owner.Motion[0] == MOTION_MOVE and
-							RAIL.Self:BlocksTo(0)(
-								-- Guess some tiles ahead when already following
-								RAIL.Owner.X[0],
-								RAIL.Owner.Y[0]
-							) > RAIL.State.FollowDistance)
-						then
-							Target.Chase = RAIL.Owner
-						end
-					else
-						-- Or if we're running ahead
-						if
-							RAIL.Owner.Motion[0] == MOTION_MOVE or
-							(RAIL.TargetHistory.Chase[0] == RAIL.Owner.ID and
-							math.abs(RAIL.Self:DistanceTo(RAIL.Owner) - RAIL.State.FollowDistance) > 1)
-						then
-							Target.Chase = RAIL.Owner
-						end
-					end
+				if ChaseOwner:Check() then
+					RAIL.Target.Chase = RAIL.Owner
 				end
 			end
 
@@ -329,45 +310,35 @@ function RAIL.AI(id)
 					end
 
 					-- If we're chasing owner, we won't be doing anything else
-					if Target.Chase ~= RAIL.Owner then
+					if RAIL.Target.Chase ~= RAIL.Owner then
 
 						-- Make sure we're not ignoring the actor
 						if not actor:IsIgnored() then
 
-							-- Check if the actor is an enemy
-							if actor:IsEnemy() then
-								local dist = RAIL.Self:DistanceTo(actor)
+							-- Add it to the all list
+							RAIL.ActorLists.All[actor.ID] = actor
 
-								-- Check if physical attacks are allowed against the enemy
-								if actor:IsAttackAllowed() then
-									-- If it's in range, add it to the potential attack list
-									if dist <= RAIL.Self.AttackRange then
-										Potential.Attack[actor.ID] = actor
-									else
-										-- Otherwise, add it to the potential chase list
-										Potential.Chase[actor.ID] = actor
-									end
-								end
+							-- Check if the actor is a friend
+							if actor:IsFriend() then
+								RAIL.ActorLists.Friends[actor.ID] = actor
+
+							-- An enemy
+							elseif actor:IsEnemy() then
+								RAIL.ActorLists.Targets[actor.ID] = actor
+
+							-- Or something else
+							else
+								RAIL.ActorLists.Other[actor.ID] = actor
 							end
 
-							-- Check the actor against potential skills
+							-- Check the actor against skills
 							SelectSkill:ActorCheck(actor)
 
-							-- Keep track of friends
-							if actor:IsFriend() then
-								Friends[actor.ID] = actor
-							end
-	
 						end -- not actor:IsIgnored()
-					end -- Target.Chase ~= RAIL.Owner
+					end -- RAIL.Target.Chase ~= RAIL.Owner
 				end -- not terminate
 			end -- RAIL.Owner.ID ~= actor
 		end -- i,actor in ipairs(GetActor())
-	end
-
-	-- After update of actors is done, check if we need to save the MobID file
-	if not RAIL.Mercenary and RAIL.State.UseMobID then
-		MobID:Update()
 	end
 
 	-- Iterate through the timeouts
@@ -395,7 +366,7 @@ function RAIL.AI(id)
 		-- Check if it's due to a portal
 		if RAIL.IsActor(terminate) then
 			RAIL.LogT(7,"Owner approaching {1}; cycle terminating after data collection.",terminate)
-	
+
 			-- Save state data before terminating
 			RAIL.State:Save()
 
@@ -418,71 +389,59 @@ function RAIL.AI(id)
 	-- Pre-decision cmd queue evaluation
 	do
 		-- Don't process commands if we're chasing owner
-		if Target.Chase ~= RAIL.Owner then
+		if RAIL.Target.Chase ~= RAIL.Owner then
 			-- Process commands to find skill target, attack target, and move target
-			Target.Skill,Target.Attack,Target.Chase =
-				RAIL.Cmd.Evaluate(Target.Skill,Target.Attack,Target.Chase)
+			RAIL.Cmd.Evaluate()
 		end -- Target.Chase ~= RAIL.Owner
 	end -- do
 
 	-- Decision Making
 	do
 		-- Skill
-		if Target.Skill == nil and Target.Chase ~= RAIL.Owner then
+		if RAIL.Target.Skill == nil and RAIL.Target.Chase ~= RAIL.Owner then
 			-- Select a skill to use
-			Target.Skill = SelectSkill:Run()
+			RAIL.Target.Skill = SelectSkill:Run()
 		end
 
 		-- Attack
-		if Target.Attack == nil and Target.Chase ~= RAIL.Owner then
+		if RAIL.Target.Attack == nil and RAIL.Target.Chase ~= RAIL.Owner then
 			-- Use routines from DecisionSupport.lua to determine the best actor
-			Target.Attack = SelectTarget.Attack(Potential.Attack,Friends)
+			RAIL.Target.Attack = SelectTarget.Attack(RAIL.ActorLists.Targets)
 		end
 
 		-- Move
-		if Target.Chase == nil then
+		if RAIL.Target.Chase == nil then
 			-- Check if we're chasing, but unable to get closer
 			if CheckChaseTimeAndDistance() then
-				Potential.Chase[RAIL.TargetHistory.Chase[0]] = nil
-			end
-
-			-- Check to see if we should add our attack target to the chase list as well
-			if not RAIL.State.AcquireWhileLocked and Target.Attack then
-				Potential.Chase[Target.Attack.ID] = Target.Attack
+				--Potential.Chase[RAIL.TargetHistory.Chase[0]] = nil
 			end
 
 			-- Find highest priority monster to move toward
-			Target.Chase = SelectTarget.Chase(Potential.Chase,Friends)
-
-			-- If we're chasing the same target that we're attacking, don't chase
-			if Target.Chase == Target.Attack then
-				Target.Chase = nil
-			end
+			RAIL.Target.Chase = SelectTarget.Chase(RAIL.ActorLists.Targets)
 		end
 
 		-- Check if we should attack while chasing
 		if
-			Target.Attack and
-			Target.Chase and
-			Target.Attack ~= Target.Chase and
+			RAIL.Target.Attack and
+			RAIL.Target.Chase and
 			not RAIL.State.AttackWhileChasing
 		then
-			Target.Attack = nil
+			RAIL.Target.Attack = nil
 		end
 	end
 
 	-- Record the targets
 	do
 		-- Attack
-		if Target.Attack then
-			RAIL.TargetHistory.Attack = Target.Attack.ID
+		if RAIL.Target.Attack then
+			RAIL.TargetHistory.Attack = RAIL.Target.Attack.ID
 		else
 			RAIL.TargetHistory.Attack = -1
 		end
 
 		-- Chase
-		if Target.Chase and Target.Chase.ID then
-			History.Update(RAIL.TargetHistory.Chase,Target.Chase.ID)
+		if RAIL.Target.Chase and RAIL.Target.Chase.ID then
+			History.Update(RAIL.TargetHistory.Chase,RAIL.Target.Chase.ID)
 		else
 			History.Update(RAIL.TargetHistory.Chase,-1)
 		end
@@ -491,10 +450,10 @@ function RAIL.AI(id)
 	-- Action
 	do
 		-- Skill
-		if Target.Skill ~= nil then
-			local skill = Target.Skill[1]
-			local target_x = Target.Skill[2]
-			local target_y = Target.Skill[3]
+		if RAIL.Target.Skill ~= nil then
+			local skill = RAIL.Target.Skill[1]
+			local target_x = RAIL.Target.Skill[2]
+			local target_y = RAIL.Target.Skill[3]
 
 			-- Check if the target is an actor
 			if RAIL.IsActor(target_x) then
@@ -507,44 +466,32 @@ function RAIL.AI(id)
 		end
 
 		-- Attack
-		if Target.Attack ~= nil then
+		if RAIL.Target.Attack ~= nil then
 			-- Log it
-			RAIL.LogT(75,"Using physical attack against {1}.",Target.Attack)
+			RAIL.LogT(75,"Using physical attack against {1}.",RAIL.Target.Attack)
 
 			-- Send the attack
-			Target.Attack:Attack()
+			RAIL.Target.Attack:Attack()
 		end
 
 		-- Move
 		local x,y
-		if Target.Chase ~= nil and Target.Chase ~= Target.Attack then
+		if RAIL.Target.Chase ~= nil then
 
-			if RAIL.IsActor(Target.Chase) then
+			-- Check if we're chasing owner
+			if RAIL.Target.Chase == RAIL.Owner then
+				-- Calculate the x,y to run to
+				x,y = ChaseOwner:Calculate()
+
+			elseif RAIL.IsActor(RAIL.Target.Chase) then
 				-- Default range is attack range
 				--	Note: Underestimate just to be safe
 				local range = RAIL.Self.AttackRange - 1
 
-				-- Check if we're chasing owner
-				if Target.Chase == RAIL.Owner then
-					-- Set range to follow distance
-					range = RAIL.State.FollowDistance
-
-					-- Check if we're supposed to run ahead
-					if RAIL.State.RunAhead then
-						-- Estimate the owner's walking speed
-						local owner_speed,angle = RAIL.Owner:EstimateMove()
-
-						-- Plot a point ahead of them
-						x,y = RAIL.Owner:AnglePlot(angle,RAIL.State.FollowDistance)
-					end
-				end
-
 				-- TODO: Check if we're chasing for a skill (to update range)
 
-				-- If a target destination hasn't been plotted yet, calculate one now
-				if not x then
-					x,y = CalculateIntercept(Target.Chase,range)
-				end
+				-- Calculate intercept now
+				x,y = CalculateIntercept(RAIL.Target.Chase,range)
 
 				-- Check if the distance between this and last move is about the same
 				if x and y then
@@ -557,31 +504,11 @@ function RAIL.AI(id)
 
 			else
 				-- Move to ground
-				x,y = Target.Chase[2],Target.Chase[3]
+				x,y = RAIL.Target.Chase[2],RAIL.Target.Chase[3]
 			end
 
-		elseif Target.Attack ~= nil then
-		--[[ Disabled; not working as intended
-			-- Use "dance step" while attacking
-			local target = RAIL.Owner
-			if
-				Target.Attack.ID ~= RAIL.TargetHistory.Move.DanceTarget or
-				RAIL.Self:DistanceTo(Target.Attack) + 1 > RAIL.Self.AttackRange
-			then
-				target = Target.Attack
-			end
-
-			-- Get the angle and distance to the target
-			local angle,dist = RAIL.Self:AngleTo(target)
-
-			RAIL.LogT(0,"dance step target = {1}; angle = {2}; dist = {3}",target,angle,dist)
-
-			-- Move one tile closer to the target
-			x,y = RAIL.Self:AnglePlot(angle, dist - 1)
-
-			-- Save the dance step target
-			RAIL.TargetHistory.Move.DanceTarget = target.ID
-		--]]
+		elseif RAIL.Target.Attack ~= nil then
+			-- TODO: Dance step
 		else
 
 			-- If moving, then stop.
@@ -634,8 +561,8 @@ function RAIL.AI(id)
 			if
 				x ~= RAIL.TargetHistory.Move.X or
 				y ~= RAIL.TargetHistory.Move.Y or
-				Target.Attack ~= nil or
-				Target.Skill ~= nil
+				RAIL.Target.Attack ~= nil or
+				RAIL.Target.Skill ~= nil
 			then
 				-- Log it
 				RAIL.LogT(85,"Moving to ({1},{2}).",x,y)

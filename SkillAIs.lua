@@ -1,3 +1,14 @@
+-- The option "Condition" is included in the following default option sets.
+-- This option allows custom use-conditions to be programmed with functions
+--	in the form of "function(_G,target)", where the global environment is
+--	accessed through _G.
+-- Note: Be careful to never use upvalues, as they cannot be serialized and will
+--	cause an error.
+-- Example: "return function(_G,target) return target:IsEnemy() end"
+--	The above example will return true if the proposed target is an enemy
+-- Note: Due to the way loadstring works, you must return the condition function, otherwise
+--	it will not be loaded properly.
+
 -- Options
 RAIL.Validate.SkillOptions = {is_subtable = true,
 	BuffBasePriority = {"number",40},
@@ -5,6 +16,7 @@ RAIL.Validate.SkillOptions = {is_subtable = true,
 		Enabled = {"boolean",true},
 		Name = {"string",nil},				-- (default set by init function)
 		PriorityOffset = {"number",0},
+		Condition = {"function",nil,unsaved=true},	-- (default set by init function)
 	},
 	buff_default = {is_subtable = true,
 		Enabled = {"boolean",true},
@@ -12,11 +24,13 @@ RAIL.Validate.SkillOptions = {is_subtable = true,
 		MaxFailures = {"number",10,1},
 		PriorityOffset = {"number",0},
 		NextCastTime = {"number",0},
-
-		-- Condition takes a function in the form of "function(_G)",
-		--	where the global environment is accessed through _G.
-		-- Note: Be careful to never use upvalues, as they cannot be
-		--	serialized
+		Condition = {"function",nil,unsaved=true},	-- (default set by init function)
+	},
+	debuff_default = {is_subtable = true,
+		Enabled = {"boolean",true},
+		Name = {"string",nil},				-- (default set by init function)
+		MaxFailures = {"number",10,1},
+		PriorityOffset = {"number",0.5},
 		Condition = {"function",nil,unsaved=true},	-- (default set by init function)
 	},
 	-- Chaotic Blessings
@@ -33,8 +47,11 @@ RAIL.Validate.SkillOptions = {is_subtable = true,
 	-- Provoke
 	[8232] = {is_subtable = true,
 		Enabled = {"boolean",true},
-		Name = {"string",nil},			-- (default set by init function)
+		Name = {"string",nil},				-- (default set by init function)
+		MaxFailures = {"number",10,1},
 		PriorityOffset = {"number",0.5},
+		Condition = {"function",nil,unsaved=true},	-- (default set by init function)
+		ProvokeOwner = {"boolean",true},
 	},
 }
 
@@ -44,94 +61,119 @@ local min_priority = -10000
 -- Skill type AIs and selector
 do
 	-- Private key to hold information on a skill
-	local priv_key = {}
+	local priv_key = {
+		Sieves = {},
+	}
+
+	local function next_key(s) return RAIL.formatT("NextSkill{1}Time",s.ID) end
+	local function failures_key(s) return RAIL.formatT("Skill{1}Failures",s.ID) end
 
 	-- Private key to hold skills
 	local skills_key
 	skills_key = {
 		-- Reuse this table to hold skill AIs
-		Attack = {
-			Init = function(skill)
-				-- Generate a validation table based on the default Attacks validation table
-				do
-					local validate_byID = RAIL.Validate.SkillOptions
-					validate_byID[skill.ID] = Table.DeepCopy(validate_byID.atks_default)
+
+		generic_offensive = {
+			range_sieve = {"SkillRangeAndLevel",function(potentials,n,protected,skill,level)
+				local ret,ret_n = {},0
+		
+				if not level then
+					level = skill.Level
 				end
 
-				priv_key.AttackSieve = Table.New()
+				local max_failures = RAIL.State.SkillOptions[skill.ID].MaxFailures or 10
 
-				-- Copy the attack target sieve, but drop retargeting
-				for i=1,SelectTarget.Attack:GetN() do
-					if SelectTarget.Attack[i][1] ~= "Retarget" then
-						priv_key.AttackSieve:Append(SelectTarget.Attack[i])
+				for id,actor in potentials do
+					if
+						RAIL.Self:DistanceTo(actor) <= skill:GetRange() and
+						actor:IsSkillAllowed(level) and
+
+						-- Also check failures and duration
+						(actor.BattleOpts[failures_key(skill)] or 0) < max_failures and
+						(skill.Duration < 1 or (actor.BattleOpts[next_key(skill)] or 0) <= GetTick()) and
+
+						-- No more things to check
+						true
+					then
+						ret[id] = actor
+						ret_n = ret_n + 1
 					end
 				end
-
-				-- Set the metatable from SelectTarget.Attack's metatable
-				setmetatable(priv_key.AttackSieve,getmetatable(SelectTarget.Attack))
-
-				-- Generate the skill success and failure callbacks now
-				priv_key.AttackCallbacks = {
-					Success = function(s,target,ticks)
-						-- Reset skill-failed counter
-						target.BattleOpts.CastsFailed = 0
-
-						-- Increment skill counter
-						target.BattleOpts.CastsAgainst = (target.BattleOpts.CastsAgainst or 0) + 1
-					end,
-					Failure = function(s,target,ticks)
-						-- Increment skill-failed counter
-						target.BattleOpts.CastsFailed = (target.BattleOpts.CastsFailed or 0) + 1
-
-						-- TODO: Ignore completely (attacks and skills) after
-						--		a number of consequtive failures
+		
+				return ret,ret_n,protected
+			end},
+			condition_sieve = {"SkillCondition",function(potentials,n,protected,skill)
+				local ret,ret_n = {},0
+		
+				for id,actor in potentials do
+					if RAIL.State.SkillOptions[skill.ID].Condition(RAIL._G,actor) then
+						ret[id] = actor
+						ret_n = ret_n + 1
 					end
-				}
-			end,
-			CycleBegin = function(skill)
-				skill[priv_key] = {}
+				end
+		
+				return ret,ret_n,protected
+			end},
 
-				-- Create a temporary list of potential skill targets
-				skill[priv_key].Targets = {}
+			callbacks = {
+				Success = function(s,target,ticks)
+					-- Set failures to 0
+					target.BattleOpts[failures_key(s)] = 0
 
-				-- Get the level of skill usable this round
-				skill[priv_key].Level = FindSkillLevel(RAIL.Self.SP[0],skill)
+					-- Set the next time that we should cast the skill
+					if s.Duration > 0 then
+						target.BattleOpts[next_key(s)] = GetTick() - ticks + s.Duration
+					end
+				end,
+				Failure = function(s,target,ticks)
+					-- Increment the failures key
+					local failures = failures_key(s)
+					target.BattleOpts[failures] = (target.BattleOpts[failures] or 0) + 1
+				end,
+			},
 
-				-- Create a temporary list of friends
-				skill[priv_key].Friends = {}
+			Init = function(skill,validate_default)
+				if validate_default then
+					-- Generate a validation table based on the default
+					RAIL.Validate.SkillOptions[skill.ID] = Table.DeepCopy(validate_default)
+				end
 
-				-- Don't return anything, since no skill usage is urgent
-				return
-			end,
-			ActorCheck = function(skill,actor)
-				-- Check...
-				if
-					-- if the actor is an enemy
-					actor:IsEnemy() and
-					-- if skills are allowed against it
-					actor:IsSkillAllowed(skill[priv_key].Level) and
-					-- and it's in range
-					RAIL.Self:DistanceTo(actor) <= skill:GetRange()
-				then
-					-- Add it to the temporary list
-					skill[priv_key].Targets[actor.ID] = actor
-				elseif
-					actor:IsFriend()
-				then
-					-- Add it to the temporary friend list
-					skill[priv_key].Friends[actor.ID] = actor
+				-- Generate a sieve
+				priv_key.Sieves[skill.ID] = SelectTarget.GenerateSieve(RAIL.formatT("Skill({1})",skill.ID))
+				local sieve = priv_key.Sieves[skill.ID]
+
+				-- Add a range sieve
+				sieve:Insert(1,skills_key.generic_offensive.range_sieve)
+
+				-- Add condition sieve
+				for i=2,sieve:GetN() do
+					if sieve[i][1] == "Priority" then
+						-- Add the condition sieve
+						sieve:Insert(i,skills_key.generic_offensive.condition_sieve)
+
+						break
+					end
 				end
 			end,
-			Select = function(skill,friends)
+			Select = function(skill,callbacks,level_ignore)
+				-- Find the level of skill usable this round
+				local level = FindSkillLevel(RAIL.Self.SP[0],skill)
+
+				-- Get the level to indicate to the sieve functions
+				local level_override = level
+				if level_ignore then
+					level_override = 10
+				end
+
 				-- Run the sieve and find a target
-				local target = priv_key.AttackSieve(skill[priv_key].Targets,skill[priv_key].Friends)
+				local target = priv_key.Sieves[skill.ID](RAIL.ActorLists.Targets,skill,level_override)
 
 				-- Check if a target was found
 				if target ~= nil then
 					-- Check if the skill level is selectable
 					if skill[1] then
 						-- Get the level we should use against the monster
-						local dummy,level = target:IsSkillAllowed(skill[priv_key].Level)
+						local dummy,level = target:IsSkillAllowed(level)
 
 						-- Set the skill to use
 						skill = skill[level]
@@ -144,10 +186,14 @@ do
 					prio = prio + RAIL.State.SkillOptions[skill.ID].PriorityOffset
 
 					-- Set the callbacks for the skill
+					if type(callbacks) ~= "table" then
+						callbacks = skills_key.generic_offensive.callbacks
+					end
+
 					RAIL.Self.SkillState.Callbacks:Add(
 						skill,
-						priv_key.AttackCallbacks.Success,
-						priv_key.AttackCallbacks.Failure,
+						callbacks.Success,
+						callbacks.Failure,
 						false
 					)
 
@@ -156,6 +202,38 @@ do
 
 				-- Otherwise, target nothing
 				return
+			end,
+		},
+
+		Attack = {
+			callbacks = {
+				Success = function(s,target,ticks)
+					-- Increment skill counter
+					-- Note: This is checked in Actor.lua's IsSkillAllowed()
+					target.BattleOpts.CastsAgainst = (target.BattleOpts.CastsAgainst or 0) + 1
+				end,
+			},
+			Init = function(skill)
+				-- Use generic initialization
+				return skills_key.generic_offensive.Init(skill,RAIL.Validate.SkillOptions.atks_default)
+			end,
+			Select = function(skill)
+				-- Use generic selection
+				local ret = { skills_key.generic_offensive.Select(skill,skills_key.Attack.callbacks) }
+
+				-- Check if a skill was selected
+				if ret[2] ~= nil then
+					-- Add another callback to count the number of successful casts
+					RAIL.Self.SkillState.Callbacks:Add(
+						skill,
+						skills_key.Attack.callbacks.Success,
+						nil,
+						false
+					)
+				end
+
+				-- Return the generic results
+				return unpack(ret)
 			end,
 		},
 		Buff = {
@@ -174,17 +252,15 @@ do
 					RAIL.State.SkillOptions[skill.ID].NextCastTime = 0
 				end
 
-				-- Set the private key to hold the next time the skill should be used
-				skill[priv_key] = {
-					Failures = 0,
-				}
+				-- Set the private key to hold the failure count
+				skill[priv_key] = 0
 
 				-- Add callbacks to the skill
 				RAIL.Self.SkillState.Callbacks:Add(
 					skill,
 					function(self,target,ticks)
 						-- Reset the failure count
-						skill[priv_key].Failures = 0
+						skill[priv_key] = 0
 
 						-- Set the next time we can use the buff
 						RAIL.State.SkillOptions[skill.ID].NextCastTime =
@@ -192,7 +268,7 @@ do
 					end,
 					function(self,target,ticks)
 						-- Increment the failure count
-						skill[priv_key].Failures = skill[priv_key].Failures + 1
+						skill[priv_key] = skill[priv_key] + 1
 					end,
 					-- Persistent
 					true
@@ -203,7 +279,7 @@ do
 				local state = RAIL.State.SkillOptions[skill.ID]
 
 				-- Check to see if the skill has failed 10 times in a row
-				if skill[priv_key].Failures >= state.MaxFailures then
+				if skill[priv_key] >= state.MaxFailures then
 					-- We probably don't actually have this skill; stop trying
 					return
 				end
@@ -221,7 +297,7 @@ do
 				end
 
 				-- Check the custom condition of the buff
-				if state.Condition(RAIL._G) then
+				if state.Condition(RAIL._G,nil) then
 					-- Return the skill priority and the skill
 					return RAIL.State.SkillOptions.BuffBasePriority + state.PriorityOffset
 					,skill,RAIL.Self
@@ -267,6 +343,16 @@ do
 				return
 			end,
 		},
+		Debuff = {
+			Init = function(skill)
+				-- Use generic initialization
+				local ret = skills_key.generic_offensive.Init(skill,RAIL.Validate.SkillOptions.debuff_default)
+			end,
+			Select = function(skill,friends)
+				-- Use generic selection
+				return skills_key.generic_offensive.Select(skill,skills_key.Debuff.callbacks)
+			end,
+		},
 		Emergency = {
 			CycleBegin = function(skill)
 				-- TODO: Check if RAIL.Owner is in emergency state
@@ -277,104 +363,27 @@ do
 		},
 		Provoke = {
 			Init = function(skill)
-				priv_key.ProvokeSieve = Table.New()
+				local ret = skills_key.generic_offensive.Init(skill)
 
-				-- Copy the attack targeting sieve, but drop retargeting
-				for i=1,SelectTarget.Attack:GetN() do
-					if SelectTarget.Attack[i][1] ~= "Retarget" then
-						priv_key.ProvokeSieve:Append(SelectTarget.Attack[i])
-					end
-				end
-
-				-- Set the metatable from SelectTarget.Attack's metatable
-				setmetatable(priv_key.ProvokeSieve,getmetatable(SelectTarget.Attack))
-
-				-- Generate the skill success and failure callbacks now
-				priv_key.ProvokeCallbacks = {
-					Success = function(s,target,ticks)
-						-- Reset skill-failed counter
-						target.BattleOpts.ProvokesFailed = 0
-
-						-- Set the time of the provoke
-						target.BattleOpts.LastProvokeTick = GetTick() - ticks
-					end,
-					Failure = function(s,target,ticks)
-						-- Increment skill-failed counter
-						target.BattleOpts.ProvokesFailed = (target.BattleOpts.ProvokesFailed or 0) + 1
-					end
-				}
-			end,
-			CycleBegin = function(skill)
-				skill[priv_key] = {}
-
-				-- Create a temporary list of potential skill targets
-				skill[priv_key].Targets = {}
-
-				-- Create a temporary list of friends
-				skill[priv_key].Friends = {}
-
-				-- Don't return anything, since no skill usage is urgent
-				return
-			end,
-			ActorCheck = function(skill,actor)
-				-- Check...
-				if
-					-- if the actor is an enemy
-					actor:IsEnemy() and
-					-- if skills are allowed against it
-					--	(don't let provoke be disqualified because of its level)
-					actor:IsSkillAllowed(10) and
+				-- TODO: Add sieve for provokes failed
 					-- if the actor hasn't had 10 provoke casts in a row fail against it
-					(actor.BattleOpts.ProvokesFailed or 0) < 10 and
-					-- if the actor hasn't been provoked recently
-					GetTick() - (actor.BattleOpts.LastProvokeTick or 0) > skill.Duration and
-					-- and it's in range
-					RAIL.Self:DistanceTo(actor) <= skill:GetRange()
-				then
-					-- Add it to the temporary list
-					skill[priv_key].Targets[actor.ID] = actor
-				elseif
-					actor:IsFriend()
-				then
-					-- Add it to the temporary friend list
-					skill[priv_key].Friends[actor.ID] = actor
-				end
+					--(actor.BattleOpts.ProvokesFailed or 0) < 10 and
+
+
+				return ret
 			end,
-			Select = function(skill,friends)
+			Select = function(skill)
 				-- Get the state file options table
 				local state = RAIL.State.SkillOptions[8232]
 
-				-- Run the sieve and find an enemy target
-				local target = priv_key.ProvokeSieve(skill[priv_key].Targets,skill[priv_key].Friends)
-
-				-- Check if a target was found
-				local prio
-				if target ~= nil then
-					-- Get the target priority
-					prio = target.BattleOpts.Priority
-
-					-- And offset it based on options
-					prio = prio + state.PriorityOffset
-				end
+				-- Run the generic offensive select
+				local offensive = { skills_key.generic_offensive.Select(skill,nil,true) }
 
 				-- TODO: Check for provoke against friendly targets
 				--	(mercenary provokes can be used friendly, right?)
 
-				-- Check if a target was selected
-				if prio ~= nil then
-					-- Set the callbacks for the skill
-					RAIL.Self.SkillState.Callbacks:Add(
-						skill,
-						priv_key.ProvokeCallbacks.Success,
-						priv_key.ProvokeCallbacks.Failure,
-						false
-					)
-	
-					return prio,skill,target
-				end
-
-				-- Otherwise, target nothing
-				return
+				-- Otherwise, return the offensive result
+				return unpack(offensive)
 			end,
 		},
 	}
@@ -508,23 +517,23 @@ do
 			end
 
 			-- Loop through each skill
-			local best_prio,best_skill,best_target_x,best_target_y = min_priority
+			local best = { min_priority }
 			for skill_obj,ai_obj in self[skills_key] do
-				local prio,skill,target_x,target_y = best_prio,nil,nil
+				local current = { best[1] }
 				if
 					ai_obj.Select and
 					skillEnabled(skill_obj) and
 					not ai_obj.wait_for_next_cycle
 				then
-					prio,skill,target_x,target_y = ai_obj.Select(skill_obj)
+					current = { ai_obj.Select(skill_obj) }
 
-					if prio == nil then
-						prio = min_priority
+					if current[1] == nil then
+						current[1] = min_priority
 					end
 				end
 
-				if prio > best_prio then
-					best_prio,best_skill,best_target_x,best_target_y = prio,skill,target_x,target_y
+				if current[1] > best[1] then
+					best = current
 				end
 
 				-- Take off the wait for next cycle flag (if it's off, nothing happens)
@@ -532,20 +541,20 @@ do
 			end
 
 			-- Ensure a skill was selected
-			if best_prio == min_priority then
+			if best[1] == min_priority then
 				return nil
 			end
 
 			-- Check if we don't have enough SP for the skill
 			-- Note: Skills don't seem to actually work unless they'll leave
 			--	the homunculus/mercenary at above 0 sp.
-			if RAIL.Self.SP[0] < best_skill.SPCost + 1 then
+			if RAIL.Self.SP[0] < best[2].SPCost + 1 then
 				-- Don't use a skill yet
 				return nil
 			end
 
 			-- Return the skill and target that were selected (if target_x is an actor, target_y will be nil)
-			return { best_skill, best_target_x, best_target_y }
+			return { best[2], best[3], best[4] }
 		end
 	}
 end

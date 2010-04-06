@@ -65,6 +65,9 @@ do
 		RAIL.Version = penv.RAIL.Version
 		RAIL.FullVersion = penv.RAIL.FullVersion
 
+		-- Don't load Version.lua again
+		_LOADED.Version = true
+
 		-- Set LUA_PATH to include the autodetected location
 		LUA_PATH = ScriptLocation .. "?;" .. ScriptLocation .. "?.lua;?;?.lua"
 	end
