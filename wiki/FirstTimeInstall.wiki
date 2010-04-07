@@ -1,6 +1,12 @@
 #summary A step-by-step guide through the first-time install of RAIL.
 #labels Phase-Deploy,Featured
 
+<wiki:toc />
+
+= Introduction =
+
+This page outlines the installation process for Rampage AI Lite. If Rampage AI Lite is already installed, please refer to the [UpdateInstall RAIL Update Wiki Page] instead.
+
 = Required Software =
 
 Rampage AI Lite relies on the use of Subversion (SVN) for distribution. To use SVN and download RAIL, you will first need to install [http://tortoisesvn.net/ TortoiseSVN]. The download page can be found at [http://tortoisesvn.net/downloads].
