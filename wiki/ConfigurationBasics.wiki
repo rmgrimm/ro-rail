@@ -1,6 +1,8 @@
 #summary A broad outline describing how to configure Rampage AI Lite.
 #labels Phase-Deploy
 
+<wiki:toc />
+
 = Configuration Basics =
 
 Rampage AI Lite configuration is split between two files: Config.lua, and the state-file. The Config.lua file holds only the most basic options for operation of Rampage AI Lite. By contrast, the state-file holds most settings and information related to the current state of the AI.
