@@ -1,6 +1,8 @@
 #summary A step-by-step guide to updating RAIL.
 #labels Phase-Deploy,Featured
 
+<wiki:toc />
+
 = Introduction =
 
 This is a guide to the update process after Rampage AI Lite (RAIL) has already been installed. If you need to install RAIL for the first time, please visit [FirstTimeInstall First Time Install].
