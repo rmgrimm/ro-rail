@@ -1,46 +1,80 @@
 #summary A list and description of all options provided by RAIL_State files.
-#labels Phase-Deploy
+#labels Phase-Deploy,Featured
 
-<wiki:comment><wiki:toc /></wiki:comment>
+<wiki:toc />
 
 = Introduction =
 
-_Coming soon!_
+The Rampage AI Lite state-file contains all configuration relating to behavior of the AI. In addition, it also contains information regarding the current-state of the AI (for example, the ID number of the homunculus/mercenary).
 
-<wiki:comment>
+The state-file options are verified as they are used, so it is impossible to cause a Lua error when changing options. Further
+
 = Finding Your State-File =
+
+_Not written yet. Check back soon!_
 
 = Options Index =
 
-== A ==
+== Base Options Table ==
 
-=== AssistOwner ===
+=== !ActorOptions ===
+
+_Please refer to [StateFileIndex#ActorOptions_Sub-table ActorOptions Sub-table]._
+
+=== Aggressive ===
 
 *Type:* Boolean
 
-== B ==
-== C ==
-== D ==
-== E ==
-== F ==
-== G ==
-== H ==
-== I ==
-== J ==
-== K ==
-== L ==
-== M ==
-== N ==
-== O ==
-== P ==
-== Q ==
-== R ==
-== S ==
-== T ==
-== U ==
-== V ==
-== W ==
-== X ==
-== Y ==
-== Z ==
-</wiki:comment>
+*Default:* `False`
+
+When set to `true`, Aggressive will cause the AI to actively search for new targets.
+
+_Note: This option can be changed by pressing `<ALT+T>` for a homunculus, or `<CTRL+T>` for a mercenary. Changes made by this key-press will be saved._
+
+=== !AssistOwner ===
+
+*Type:* Boolean
+
+*Default:* `False`
+
+When set to `true`, !AssistOwner will cause the AI to select targets that the owner is hostile against. This includes attacks, skill charge-up, and skill casts against enemy targets.
+
+This option takes precedence over all others, including [StateFileIndex#Aggressive Aggressive], [StateFileIndex#_AssistOther AssistOther], and [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table] options.
+
+*See also:* [StateFileIndex#_AssistOther AssistOther]
+
+=== !AssistOther ===
+
+*Type:* Boolean
+
+*Default:* `False`
+
+!AssistOther operates like !AssistOwner, but causes the AI to assist its counterpart. For example, if both homunculus and mercenary are active, !AssistOther in the mercenary state-file would cause a passive mercenary to target enemies that the homunculus is attacking.
+
+This option takes precedence over [StateFileIndex#Aggressive Aggressive] and [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table] options.
+
+*See also:* [StateFileIndex#_AssistOwner AssistOwner]
+
+=== !DebugFile ===
+
+_Not written yet. Check back soon!_
+
+=== !DebugLevel ===
+
+*Type:* Number
+
+*Default:* 50
+
+*Maximum Value:* 99
+
+This option sets the verbosity of RAIL logging, with higher numbers being more verbose. Unless troubleshooting or learning about RAIL, this option should be ignored.
+
+*See also:* [StateFileIndex#_DebugFile DebugFile]
+
+== !ActorOptions Sub-table ==
+
+_Not written yet. Check back soon!_
+
+== !DefendOptions Sub-table ==
+
+_Not written yet. Check back soon!_
