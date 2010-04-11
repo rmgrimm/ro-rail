@@ -17,9 +17,9 @@ You may also use other SVN clients; however, this guide will only give example s
 
 == Before You Begin: Locate your Ragnarok Online directory ==
 
-Before continuing, you will need to locate the directory that Ragnarok Online is installed into. The following examples show _C:\Users\Robert\Documents\iRO\_ as the installation directory. Your install directory will probably be different.
+Before continuing, you will need to locate the directory that Ragnarok Online is installed into. The examples on this website show _C:\Users\Robert\Documents\iRO\_ as the installation directory. Your install directory will probably be different.
 
-The following steps will take place in the AI directory, which should be found inside the Ragnarok Online directory.
+The following steps will take place in the _AI_ subdirectory, which should be found inside the Ragnarok Online directory.
 
 _Note: Vista users should not install Ragnarok Online into the _Program Files_ directory, because of complications with User Account Control (UAC)._
 
