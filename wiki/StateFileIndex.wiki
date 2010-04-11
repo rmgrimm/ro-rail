@@ -59,7 +59,7 @@ _Please refer to [StateFileIndex#ActorOptions_Sub-table ActorOptions Sub-table].
 
 When set to `true`, Aggressive will cause the AI to actively search for new targets.
 
-_Note: This option can be changed by pressing `<ALT+T>` for a homunculus, or `<CTRL+T>` for a mercenary. Changes made by this key-press will be saved._
+_Note: This option can be changed from inside the Ragnarok Online client by pressing `<ALT+T>` for a homunculus, or `<CTRL+T>` for a mercenary. Changes made by this key-press will be saved._
 
 === !AssistOwner ===
 
