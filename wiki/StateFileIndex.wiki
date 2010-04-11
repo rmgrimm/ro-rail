@@ -23,9 +23,7 @@ Once you've located the state-file, it is safe to open it in Microsoft Notepad o
 
 _Note: Vista users will have problems editing the state-file if it is inside the _Program Files_ directory. Please make sure your copy of Ragnarok Online is installed outside of this folder._
 
-= Options Index =
-
-== An Important Note ==
+= An Important Note =
 
 All options shown on this page will appear in the state-file similar to the following:
 {{{
@@ -34,6 +32,8 @@ rail_state["Aggressive"] = false
 In this example, the option is [StateFileIndex#Aggressive Aggressive], and the option is set to `false`.
 
 The names of the options in the state-file (eg, "[StateFileIndex#Aggressive Aggressive]") are all case-sensitive. In other words, the option "aggRESsive" will not have any relation to the option "[StateFileIndex#Aggressive Aggressive]". When adding new options, be careful to note that the capitalization matches what is shown on this page.
+
+= Options Index =
 
 == Base Options Table ==
 
