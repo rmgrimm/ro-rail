@@ -13,72 +13,103 @@ do
 	local key = {}
 
 	GetType = {
+		-- Modes take the form of:
+		--	[1] -> boolean; load MobID table at start
+		--	[2] -> function to get monster type from ID
 		[true] = {
-			["disabled"] = function(self,id)
-				-- Just return the type
-				return GetV(self[key].SaneGetType,id)
-			end,
-			["automatic"] = function(self,id)
-				if RAIL.Other == RAIL.Self then
-					-- If not paired with another RAIL, don't use Mob ID
-					return GetType[true].disabled(self,id)
-				end
+			["disabled"] = {
+				false,
+				function(self,id)
+					-- Just return the type
+					return GetV(self[key].SaneGetType,id)
+				end,
+			},
+			["automatic"] = {
+				false,
+				function(self,id)
+					if RAIL.Other == RAIL.Self then
+						-- If not paired with another RAIL, don't use Mob ID
+						return GetType[true].disabled[2](self,id)
+					end
 
-				-- Otherwise, use "update"
-				return GetType[true].update(self,id)
-			end,
-			["update"] = function(self,id)
-				-- After the first init, works exactly like "overwrite"
-				return GetType[true].overwrite(self,id)
-			end,
-			["overwrite"] = function(self,id)
-				-- Get the type from disabled
-				local type = GetType[true].disabled(self,id)
+					-- Otherwise, use "overwrite"
+					return GetType[true].overwrite[2](self,id)
+				end,
+			},
+			["update"] = {
+				true,
+				function(self,id)
+					-- After the first init, works exactly like "overwrite"
+					return GetType[true].overwrite[2](self,id)
+				end,
+			},
+			["overwrite"] = {
+				false,
+				function(self,id)
+					-- Get the type from disabled
+					local type = GetType[true].disabled[2](self,id)
 
-				-- Check for change
-				if type ~= self[key].Map[id] then
-					-- Force an update
-					self[key].ForceUpdate = true
-				end
+					-- Check for change
+					if type ~= self[key].Map[id] then
+						-- Force an update
+						self[key].ForceUpdate = true
+					end
 
-				-- Store it in the MobID table
-				self[key].Map[id] = type
+					-- Store it in the MobID table
+					self[key].Map[id] = type
 
-				-- Return the type
-				return type
-			end,
+					-- Return the type
+					return type
+				end,
+			},
 		},
 		[false] = {
-			["disabled"] = function(self,id)
-				return -2
-			end,
-			["automatic"] = function(self,id)
-				if RAIL.Other == RAIL.Self then
-					-- If not paired with another RAIL, don't use Mob ID
-					return GetType[false].disabled(self,id)
-				end
+			["disabled"] = {
+				false,
+				function(self,id)
+					return -2
+				end,
+			},
+			["automatic"] = {
+				false,
+				function(self,id)
+					if RAIL.Other == RAIL.Self then
+						-- If not paired with another RAIL, don't use Mob ID
+						return GetType[false].disabled[2](self,id)
+					end
 
-				-- Otherwise, use enabled
-				return GetType[false].enabled(self,id)
-			end,
-			["enabled"] = function(self,id)
-				local type = self[key].Map[id]
+					-- Otherwise, use "active"
+					return GetType[false].active[2](self,id)
+				end,
+			},
+			["once"] = {
+				true,
+				function(self,id)
+					-- Return the Type ID if known, or disabled value
+					return self[key].Map[id] or GetType[false].disabled[2](self,id)
+				end,
+			},
+			["active"] = {
+				false,
+				function(self,id)
+					local type = self[key].Map[id]
 
-				if type == nil then
-					-- Force an update
-					self[key].ForceUpdate = true
+					if type == nil then
+						-- Force an update
+						self[key].ForceUpdate = true
 
-					-- Get from disabled
-					type = GetType[false].disabled(self,id)
-				end
+						-- Get from disabled
+						type = GetType[false].disabled[2](self,id)
+					end
 
-				return type
-			end,
+					return type
+				end,
+			},
 		},
 	}
 	local GetType_mt = {
 		__call = function(self,self2,id)
-			return self[string.lower(RAIL.State.MobIDMode)](self2,id)
+			return self[string.lower(RAIL.State.MobIDMode)][2](self2,id)
 		end,
 	}
 	setmetatable(GetType[true],GetType_mt)
@@ -178,12 +209,13 @@ do
 		-- Set the update function
 		self[key].Update = Update[self[key].SaneGetType ~= nil]
 
-		-- If the mode is "update", load the data right away
-		if string.lower(RAIL.State.MobIDMode) == "update" then
+		-- Check if the mode is set to load table on startup
+		if types[string.lower(RAIL.State.MobIDMode)][1] then
 			self[key].Update(self)
 		end
 
 		-- Setup a timeout to load/save the MobID file at regular intervals
+		-- Note: RAIL._G.debug only appears in lua.exe, not in ragexe.exe
 		if not RAIL._G.debug then
 			self[key].Timeout = RAIL.Timeouts:New(250,true,function(self)
 				-- Check if an update is forced
