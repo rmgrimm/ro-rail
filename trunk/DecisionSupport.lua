@@ -11,7 +11,10 @@ RAIL.Validate.DefendOptions = {is_subtable = true,
 	FriendThreshold = {"number",4,0},
 }
 RAIL.Validate.FollowDistance = {"number", 7, 3, 14}
-RAIL.Validate.InterceptAlgorithm = {"string","normal"}
+RAIL.Validate.InterceptAlgorithm = {"string","normal",
+	-- Note: Don't allow advanced until it's written
+	{ ["none"] = true, ["sloppy"] = true, ["normal"] = true, ["advanced"] = nil, }
+}
 RAIL.Validate.MaxDistance = {"number", 13, 3, 14}
 RAIL.Validate.RunAhead = {"boolean",false}
 

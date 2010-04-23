@@ -71,22 +71,15 @@ function AI(id)
 	RAIL.LogT(0," --> Full Version ID = {1}",RAIL.FullVersion)
 
 	-- Check for some features of Lua
-	RAIL.LogT(0," --> Lua: _VERSION = {1}; coroutine = {2};",
-		RAIL._G._VERSION, RAIL._G.coroutine)
+	RAIL.LogT(0," --> Lua: _VERSION = {1}; coroutine = {2}; newproxy = {3};",
+		RAIL._G._VERSION, RAIL._G.coroutine, RAIL._G.newproxy)
 
 	-- Load persistent state data again
 	--	Note: Redundant, but will show up in the log now
 	RAIL.State:Load(true)
 
-	-- Check if we're homunculus, tracking MobID, and should update (instead of overwrite)
-	if not RAIL.Mercenary and RAIL.State.UseMobID and RAIL.State.MobIDMode == "update" then
-		-- Load the MobID file
-		-- Note: Since the Load function only maintains Update, this will only work once
-		MobID:Load(true)
-	else
-		-- Remove the Load function, as it's not needed
-		MobID.Load = nil
-	end
+	-- Initialize MobID support
+	RAIL.MobID:Init()
 
 	-- Store the initialization time
 	RAIL.State.Information.InitTime = GetTick()
@@ -180,7 +173,9 @@ function AI(id)
 
 	-- Save some processing power on later cycles
 	RAIL.Owner.ExpireTimeout[1] = false
+	RAIL.Owner.Active = true
 	RAIL.Self.ExpireTimeout[1] = false
+	RAIL.Self.Active = true
 
 	-- Check for the global variable "debug" (should be a table), to determine
 	--	if we're running inside lua.exe or ragexe.exe
@@ -193,15 +188,6 @@ function AI(id)
 			-- Save data (if any data was loaded, it won't be dirty and won't save)
 			RAIL.State:Save()
 		end)
-
-		-- Homunculi should periodically save MobID file
-		if not RAIL.Mercenary then
-			RAIL.Timeouts:New(500,true,function()
-				if RAIL.State.UseMobID then
-					MobID:Update()
-				end
-			end)
-		end
 	end
 
 	-- Profile the AI() function (and include memory information)

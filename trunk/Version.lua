@@ -26,6 +26,7 @@ end
 --	Note: View the subversion commit notes for more full changelog.
 --		(This is maintained to regularly bump version number.)
 
+-- 2010-04-23 -- Completed State.lua's require replacement function, added options for strings; redo MobID code
 -- 2010-04-06 -- Made targets public as part of RAIL object; restructured owner chase; reworked skill AIs; see SVN log for more
 -- 2010-03-24 -- Reimplement logic to default plants at 1 priority below other default monsters; Small fixes
 -- 2010-03-23 -- Rework of actor options setup; Updates to state file handling; Include AMCs; Bug fixes.

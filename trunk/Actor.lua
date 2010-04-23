@@ -1,6 +1,208 @@
 -- A few persistent-state options used
 RAIL.Validate.TempFriendRange = {"number",-1,-1,5}
-RAIL.Validate.UseMobID = {"boolean",false}
+
+-- Mob ID Support
+do
+	-- Mob ID State-Options
+	RAIL.Validate.MobIDFile = {"string","./AI/USER_AI/Mob_ID.lua"}
+
+	--	Note: Possible MobIDMode values are set in the RAIL.MobID.Init function
+	RAIL.Validate.MobIDMode = {"string","automatic"}
+
+	-- Private data key
+	local key = {}
+
+	GetType = {
+		[true] = {
+			["disabled"] = function(self,id)
+				-- Just return the type
+				return GetV(self[key].SaneGetType,id)
+			end,
+			["automatic"] = function(self,id)
+				if RAIL.Other == RAIL.Self then
+					-- If not paired with another RAIL, don't use Mob ID
+					return GetType[true].disabled(self,id)
+				end
+
+				-- Otherwise, use "update"
+				return GetType[true].update(self,id)
+			end,
+			["update"] = function(self,id)
+				-- After the first init, works exactly like "overwrite"
+				return GetType[true].overwrite(self,id)
+			end,
+			["overwrite"] = function(self,id)
+				-- Get the type from disabled
+				local type = GetType[true].disabled(self,id)
+
+				-- Check for change
+				if type ~= self[key].Map[id] then
+					-- Force an update
+					self[key].ForceUpdate = true
+				end
+
+				-- Store it in the MobID table
+				self[key].Map[id] = type
+
+				-- Return the type
+				return type
+			end,
+		},
+		[false] = {
+			["disabled"] = function(self,id)
+				return -2
+			end,
+			["automatic"] = function(self,id)
+				if RAIL.Other == RAIL.Self then
+					-- If not paired with another RAIL, don't use Mob ID
+					return GetType[false].disabled(self,id)
+				end
+
+				-- Otherwise, use enabled
+				return GetType[false].enabled(self,id)
+			end,
+			["enabled"] = function(self,id)
+				local type = self[key].Map[id]
+
+				if type == nil then
+					-- Force an update
+					self[key].ForceUpdate = true
+
+					-- Get from disabled
+					type = GetType[false].disabled(self,id)
+				end
+
+				return type
+			end,
+		},
+	}
+	local GetType_mt = {
+		__call = function(self,self2,id)
+			return self[string.lower(RAIL.State.MobIDMode)](self2,id)
+		end,
+	}
+	setmetatable(GetType[true],GetType_mt)
+	setmetatable(GetType[false],GetType_mt)
+
+	local Update = {
+		-- Valid; save types
+		[true] = function(self)
+			-- Create a simply serialized string (no need for full serialization)
+			local buf = StringBuffer.New()
+				:Append("MobID = {}\n")
+			for key,value in self[key].Map do
+				buf:Append("MobID["):Append(key):Append("] = "):Append(value):Append("\n")
+			end
+
+			-- Save the state to a file
+			local file = io.open(RAIL.State.MobIDFile,"w")
+			if file ~= nil then
+				file:write(buf:Get())
+				file:close()
+
+				RAIL.LogT(55,"MobID table saved to \"{1}\".",RAIL.State.MobIDFile)
+			end
+		end,
+		-- Invalid; load types
+		[false] = function(self)
+			-- Try to load the MobID file into a function
+			local f,err = RAIL.ploadfile(RAIL.State.MobIDFile)
+	
+			if not f then
+				RAIL.LogT(55,"Failed to load MobID file \"{1}\": {2}",RAIL.State.MobIDFile,err)
+				return
+			end
+	
+			-- Protect RAIL from any unwanted code
+			local env = ProtectedEnvironment()
+			setfenv(f,env)
+	
+			-- Run the MobID function
+			f()
+	
+			-- Check for the creation of a MobID table
+			if type(env.MobID) ~= "table" then
+				RAIL.LogT(55,"File \"{1}\" failed to load MobID table.",RAIL.State.MobIDFile)
+				return
+			end
+	
+			-- Log it
+			RAIL.LogT(55,"MobID table loaded from \"{1}\".",RAIL.State.MobIDFile)
+
+			-- Set it to our Map table
+			self[key].Map = env.MobID
+		end,
+	}
+
+	-- Setup RAIL's Mob ID table
+	RAIL.MobID = {
+		[key] = {
+			Update = nil,		-- function; set later
+			GetType = nil,		-- function; set later
+			SaneGetType = nil,	-- number; set later
+			ForceUpdate = false,
+			Map = {}		-- table; map of ID->type
+		},
+	}
+	setmetatable(RAIL.MobID,{
+		__index = function(self,id)
+			-- Make sure we're initialized
+			if not self[key].GetType then
+				return -1
+			end
+
+			-- Return the type
+			return self[key].GetType(self,id)
+		end,
+	})
+
+	local TypeNums = {
+		V_HOMUNTYPE,
+		-- never sane: V_MERTYPE,
+	}
+
+	RAIL.MobID.Init = function(self)
+		-- Check for a sane GetType
+		for i,V_ in TypeNums do
+			if GetV(V_,RAIL.Owner.ID) ~= nil then
+				self[key].SaneGetType = V_
+				break
+			end
+		end
+
+		-- Set valid options (and handlers) for MobIDMode
+		local types = GetType[self[key].SaneGetType ~= nil]
+		RAIL.Validate.MobIDMode[3] = types
+		self[key].GetType = types
+
+		-- Set the update function
+		self[key].Update = Update[self[key].SaneGetType ~= nil]
+
+		-- If the mode is "update", load the data right away
+		if string.lower(RAIL.State.MobIDMode) == "update" then
+			self[key].Update(self)
+		end
+
+		-- Setup a timeout to load/save the MobID file at regular intervals
+		if not RAIL._G.debug then
+			self[key].Timeout = RAIL.Timeouts:New(250,true,function(self)
+				-- Check if an update is forced
+				if not self[key].ForceUpdate then
+					return
+				end
+
+				-- Unset ForceUpdate
+				self[key].ForceUpdate = false
+
+				-- Run the update function
+				return self[key].Update(self)
+			end,self)
+		end
+
+		-- Remove the init function from self
+		self.Init = nil
+	end
+end
 
 -- Actor data-collection
 do
@@ -34,7 +236,7 @@ do
 					:Append(self.X[0]):Append(","):Append(self.Y[0])
 				:Append(")")
 
-			if not RAIL.Mercenary or RAIL.State.UseMobID then
+			if self.Type ~= -2 then
 				buf:Append(", Type:"):Append(self.Type)
 			end
 
@@ -172,126 +374,61 @@ do
 
 	-- A "private" function to initialize new actor types
 	do
-		-- A helper function to reduce redundancy of the hidden Actor[actor_key] functions
-		local setActorType = function(actor,ActorType,PossibleEnemy,FullUpdate)
-			-- Set Actor Type
-			actor.ActorType = ActorType
+		Actor[actor_key] = {
+			[true] = function(self,t,notnpc)
+				-- Set the new type
+				self[actor_key] = t
+				self.Type = t
 
-			-- If not a possible enemy, replace IsEnemy with a false-return function
-			if not PossibleEnemy then
-				actor.IsEnemy = ret_false
-			else
-				if rawget(actor,"IsEnemy") == ret_false then
-					rawset(actor,"IsEnemy",nil)
+				-- Check the type for sanity
+				if (self.ID < 100000 or self.ID > 110000000) and
+					-- Homunculus types
+					((1 <= self.Type and self.Type <= 16) or
+					-- Mercenary types
+					(17 <= self.Type and self.Type <= 46)) and
+					-- Not a portal
+					(self.Type ~= 45 or notnpc)
+				then
+					self.Type = self.Type + 6000
 				end
-			end
+	
+				-- Initialize differently based upon type
+				if self.Type == -1 then
+					-- Unknowns are never enemies, but track data
+					return "Unknown",false,true
+	
+				-- Portals
+				elseif self.Type == 45 then
+					-- Portals are never enemies and shouldn't be tracked
+					return "Portal",false,false
+	
+				-- Player Jobs
+				elseif (0 <= self.Type and self.Type <= 25) or
+					(161 <= self.Type and self.Type <= 181) or
+					(4001 <= self.Type and self.Type <= 4049)
+				then
+					-- Players are potential enemies and should be tracked
+					return "Player",true,true
 
-			-- Track position, motion, etc...
-			actor.FullUpdate = FullUpdate
-		end
-
-		-- A function to get the type of monster
-		local get_type
-		if not RAIL.Mercenary then
-			-- Homunculi are fairly simple
-			get_type = function(id)
-				local type = GetV(V_HOMUNTYPE,id)
-
-				-- Check to update the Mob ID file
-				if RAIL.State.UseMobID and MobID[id] ~= type then
-					MobID[id] = type
-					MobID.Save = true
+				-- NPCs (non-player jobs that are below 1000)
+				elseif self.Type < 1000 then
+					-- NPCs are never enemies and shouldn't be tracked
+					return "NPC",false,false
+	
+				-- All other types
+				else
+					-- All other actors are probably monsters or homunculi
+					return "Actor",true,true
 				end
-
-				return type
-			end
-		else
-			-- Mercenaries require the use of a Mob ID file
-			get_type = function(id)
-				if RAIL.State.UseMobID then
-					-- Check for an existing MobID entry
-					if MobID[id] == nil then
-						-- Try to reload the MobID file
-						MobID:Update()
-					end
-
-					-- Use the MobID, or -2 if it's still not known
-					return MobID[id] or -2
-
-				end
-
-				-- Use -2 if UseMobID is deactivated
-				return -2
-			end
-		end
-
-		-- Default function is able to distinguish monster types
-		Actor[actor_key] = function(self,notnpc)
-			-- Set the new type
-			self[actor_key] = get_type(self.ID)
-			self.Type = self[actor_key]
-
-			-- Check the type for sanity
-			if (self.ID < 100000 or self.ID > 110000000) and
-				-- Homunculus types
-				((1 <= self.Type and self.Type <= 16) or
-				-- Mercenary types
-				(17 <= self.Type and self.Type <= 46)) and
-				-- Not a portal
-				(self.Type ~= 45 or notnpc)
-			then
-				self.Type = self.Type + 6000
-			end
-
-			-- Initialize differently based upon type
-			if self.Type == -1 then
-				-- Unknowns are never enemies, but track data
-				setActorType(self,"Unknown",false,true)
-
-			-- Portals
-			elseif self.Type == 45 then
-				-- Portals are never enemies and shouldn't be tracked
-				setActorType(self,"Portal",false,false)
-
-			-- Player Jobs
-			elseif (0 <= self.Type and self.Type <= 25) or
-				(161 <= self.Type and self.Type <= 181) or
-				(4001 <= self.Type and self.Type <= 4049)
-			then
-				-- Players are potential enemies and should be tracked
-				setActorType(self,"Player",true,true)
-
-			-- NPCs (non-player jobs that are below 1000)
-			elseif self.Type < 1000 then
-				-- NPCs are never enemies and shouldn't be tracked
-				setActorType(self,"NPC",false,false)
-
-			-- All other types
-			else
-				-- All other actors are probably monsters or homunculi
-				setActorType(self,"Actor",true,true)
-			end
-		end
-
-		-- Mercenaries require special handling
-		if RAIL.Mercenary then
-			local homun_changeType = Actor[actor_key]
-
-			-- Specialized type determination for Mercenaries
-			Actor[actor_key] = function(self,notnpc)
-				-- Check if we're using a MobID file
-				if RAIL.State.UseMobID and get_type(self.ID) ~= -2 then
-					return homun_changeType(self)
-				end
-
-				-- Unable to distinguish types, so use other methods to detemine type
-				self[actor_key] = -2
-				self.Type = -2
+			end,
+			[false] = function(self,t,notnpc)
+				self[actor_key] = t
+				self.Type = t
 
 				-- Find players based on ID
 				if self.ID >= 100000 and self.ID <= 110000000 then
 					-- Likely a player
-					setActorType(self,"Player",true,true)
+					return "Player",true,true
 
 				-- NPCs and Portals stand still and are never monsters
 				elseif not notnpc and
@@ -300,14 +437,32 @@ do
 					GetV(V_TARGET,self.ID) == 0
 				then
 					-- Likely an NPC
-					setActorType(self,"NPC",false,false)
+					return "NPC",false,false
 
 				-- All other types
 				else
-					setActorType(self,"Actor",true,true)
+					return "Actor",true,true
 				end
-			end
-		end
+			end,
+		}
+		setmetatable(Actor[actor_key],{
+			__call = function(self,actor,...)
+				-- Get the type from MobID handler
+				local t = RAIL.MobID[actor.ID]
+
+				-- Pass it to the proper function
+				local possibleEnemy
+				actor.ActorType,possibleEnemy,actor.FullUpdate = self[t ~= -2](actor,t,unpack(arg))
+
+				if possibleEnemy then
+					if rawget(actor,"IsEnemy") == ret_false then
+						rawset(actor,"IsEnemy",nil)
+					end
+				else
+					actor.IsEnemy = ret_false
+				end
+			end,
+		})
 	end
 
 	-- Update information about the actor
@@ -322,7 +477,7 @@ do
 		end
 
 		-- Check for a type change
-		if not RAIL.Mercenary and GetV(V_HOMUNTYPE,self.ID) ~= self[actor_key] then
+		if RAIL.MobID[self.ID] ~= self[actor_key] then
 			-- Pre-log
 			local str = tostring(self)
 
@@ -350,6 +505,9 @@ do
 		if not self.ExpireTimeout[1] and not self.Active then
 			self.ExpireTimeout[1] = true
 			RAIL.Timeouts:Insert(self.ExpireTimeout)
+
+			-- Log its reactivation
+			RAIL.LogT(40,"Reactivating {1}.",self)
 		end
 
 		-- Update ignore time
@@ -428,7 +586,7 @@ do
 	local targeted_time = {}
 	Actor.TargetedBy = function(self,actor)
 		-- If something targets an NPC, it isn't an NPC
-		if RAIL.Mercenary and self.Type == -2 and self.ActorType == "NPC" then
+		if self.Type == -2 and self.ActorType == "NPC" then
 			-- Call the private type changing function
 			Actor[actor_key](self,true)
 
