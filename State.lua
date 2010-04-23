@@ -124,6 +124,7 @@ do
 			setfenv = RAIL._G.setfenv,
 
 			-- Memory
+			newproxy = RAIL._G.newproxy,
 			gcinfo = RAIL._G.gcinfo,
 			collectgarbage = RAIL._G.collectgarbage,
 
@@ -134,7 +135,11 @@ do
 			_LOADED = {},
 			loadfile = RAIL.ploadfile,
 			loadstring = RAIL.ploadstring,
-			require = nil,	-- set later
+			require = nil,	-- function created later
+
+			-- Lua modules
+			os = {},	-- proxy metatable set later
+			string = {},	-- proxy metatable set later
 
 			-- Ragnarok API
 			TraceAI = RAIL._G.TraceAI,
@@ -152,21 +157,84 @@ do
 		}
 
 		-- Create a new require function so setfenv on the original function won't result in strange behavior
-		env.require = function(file)
+		env.require = function(virt_file)
+			-- Check if the file has been required before
 			local _G = getfenv(0)
-			if _G._LOADED[file] then
+			if _G._LOADED[virt_file] then
+				return _G._LOADED[virt_file]
+			end
+
+			-- Get LUA_PATH
+			local path
+			if type(_G.LUA_PATH) == "string" then
+				path = _G.LUA_PATH
+			elseif type(_G.os.getenv("LUA_PATH")) == "string" then
+				path = _G.os.getenv("LUA_PATH")
+			else
+				path = "?;?.lua"
+			end
+
+			-- Search each path, separated by ";"
+			local f
+			do
+				local start = 1
+				repeat
+					local pos = _G.string.find(path,";",start,true)
+
+					-- Get the pattern used for finding the file
+					local pattern
+					if pos then
+						pattern = _G.string.sub(path,start,pos)
+						start = pos+1
+					else
+						pattern = _G.string.sub(path,start)
+					end
+
+					-- Replace "?" with virt_file
+					local file = string.gsub(pattern,"%?",virt_file)
+
+					-- Attempt to load the file
+					local new_f,err = _G.loadfile(file)
+
+					if new_f ~= nil then
+						f = new_f
+						break
+					end
+				until pos == nil
+			end
+
+			if type(f) == "function" then
+				-- Copy the previous value of _REQUIREDNAME
+				local prev_name = _G._REQUIREDNAME
+
+				-- Set _REQUIREDNAME
+				_G._REQUIREDNAME = virt_file
+
+				-- Run the function with file contents
+				_G._LOADED[file] = f()
+				if _G._LOADED[virt_file] == nil then
+					_G._LOADED[virt_file] = true
+				end
+
+				-- Reset _REQUIREDNAME
+				_G._REQUIREDNAME = prev_name
+
+				-- Return the result of running the file
 				return _G._LOADED[file]
 			end
 
-			-- TODO: Make this function aware of LUA_PATH
-
-			local f = RAIL.ploadfile(file)
-			if f then
-				_G._LOADED[file] = f() or true
-				return _G._LOADED[file]
-			end
+			-- Fail safely
+			return nil, _G.string.format("could not load package `%s' from path `%s'", virt_file, path)
 		end
 		setfenv(env.require,env)
+
+		-- Proxy the Lua standard library
+		setmetatable(env.os,{
+			__index = RAIL._G.os
+		})
+		setmetatable(env.string,{
+			__index = RAIL._G.string
+		})
 
 		-- return the environment
 		return env
@@ -250,6 +318,24 @@ do
 				return {}
 			end
 
+			return data
+		end,
+		string = function(data,validate)
+			-- Check that it's a string
+			if type(data) ~= "string" then
+				return validate[2]
+			end
+
+			-- Check if there's a table of possible values
+			if type(validate[3]) == "table" then
+				-- Check if the string (in lower case) is in the accepted values table
+				if validate[3][string.lower(data)] ~= nil then
+					-- Return default
+					return validate[2]
+				end
+			end
+
+			-- Data is fine
 			return data
 		end,
 		default = function(data,validate)
@@ -605,109 +691,4 @@ do
 
 		end
 	end)
-end
-
--- MobID
-do
-	-- Mob ID state-file options
-	RAIL.Validate.MobIDFile = {"string","./AI/USER_AI/Mob_ID.lua"}
-	if not RAIL.Mercenary then
-		-- Available options are "overwrite" and "update"
-		-- 	Overwrite will start fresh on each load
-		--	Update will load the existing file and update it as monsters are seen
-		--		* use this mode for teleporting around a map
-		RAIL.Validate.MobIDMode = {"string","overwrite"}
-	end
-
-	-- Update-time private key
-	local priv_key = {}
-
-	-- Default MobID table
-	MobID = {
-		[priv_key] = 0,
-	}
-
-	-- Mercenaries load the Mob ID file
-	MobID.Update = function(self,forced)
-		-- Check if it's too soon to update
-		if not forced and math.abs(self[priv_key] - GetTick()) < 100 then
-			return
-		end
-
-		-- Try to load the MobID file into a function
-		local f,err = RAIL.ploadfile(RAIL.State.MobIDFile)
-
-		if not f then
-			RAIL.LogT(55,"Failed to load MobID file \"{1}\": {2}",RAIL.State.MobIDFile,err)
-			return
-		end
-
-		-- Protect RAIL from any unwanted code
-		local env = ProtectedEnvironment()
-		setfenv(f,env)
-
-		-- Run the MobID function
-		f()
-
-		-- Check for the creation of a MobID table
-		if type(env.MobID) ~= "table" then
-			RAIL.LogT(55,"MobID file \"{1}\" failed to load MobID table.",RAIL.State.MobIDFile)
-			return
-		end
-
-		-- Log it
-		RAIL.LogT(55,"MobID table loaded from \"{1}\".",RAIL.State.MobIDFile)
-
-		-- Add RAIL's MobID update function
-		env.MobID.Update = self.Update
-
-		-- Set the update time
-		env.MobID[priv_key] = GetTick()
-
-		-- Save it as our own MobID
-		MobID = env.MobID
-	end
-
-	if not RAIL.Mercenary then
-		-- Copy the mercenary's version of Update to "Load"
-		MobID.Load = MobID.Update
-
-		-- Homunculi save the MobID file
-		MobID.Update = function(self)
-			-- Check if the MobID file needs to be saved
-			if not self.Save then
-				-- Nothing needs to be saved
-				return
-			else
-				-- Unset the save flag
-				self.Save = nil
-			end
-
-			-- Check if it's too soon to update
-			if math.abs(self[priv_key] - GetTick()) < 100 then
-				return
-			end
-
-			-- Create a simply serialized string (no need for full serialization)
-			local buf = StringBuffer.New()
-				:Append("MobID = {}\n")
-			for key,value in self do
-				if type(key) == "number" then
-					buf:Append("MobID["):Append(key):Append("] = "):Append(value):Append("\n")
-				end
-			end
-
-			-- Save the state to a file
-			local file = io.open(RAIL.State.MobIDFile,"w")
-			if file ~= nil then
-				file:write(buf:Get())
-				file:close()
-
-				RAIL.Log(55,"MobID table saved to %q.",RAIL.State.MobIDFile)
-			end
-
-			-- Set the update time
-			self[priv_key] = GetTick()
-		end
-	end
 end
