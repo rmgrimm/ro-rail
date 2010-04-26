@@ -176,6 +176,14 @@ do
 		[1086] = "Golden Thief Bug",	-- MVP
 		[1087] = "Orc Hero",		-- MVP
 
+		-- ...
+
+		[1177] = "Zenorc",
+
+
+
+		-- Specialized below
+
 		-- Plants / Mushrooms
 		[1078] = "Red Plant",
 		[1079] = "Blue Plant",
