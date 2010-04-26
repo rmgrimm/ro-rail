@@ -575,8 +575,7 @@ do
 				end
 			else
 				-- Make sure the X,Y integers are even
-				x = RoundNumber(x)
-				y = RoundNumber(y)
+				x,y = RoundNumber(x,y)
 
 				if self.Hide then
 					-- Log it
