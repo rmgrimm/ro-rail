@@ -26,6 +26,7 @@ end
 --	Note: View the subversion commit notes for more full changelog.
 --		(This is maintained to regularly bump version number.)
 
+-- 2010-04-26 -- Change FollowDistance to only take effect when Owner is still moving.
 -- 2010-04-26 -- Fixed State.lua not properly protecting RO client from state-file errors; added DisableChase state-file option; Chase fixes
 -- 2010-04-23 -- Tweak to new MobID
 -- 2010-04-23 -- Completed State.lua's require replacement function, added options for strings; redo MobID code

@@ -20,16 +20,18 @@ end
 
 -- Number functions
 do
-	-- Round a number up or down based on the decimal
-	function RoundNumber(n)
-		local floor = math.floor(n)
-		n = n - floor
+	local function do_round(num,idp)
+		local mult = 10^(idp or 0)
+		return math.floor(num * mult + 0.5) / mult
+	end
 
-		if n >= 0.5 then
-			return floor + 1
-		else
-			return floor
-		end
+	-- Round a number up or down based on the decimal
+	function RoundNumber(n,...)
+		-- Ensure we have a number to round
+		if not n then return nil end
+
+		-- Round the number, and recurse
+		return do_round(n),RoundNumber(unpack(arg))
 	end
 end
 

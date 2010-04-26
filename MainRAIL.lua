@@ -531,11 +531,7 @@ function RAIL.AI(id)
 			end
 
 			-- Plot a shorter distance in the same direction
-			x,y = RAIL.Self:AnglePlot(angle,dist)
-
-			-- Make the numbers nice and round
-			x = RoundNumber(x)
-			y = RoundNumber(y)
+			x,y = RoundNumber(RAIL.Self:AnglePlot(angle,dist))
 
 			-- Check if we tried to move here last cycle
 			if x == RAIL.TargetHistory.Move.X and y == RAIL.TargetHistory.Move.Y then

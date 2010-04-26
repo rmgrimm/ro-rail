@@ -54,7 +54,7 @@ do
 			-- Check if the target is within range
 			if dist > range then
 				-- Plot a point that's within range of the target
-				x,y = target:AnglePlot(ticks)(angle,range)
+				x,y = RoundNumber(target:AnglePlot(ticks)(angle,range))
 
 				-- Double-check that the point is closer than current
 				if target:DistanceTo(ticks)(x,y) > dist then
@@ -95,7 +95,7 @@ do
 			local x,y = target:AnglePlot(t_angle,t_dist)
 
 			-- Calculate the distance and angle from that position
-			local angle,dist = RAIL.Self:AngleFrom(0)(x,y)
+			local angle,dist = RAIL.Self:AngleFrom(0)(RoundNumber(x,y))
 
 			-- Check if the position is within range
 			if dist > range then
@@ -104,10 +104,10 @@ do
 				local f_x,f_y = x,y
 
 				-- Plot a point that's closer to it
-				x,y = PlotCircle(x,y,angle,range)
+				x,y = RoundNumber(PlotCircle(f_x,f_y,angle,range))
 
 				-- Double-check that the point is closer than current
-				if PythagDistance(f_x,f_y,x,y) > dist then
+				if PythagDistance(RoundNumber(f_x),RoundNumber(f_y),x,y) > dist then
 					x,y = nil,nil
 				end
 			else
@@ -638,9 +638,7 @@ do
 						ret_n = ret_n + 1
 					else
 						-- Plot a point that will be closer to the owner
-						local x,y = RAIL.Owner:AnglePlot(angle,dist - RAIL.Self.AttackRange)
-						x = RoundNumber(x)
-						y = RoundNumber(y)
+						local x,y = RoundNumber(RAIL.Owner:AnglePlot(angle,dist - RAIL.Self.AttackRange))
 
 						-- Check if this point would be inside MaxDistance
 						local closest_blocks = RAIL.Owner:BlocksTo(x,y)
@@ -757,25 +755,25 @@ do
 		-- Follow behind
 		[false] = {
 			Check = function(self)
-				local max
+				local max = RAIL.State.MaxDistance
 				local moving = false
 
 				-- Check if we were already chasing our owner
 				if RAIL.TargetHistory.Chase[0] == RAIL.Owner.ID then
 					-- Already chasing owner
 
-					max = RAIL.State.FollowDistance
-
 					if
 						RAIL.Owner.Motion[0] == MOTION_MOVE or
 						History.FindMostRecent(RAIL.Owner.Motion,MOTION_MOVE,nil,500)
 					then
+						-- Set the moving flag
 						moving = true
+
+						-- Also chase to a closer distance
+						max = RAIL.State.FollowDistance
 					end
 				else
 					-- Not already chasing owner
-
-					max = RAIL.State.MaxDistance
 
 					if
 						RAIL.Owner.Motion[0] == MOTION_MOVE and
