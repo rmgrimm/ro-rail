@@ -61,20 +61,15 @@ When set to `true`, Aggressive will cause the AI to actively search for new targ
 
 _Note: This option can be changed from inside the Ragnarok Online client by pressing `<ALT+T>` for a homunculus, or `<CTRL+T>` for a mercenary. Changes made by this key-press will be saved._
 
-=== !AssistOwner ===
+=== !AssistOptions ===
 
-*Type:* Boolean
+_Please refer to [StateFileIndex#AssistOptions_Sub-table AssistOptions Sub-table]._
 
-*Default:* `false`
+=== ~~!AssistOther~~ ===
 
-When set to `true`, !AssistOwner will cause the AI to select targets that the owner is hostile against. This includes attacks, skill charge-up, and skill casts against enemy targets.
+_This option was removed in [http://code.google.com/p/ro-rail/source/detail?r=164 revision 164]. Please refer to [StateFileIndex#AssistOptions_Sub-table AssistOptions Sub-table]._
 
-This option takes precedence over all others, including [StateFileIndex#Aggressive Aggressive], [StateFileIndex#AssistOther AssistOther], and [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table] options.
-
-*See also:* [StateFileIndex#AssistOther AssistOther]
-
-=== !AssistOther ===
-
+<wiki:comment>
 *Type:* Boolean
 
 *Default:* `false`
@@ -84,6 +79,23 @@ This option takes precedence over all others, including [StateFileIndex#Aggressi
 This option takes precedence over [StateFileIndex#Aggressive Aggressive] and [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table] options.
 
 *See also:* [StateFileIndex#AssistOwner AssistOwner]
+</wiki:comment>
+
+=== ~~!AssistOwner~~ ===
+
+_This option was removed in [http://code.google.com/p/ro-rail/source/detail?r=164 revision 164]. Please refer to [StateFileIndex#AssistOptions_Sub-table AssistOptions Sub-table]._
+
+<wiki:comment>
+*Type:* Boolean
+
+*Default:* `false`
+
+When set to `true`, !AssistOwner will cause the AI to select targets that the owner is hostile against. This includes attacks, skill charge-up, and skill casts against enemy targets.
+
+This option takes precedence over all others, including [StateFileIndex#Aggressive Aggressive], [StateFileIndex#AssistOther AssistOther], and [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table] options.
+
+*See also:* [StateFileIndex#AssistOther AssistOther]
+</wiki:comment>
 
 === !AttackWhileChasing ===
 
@@ -123,17 +135,32 @@ _Note: Debug levels for various log messages can be found at the top of [http://
 
 _Please refer to [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table]._
 
+=== !DisableChase ===
+
+*Type:* Boolean
+
+*Default:* `false`
+
+When !DisableChase is set to `true`, Rampage AI Lite will not attempt to move toward enemies. This setting removes offensive chase-targeting, and brings movement to a bare minimum. Take note that unlike restricting [StateFileIndex#MaxDistance MaxDistance], this still allows manually-controlled movement within the [StateFileIndex#MaxDistance MaxDistance] area.
+
+_Note: Manually moving is possible on the homunculus with _`<ALT+Right Click>`_, and on the mercenary with _`<ALT+Left Click>`_._
+
+*See also:* [StateFileIndex#MaxDistance MaxDistance]
+
 === !FollowDistance ===
 
 *Type:* Number
 
-*Default:* `7`
+*Default:* `4`
 
-*Minimum Value:* `3`
+*Minimum Value:* `0`
 
-*Maximum Value:* `14`
+*Maximum Value:* _The value of [StateFileIndex#MaxDistance MaxDistance]_
 
-_Not written yet. Check back soon!_
+Once Rampage AI Lite begins following the owner (your character) due to [StateFileIndex#MaxDistance MaxDistance], it will only stop under two conditions:
+  # Your character stops moving; or
+  # Rampage AI Lite manages to get close enough to its owner.
+!FollowDistance indicates how close RAIL needs to be before it decides it is "close enough" and resumes normal operation.
 
 *See also:* [StateFileIndex#MaxDistance MaxDistance]
 
@@ -146,7 +173,7 @@ _Not written yet. Check back soon!_
 !InterceptAlgorithm specifies the method that RAIL should use to chase a moving target. There are four accepted values for this option:
   * `"none"` makes no future estimation, and moves toward the current location.
   * `"sloppy"` estimates where the target will be after 500ms, and moves toward that location.
-  * `"normal"` makes a rough estimation where the target will be by the time the AI reaches it.
+  * `"normal"` makes a rough estimation where the target will be by the time the AI reaches it. This is recommended for regular use.
   * ~~`"advanced"`~~ _This option is not implemented yet._
 
 _Note: This algorithm is also used when chasing after the owner to stay on screen._
@@ -157,13 +184,15 @@ _Note: This algorithm is also used when chasing after the owner to stay on scree
 
 *Default:* `13`
 
-*Minimum Value:* `3`
+*Minimum Value:* `0`
 
 *Maximum Value:* `14`
 
-_Not written yet. Check back soon!_
+This option specifies the maximum distance (in tiles) that Rampage AI Lite should stray. RAIL will still move to attack enemies outside of this area, provided it has a long enough  attack range (eg, archer mercenaries).
 
-*See also:* [StateFileIndex#FollowDistance FollowDistance]
+If Rampage AI Lite detects that your character begins movement that will place it outside of this range, it will spend all resources in attempt to stay within this number of tiles.
+
+*See also:* [StateFileIndex#FollowDistance FollowDistance]; [StateFileIndex#DisableChase DisableChase]
 
 === MobIDFile ===
 
@@ -217,6 +246,22 @@ The !ProfileMark option specifies how often Rampage AI Lite should log profiling
 
 _Please refer to [StateFileIndex#SkillOptions_Sub-table SkillOptions Sub-table]._
 
+=== !TempFriendRange ===
+
+*Type:* Number
+
+*Default:* `-1`
+
+*Minimum Value:* `-1`
+
+*Maximum Value:* `5`
+
+!TempFriendRange sets the distance at which players will be temporarily considered "friends" for the purpose of defending, assisting, and disabling kill-steal protection. Players are considered friends only for the duration that they are within this range, and no permanent record is kept.
+
+This range is counted by tiles from your character, from `0` to `5`. A value of `-1` indicates that no players should ever be counted as temporary friends.
+
+*See also:* [StateFileIndex#AssistOptions_Sub-table AssistOptions Sub-table]; [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table]
+
 === update ===
 
 *Type:* Boolean
@@ -254,6 +299,31 @@ _Note: When both homunculus and mercenary are used together (with UseMobID enabl
 == !ActorOptions Sub-table ==
 
 _Not written yet. Check back soon!_
+
+== !AssistOptions Sub-table ==
+
+The !AssistOptions Sub-table contains three settings related to the way Rampage AI Lite assists other players. Each settings is identical and works to classify the player into one of three groups:
+  * `"Owner"` refers _only_ to Rampage AI Lite's owner; also known as your character.
+  * `"Other"` refers _only_ to a paired homunculus or mercenary. For example, an alchemist's homunculus would refer to the same alchemist's mercenary as `"Other"`, and vice versa.
+    * _Note: This only takes effect when both homunculus and mercenary are running Rampage AI Lite._
+  * `"Friend"` refers to any player that is either:
+    * explicitly marked as a friend, or
+    * is within a certain number of tiles from your character (decided by [StateFileIndex#TempFriendRange TempFriendRange]).
+
+For clarity and simplicity, the following settings are described in terms of the above `"Owner"` category; however, each may be used for any category setting. The possible settings include: 
+  * `"assist"` indicates that Rampage AI Lite should prioritize attacking your target. If multiple categories are set to `"assist"`, Rampage AI Lite will select targets in this order: `"Owner"`, `"Other"`, and `"Friend"`. In other words, the `"Owner"`'s target will take precedence over all others.
+  * `"avoid"` causes Rampage AI Lite to attack your target _only_ when no other enemies are available. If multiple categories are set to `"avoid"`, Rampage AI Lite will group the targets together. In this way, it will avoid all `"avoid"`ed targets together, or none at all.
+  * `"indifferent"` has no effect on the normal targeting routines of Rampage AI Lite. This option is default.
+
+Both `"assist"` and `"avoid"` take precedence over the [StateFileIndex#ActorOptions_Sub-table ActorOptions Sub-table]'s [UnwrittenThing Priority] option and all [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table] options.
+
+As an example, to optimize killing with a high-level pair of homunculus and mercenary:
+Set the following in *both* `homu` and `merc` state-files:
+{{{
+rail_state["AssistOptions"]["Other"] = "avoid"
+}}}
+
+*Warning:* Setting *both* `homu` and `merc` state-file settings of `"Other"` to `"assist"` (as opposed to the above example of `"avoid"`) may result in low-priority targeting or other undesirable behavior.
 
 == !DefendOptions Sub-table ==
 
