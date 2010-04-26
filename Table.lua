@@ -172,9 +172,29 @@ do
 		return t
 	end
 --]]
+	-- Shallow copy a table (just create a new one)
+	function Table.ShallowCopy(t,into,overwrite)
+		local copy = into or {}
 
+		-- Loop through all elements of the table
+		for k,v in t do
+			if copy[k] == nil or overwrite then
+				copy[k] = v
+			end
+		end
+
+		-- Set the same metatable
+		local mt = getmetatable(t)
+		if type(mt) == "table" then
+			setmetatable(copy,mt)
+		end
+
+		return copy
+	end
+
+	-- Deep copy a table (subtables are also copied to new ones)
 	do
-		local function do_copy(v)
+		local function do_deep_copy(v)
 			local t = type(v)
 			if t == "table" then
 				-- Deep copy the table
@@ -194,10 +214,10 @@ do
 
 			-- Loop through all elements of the table
 			for k,v in t do
-				local new_k = do_copy(k)
+				local new_k = do_deep_copy(k)
 
 				if copy[new_k] == nil or overwrite then
-					copy[new_k] = do_copy(v)
+					copy[new_k] = do_deep_copy(v)
 				end
 			end
 

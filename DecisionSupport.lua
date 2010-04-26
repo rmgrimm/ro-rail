@@ -1,8 +1,11 @@
 -- Validation options
 RAIL.Validate.AcquireWhileLocked = {"boolean",false}
 RAIL.Validate.Aggressive = {"boolean",false}
-RAIL.Validate.AssistOwner = {"boolean",false}
-RAIL.Validate.AssistOther = {"boolean",false}
+RAIL.Validate.AssistOptions = {is_subtable = true,
+	Owner = {"string","indifferent",nil},
+	Other = {"string","indifferent",nil},	-- allowed options further down this file
+	Friend = {"string","indifferent",nil},	--	(search "RAIL.Validate.AssistOptions.Owner")
+}
 RAIL.Validate.DisableChase = {"boolean",false}
 RAIL.Validate.DefendOptions = {is_subtable = true,
 	DefendWhilePassive = {"boolean",true},
@@ -146,7 +149,7 @@ do
 			end
 
 			-- Get the intercept algorithm
-			local algo = t[string.lower(RAIL.State.InterceptAlgorithm)] or t.none
+			local algo = t[RAIL.State.InterceptAlgorithm] or t.none
 
 			-- Verify the algorithm is a function
 			if type(algo) ~= "function" then
@@ -245,7 +248,7 @@ do
 			return ret,ret_n,protected
 		end}
 
-		-- Assist owner or other
+		-- Assist/avoid owner or other's target
 		do
 			-- A helper function for most recent offensive motion
 			local function offensive_motion(v) return
@@ -256,52 +259,95 @@ do
 				false
 			end
 
-			-- A helper function to generate sieve to assist a target
-			local function generate_assist(assist,allowed)
-				return function(potentials,n,protected)
-						-- Get the target to assist
-						local assist = assist()
+			-- A helper function to find the target of an actor's offensive motion
+			local function offensive_target(actor)
+				-- Find most recent offensive motion
+				local most_recent = History.FindMostRecent(actor.Motion,offensive_motion,nil,3000)
 
-						-- Check assist target and the allowed function
-						if not assist or not allowed() then
-							return potentials,n,protected
-						end
+				-- If no offensive motion, no target
+				if most_recent == nil then return nil end
 
-						-- Get the most recent offensive move
-						local most_recent = History.FindMostRecent(assist.Motion,offensive_motion,nil,3000)
-
-						-- Ensure most_recent isn't nil
-						if most_recent ~= nil then
-							-- Check the target of that offensive motion
-							local target = assist.Target[most_recent]
-
-							-- Check if that target is an option
-							if RAIL.IsActor(potentials[target]) then
-								-- Return only that actor
-								local ret = { [target] = potentials[target] }
-
-								-- Note: return this table twice, to protect from being removed by non-aggro sieve
-								return ret,1,ret
-							end
-						end
-
-						-- Don't modify potential targets
-						return potentials,n,protected
-				end
+				-- Return the target
+				return Actors[actor.Target[most_recent]]
 			end
 
-			SelectTarget.Attack
-				:Append{"AssistOwner",generate_assist(
-					function() return RAIL.Owner end,
-					function() return RAIL.State.AssistOwner end
-				)}
-				:Append{"AssistOther",generate_assist(
-					function()
-						if RAIL.Other == RAIL.Self then return nil end
-						return RAIL.Other
-					end,
-					function() return RAIL.State.AssistOther end
-				)}
+			-- Functions to sort into categories
+			local sorters = {
+				["indifferent"] = function(assist,avoid,actor)
+					-- Do nothing; indifferent to their target
+				end,
+				["assist"] = function(assist,avoid,actor)
+					local target = offensive_target(actor)
+
+					if target ~= nil then
+						assist:Append(target)
+					end
+				end,
+				["avoid"] = function(assist,avoid,actor)
+					local target = offensive_target(actor)
+
+					if target ~= nil then
+						avoid:Append(target)
+					end
+				end,
+			}
+
+			-- Set the valid options for AssistOptions
+			RAIL.Validate.AssistOptions.Owner[3] = sorters
+			RAIL.Validate.AssistOptions.Other[3] = sorters
+			RAIL.Validate.AssistOptions.Friend[3] = sorters
+
+			SelectTarget.Attack:Append{"AssistAndAvoid",function(potentials,n,protected)
+				local ret,ret_n
+
+				-- First, build tables of assist/avoid (and drop indifferent)
+				local assist = Table.New()
+				local avoid = Table.New()
+
+				do
+					sorters[RAIL.State.AssistOptions.Owner](assist,avoid,RAIL.Owner)
+					sorters[RAIL.State.AssistOptions.Other](assist,avoid,RAIL.Other)
+
+					local f = sorters[RAIL.State.AssistOptions.Friend]
+					for id,actor in RAIL.ActorLists.Friends do
+						f(assist,avoid,actor)
+					end
+				end
+
+				-- Loop through each assist
+				for i=1,assist:GetN() do
+					local target = assist[i]
+					-- Check if the target is a potential
+					if potentials[target.ID] then
+						-- Assist against this target
+						ret = { [target.ID] = target }
+						return ret,1,ret
+					end
+				end
+
+				-- Make a copy of the potentials
+				ret,ret_n = Table.ShallowCopy(potentials),n
+
+				-- Loop through each avoid and remove the target
+				for i=1,avoid:GetN() do
+					local target = avoid[i]
+
+					-- Check if the target is a potential
+					if ret[target.ID] then
+						-- Remove it
+						ret[target.ID] = nil
+						ret_n = ret_n - 1
+					end
+				end
+
+				-- If none are left, don't replace the table
+				if ret_n < 1 then
+					return potentials,n,protected
+				end
+
+				-- Otherwise, return what's left-over
+				return ret,ret_n,protected
+			end}
 		end
 
 		-- Defend owner, other, and friends

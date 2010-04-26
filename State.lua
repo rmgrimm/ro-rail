@@ -365,8 +365,11 @@ do
 
 			-- Check if there's a table of possible values
 			if type(validate[3]) == "table" then
+				-- Convert the string to lower case
+				data = string.lower(data)
+
 				-- Check if the string (in lower case) is in the accepted values table
-				if validate[3][string.lower(data)] ~= nil then
+				if validate[3][data] == nil then
 					-- Return default
 					return validate[2]
 				end

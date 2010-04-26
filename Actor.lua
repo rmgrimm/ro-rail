@@ -109,7 +109,7 @@ do
 	}
 	local GetType_mt = {
 		__call = function(self,self2,id)
-			return self[string.lower(RAIL.State.MobIDMode)][2](self2,id)
+			return self[RAIL.State.MobIDMode][2](self2,id)
 		end,
 	}
 	setmetatable(GetType[true],GetType_mt)
@@ -210,7 +210,7 @@ do
 		self[key].Update = Update[self[key].SaneGetType ~= nil]
 
 		-- Check if the mode is set to load table on startup
-		if types[string.lower(RAIL.State.MobIDMode)][1] then
+		if types[RAIL.State.MobIDMode][1] then
 			self[key].Update(self)
 		end
 
