@@ -252,20 +252,16 @@ function RAIL.AI(id)
 		-- Check if we're terminating this round
 		if not terminate then
 			-- Determine if we need to chase our owner
-			do
-				if ChaseOwner:Check() then
-					RAIL.Target.Chase = RAIL.Owner
-				end
+			if ChaseOwner:Check() then
+				RAIL.Target.Chase = RAIL.Owner
 			end
 
 			-- Begin determining the best skill to use
-			do
-				local skill = SelectSkill:CycleBegin()
+			local skill = SelectSkill:CycleBegin()
 
-				if skill ~= nil then
-					-- An emergency skill, use it and terminate
-					terminate = skill
-				end
+			if skill ~= nil then
+				-- An emergency skill, use it and terminate
+				terminate = skill
 			end
 		end -- not terminate
 
@@ -506,23 +502,27 @@ function RAIL.AI(id)
 		end
 
 		if type(x) == "number" and type(y) == "number" then
-			-- Make sure the move isn't outside MaxDistance
-			local owner_estim = (-1 * math.ceil(RAIL.State.MaxDistance / 4))
-				* RAIL.Owner:EstimateMove()
-			local x_d = RAIL.Owner.X[owner_estim] - x
-			local y_d = RAIL.Owner.Y[owner_estim] - y
-			if x_d > RAIL.State.MaxDistance then
-				x_d = RAIL.State.MaxDistance
-			elseif x_d < -RAIL.State.MaxDistance then
-				x_d = -RAIL.State.MaxDistance
+			if RAIL.Target.Chase ~= RAIL.Owner then
+				-- Make sure the move isn't outside MaxDistance
+				local speed = RAIL.Owner:EstimateMove()
+				local tiles = math.ceil(RAIL.State.MaxDistance / 4)
+				local owner_estim = -1 * tiles * speed
+	
+				local x_d = RAIL.Owner.X[owner_estim] - x
+				local y_d = RAIL.Owner.Y[owner_estim] - y
+				if x_d > RAIL.State.MaxDistance then
+					x_d = RAIL.State.MaxDistance
+				elseif x_d < -RAIL.State.MaxDistance then
+					x_d = -RAIL.State.MaxDistance
+				end
+				if y_d > RAIL.State.MaxDistance then
+					y_d = RAIL.State.MaxDistance
+				elseif y_d < -RAIL.State.MaxDistance then
+					y_d = -RAIL.State.MaxDistance
+				end
+				x = RAIL.Owner.X[owner_estim] - x_d
+				y = RAIL.Owner.Y[owner_estim] - y_d
 			end
-			if y_d > RAIL.State.MaxDistance then
-				y_d = RAIL.State.MaxDistance
-			elseif y_d < -RAIL.State.MaxDistance then
-				y_d = -RAIL.State.MaxDistance
-			end
-			x = RAIL.Owner.X[owner_estim] - x_d
-			y = RAIL.Owner.Y[owner_estim] - y_d
 
 			-- Make sure the target coords are short enough that the server won't ignore them
 			local angle,dist = RAIL.Self:AngleTo(x,y)

@@ -3,6 +3,7 @@ RAIL.Validate.AcquireWhileLocked = {"boolean",false}
 RAIL.Validate.Aggressive = {"boolean",false}
 RAIL.Validate.AssistOwner = {"boolean",false}
 RAIL.Validate.AssistOther = {"boolean",false}
+RAIL.Validate.DisableChase = {"boolean",false}
 RAIL.Validate.DefendOptions = {is_subtable = true,
 	DefendWhilePassive = {"boolean",true},
 	DefendWhileAggro = {"boolean",true},
@@ -10,13 +11,23 @@ RAIL.Validate.DefendOptions = {is_subtable = true,
 	SelfThreshold = {"number",5,0},
 	FriendThreshold = {"number",4,0},
 }
-RAIL.Validate.FollowDistance = {"number", 7, 3, 14}
 RAIL.Validate.InterceptAlgorithm = {"string","normal",
 	-- Note: Don't allow advanced until it's written
 	{ ["none"] = true, ["sloppy"] = true, ["normal"] = true, ["advanced"] = nil, }
 }
-RAIL.Validate.MaxDistance = {"number", 13, 3, 14}
 RAIL.Validate.RunAhead = {"boolean",false}
+
+RAIL.Validate.MaxDistance = {"number", 13, 0, 14}
+RAIL.Validate.FollowDistance = {"number", 4, 0, nil}	-- maximum value will be MaxDistance
+setmetatable(RAIL.Validate.FollowDistance,{
+	__index = function(self,idx)
+		if idx == 4 then
+			return RAIL.State.MaxDistance
+		end
+
+		return nil
+	end,
+})
 
 
 -- Minimum priority (not an option)
@@ -78,7 +89,7 @@ do
 			local t_dist = math.floor(ticks / t_speed)
 
 			-- Bring distance down a bit
-			if t_dist >= 3 then t_dist = 3 end
+			if t_dist >= 4 then t_dist = 4 end
 
 			-- Project where the actor will be after moving that distance
 			local x,y = target:AnglePlot(t_angle,t_dist)
@@ -88,11 +99,15 @@ do
 
 			-- Check if the position is within range
 			if dist > range then
+				-- Save the projected location of the monster
+				--	(future_x, future_y)
+				local f_x,f_y = x,y
+
 				-- Plot a point that's closer to it
 				x,y = PlotCircle(x,y,angle,range)
 
 				-- Double-check that the point is closer than current
-				if target:DistanceTo(ticks)(x,y) > dist then
+				if PythagDistance(f_x,f_y,x,y) > dist then
 					x,y = nil,nil
 				end
 			else
@@ -187,7 +202,7 @@ do
 
 					-- Log it
 					if n ~= n_before then
-						RAIL.LogT(95,"Sieve Table \"{1}\"'s \"{2}\" removed {3} actors; before={4}, after={5}.",
+						RAIL.LogT(95,"\"{1}\" sieve table's \"{2}\" removed {3} actors; before={4}, after={5}.",
 							sieveType,t[1],n_before-n,n_before,n)
 					end
 				end
@@ -555,8 +570,17 @@ do
 	do
 		SelectTarget.Chase = SelectTarget.GenerateSieve("Chase")
 
+		-- Remove all targets if chase targeting is disabled
+		SelectTarget.Chase:Insert(1,{"DisableChase",function(potentials,n,protected)
+			if RAIL.State.DisableChase then
+				return {},0,{}
+			end
+
+			return potentials,n,protected
+		end})
+
 		-- Sieve out targets that are not attack-allowed or skill-allowed
-		SelectTarget.Chase:Insert(1,{"NotAllowed",function(potentials,n,protected)
+		SelectTarget.Chase:Insert(2,{"NotAllowed",function(potentials,n,protected)
 			local ret,ret_n = {},0
 			for id,actor in potentials do
 				if actor:IsAttackAllowed() or actor:IsSkillAllowed(1) then
@@ -569,7 +593,7 @@ do
 		end})
 
 		-- Sieve out targets that are already within range
-		SelectTarget.Chase:Insert(1,{"TooClose",function(potentials,n,protected)
+		SelectTarget.Chase:Insert(3,{"TooClose",function(potentials,n,protected)
 			-- Get attack range
 			local range = RAIL.Self.AttackRange
 
@@ -590,7 +614,7 @@ do
 		end})
 
 		-- Ensure we won't move outside of RAIL.State.MaxDistance
-		SelectTarget.Chase:Insert(2,{"MaxDistance",function(potentials,n,protected)
+		SelectTarget.Chase:Insert(4,{"MaxDistance",function(potentials,n,protected)
 			-- MaxDistance is in block tiles, but attack range is in pythagorean distance...
 			local max_dist = RAIL.State.MaxDistance
 
@@ -670,6 +694,7 @@ end
 -- Chase Owner
 do
 	local private = {
+		-- TODO: Fix RunAhead, and remove this default override
 		Override = false,
 	}
 
@@ -741,7 +766,10 @@ do
 
 					max = RAIL.State.FollowDistance
 
-					if History.FindMostRecent(RAIL.Owner.Motion,MOTION_MOVE,nil,500) then
+					if
+						RAIL.Owner.Motion[0] == MOTION_MOVE or
+						History.FindMostRecent(RAIL.Owner.Motion,MOTION_MOVE,nil,500)
+					then
 						moving = true
 					end
 				else
@@ -751,7 +779,11 @@ do
 
 					if
 						RAIL.Owner.Motion[0] == MOTION_MOVE and
-						RAIL.Self:DistanceTo(-500)(RAIL.Owner) > RAIL.Self:DistanceTo(RAIL.Owner)
+						-- Note: Use DistanceTo() instead of BlocksTo() to determine if the owner is
+						--	moving away from us. (eg, already X delta of 12, but
+						--	moving along Y axis. BlocksTo won't show change, but DistanceTo will)
+						RAIL.Self:DistanceTo(0)(RAIL.Owner.X[-500],RAIL.Owner.Y[-500])
+							> RAIL.Self:DistanceTo(0)(RAIL.Owner)
 					then
 						moving = true
 					end
@@ -813,13 +845,13 @@ do
 	
 			-- Get the state option for this actor
 			local actor = Actors[RAIL.TargetHistory.Chase[0]]
-			local ignore_after = actor.BattleOpts.IgnoreAfterChaseFail
-	
-			-- Use a minimum value of 2000
-			if ignore_after < 2000 and ignore_after >= 0 then
-				actor.BattleOpts.IgnoreAfterChaseFail = 2000
-				ignore_after = 2000
+
+			-- Don't repeatedly ignore
+			if actor:IsIgnored() then
+				return false
 			end
+
+			local ignore_after = actor.BattleOpts.IgnoreAfterChaseFail
 	
 			-- Check if we've been chasing this actor for a while
 			if tick_delta >= ignore_after and ignore_after ~= -1 then
@@ -827,18 +859,18 @@ do
 	
 				-- Get the actor's current position
 				local x,y = actor.X[0],actor.Y[0]
-	
+
 				-- Check if X coordinate has changed recently
 				local x_changed_f = function(v) return v ~= x end
 				local most_recent_x = History.FindMostRecent(actor.X,x_changed_f,nil,tick_delta)
 	
 				-- If it hasn't, then check Y
-				if not most_recent_x or most_recent_x > 2000 then
+				if not most_recent_x or most_recent_x > ignore_after then
 					local y_changed_f = function(v) return v ~= y end
 					local most_recent_y = History.FindMostRecent(actor.Y,y_changed_f,nil,tick_delta)
 	
 					-- If it hasn't, ignore the actor
-					if not most_recent_y or most_recent_y > 2000 then
+					if not most_recent_y or most_recent_y > ignore_after then
 						-- Log it
 						RAIL.LogT(20,"Failed to get closer to {1} (closest = {2}); ignoring.",
 							actor,RAIL.Self:DistanceTo(actor))

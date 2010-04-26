@@ -12,31 +12,41 @@
 -- Options
 RAIL.Validate.SkillOptions = {is_subtable = true,
 	BuffBasePriority = {"number",40},
-	atks_default = {is_subtable = true,
+
+	-- Default options that all skills will have
+	all_default = {is_subtable = true,
 		Enabled = {"boolean",true},
 		Name = {"string",nil},				-- (default set by init function)
-		PriorityOffset = {"number",0},
 		Condition = {"function",nil,unsaved=true},	-- (default set by init function)
 	},
-	buff_default = {is_subtable = true,
-		Enabled = {"boolean",true},
-		Name = {"string",nil},				-- (default set by init function)
+
+	-- Options that all attack skills will have
+	atks_default = {
+		PriorityOffset = {"number",0},
+	},
+
+	-- Options that all buff skills will have
+	buff_default = {
 		MaxFailures = {"number",10,1},
 		PriorityOffset = {"number",0},
 		NextCastTime = {"number",0},
-		Condition = {"function",nil,unsaved=true},	-- (default set by init function)
 	},
-	debuff_default = {is_subtable = true,
-		Enabled = {"boolean",true},
-		Name = {"string",nil},				-- (default set by init function)
+
+	-- Options that all debuff skills will have
+	debuff_default = {
 		MaxFailures = {"number",10,1},
 		PriorityOffset = {"number",0.5},
-		Condition = {"function",nil,unsaved=true},	-- (default set by init function)
+	},
+
+	-- Mental Charge
+	--	(inherits from debuff_default and all_default)
+	[8004] = {
+		MaxFailures = {"number",2},
+		PriorityOffset = {"number",15},
 	},
 	-- Chaotic Blessings
-	[8014] = {is_subtable = true,
-		Enabled = {"boolean",true},
-		Name = {"string",nil},				-- (default set by init function)
+	--	(inherits from all_default)
+	[8014] = {
 		Priority = {"number",50},
 		EstimateFutureTicks = {"number",0,0},
 		OwnerHP = {"number",50,0},
@@ -45,12 +55,8 @@ RAIL.Validate.SkillOptions = {is_subtable = true,
 		SelfHPisPercent = {"boolean",false},
 	},
 	-- Provoke
-	[8232] = {is_subtable = true,
-		Enabled = {"boolean",true},
-		Name = {"string",nil},				-- (default set by init function)
-		MaxFailures = {"number",10,1},
-		PriorityOffset = {"number",0.5},
-		Condition = {"function",nil,unsaved=true},	-- (default set by init function)
+	--	(inherits from debuff_default and all_default)
+	[8232] = {
 		ProvokeOwner = {"boolean",true},
 	},
 }
@@ -135,7 +141,8 @@ do
 			Init = function(skill,validate_default)
 				if validate_default then
 					-- Generate a validation table based on the default
-					RAIL.Validate.SkillOptions[skill.ID] = Table.DeepCopy(validate_default)
+					-- Note: If the table exists, it will copy into it
+					RAIL.Validate.SkillOptions[skill.ID] = Table.DeepCopy(validate_default,RAIL.Validate.SkillOptions[skill.ID],false)
 				end
 
 				-- Generate a sieve
@@ -242,7 +249,8 @@ do
 				do
 					-- Generate the table, based off of default options
 					local validate_byID = RAIL.Validate.SkillOptions
-					validate_byID[skill.ID] = Table.DeepCopy(validate_byID.buff_default)
+					-- Note: If the table exists, it will copy into it
+					validate_byID[skill.ID] = Table.DeepCopy(validate_byID.buff_default,validate_byID[skill.ID],false)
 				end
 
 				-- Ensure that the NextCastTime is sane
@@ -363,7 +371,7 @@ do
 		},
 		Provoke = {
 			Init = function(skill)
-				local ret = skills_key.generic_offensive.Init(skill)
+				local ret = skills_key.generic_offensive.Init(skill,RAIL.Validate.SkillOptions.debuff_default)
 
 				-- TODO: Add sieve for provokes failed
 					-- if the actor hasn't had 10 provoke casts in a row fail against it
@@ -434,9 +442,12 @@ do
 					if skills_key[ai_type].Select then select = true end
 
 					-- Set validation options
-					if byID[skill.ID] then
+					do
+						-- Copy from all_default, but don't overwrite
+						byID[skill.ID] = Table.DeepCopy(byID.all_default,byID[skill.ID],false)
+
 						-- Skill Name
-						if byID[skill.ID].Name then
+						do
 							-- Set the default name
 							byID[skill.ID].Name[2] = AllSkills[skill.ID]:GetName()
 
@@ -447,7 +458,7 @@ do
 						end
 
 						-- Condition
-						if byID[skill.ID].Condition then
+						do
 							-- Set the default condition
 							byID[skill.ID].Condition[2] = AllSkills[skill.ID].Condition
 						end

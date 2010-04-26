@@ -3,6 +3,8 @@ RAIL.Validate.ActorOptions = {is_subtable=true}
 RAIL.Validate.ActorOptions.Default = {is_subtable=true,
 	Name = {"string","unknown"},
 	Friend = {"boolean",false},
+	FreeForAll = {"boolean",false},
+
 	Priority = {"number",0},		-- higher number, higher priority; eg, 10 is higher than 1
 	AttackAllowed = {"boolean",true},
 	DefendOnly = {"boolean",false},
@@ -16,8 +18,8 @@ RAIL.Validate.ActorOptions.Default = {is_subtable=true,
 	-- amount of time to ignore the actor
 	DefaultIgnoreTicks = {"number",10000,1000},
 	-- When chasing fails, ignore actor after this many ticks
-	--	(-1 is never; values below 2000 will use 2000 instead)
-	IgnoreAfterChaseFail = {"number",5000,-1},
+	--	(-1 is never; an exception to the minimum of 2000)
+	IgnoreAfterChaseFail = {"number",5000,2000,nil,{ [-1] = true, },},
 }
 RAIL.Validate.ActorOptions.ByType = {is_subtable=true}
 RAIL.Validate.ActorOptions.ByID = {is_subtable=true}
