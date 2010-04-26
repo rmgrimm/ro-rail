@@ -11,6 +11,9 @@ do
 
 	-- A helper funvtion to calculate values
 	History.SubValue = function(a,b,target)
+		-- If the same, return the same
+		if a[1] == b[1] then return a[1] end
+
 		-- Calculate the time difference ratio of A->B to A->Target
 		local dest_ratio = (b[2] - a[2]) / (target - a[2])
 

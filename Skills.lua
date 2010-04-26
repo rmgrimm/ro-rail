@@ -843,7 +843,7 @@ do
 					HealHands = AllSkills[8001],	-- healing hands
 					Buff = AllSkills[8002],		-- urgent escape
 					--AllSkills[8003],		-- brain surgery (passive)
-					AllSkills[8004],		-- mental charge
+					Buff2 = AllSkills[8004],	-- mental charge
 				}
 			elseif id == AMISTR or id == AMISTR2 or id == AMISTR_H or id == AMISTR_H2 then
 				return {

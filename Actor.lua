@@ -27,7 +27,7 @@ do
 			["automatic"] = {
 				false,
 				function(self,id)
-					if RAIL.Other == RAIL.Self then
+					if RAIL.Other == RAIL.Self or RAIL.Other == nil then
 						-- If not paired with another RAIL, don't use Mob ID
 						return GetType[true].disabled[2](self,id)
 					end
@@ -73,7 +73,7 @@ do
 			["automatic"] = {
 				false,
 				function(self,id)
-					if RAIL.Other == RAIL.Self then
+					if RAIL.Other == RAIL.Self or RAIL.Other == nil then
 						-- If not paired with another RAIL, don't use Mob ID
 						return GetType[false].disabled[2](self,id)
 					end
@@ -282,6 +282,9 @@ do
 
 	-- Private key for keeping closures
 	local closures = {}
+
+	-- Private key of TargetOf, to keep the time of last table update
+	local targeted_time = {}
 
 	-- Position tracking uses a specialty "diff" function
 	local pos_diff = function(a,b)
@@ -615,7 +618,6 @@ do
 	end
 
 	-- Track when other actors target this one
-	local targeted_time = {}
 	Actor.TargetedBy = function(self,actor)
 		-- If something targets an NPC, it isn't an NPC
 		if self.Type == -2 and self.ActorType == "NPC" then
@@ -1039,7 +1041,7 @@ do
 			if not targ:IsEnemy() then
 
 				-- Determine if the target has been updated recently
-				if math.abs(targ.LastUpdate - GetTick()) < 50 then
+				if targ.Active then
 					-- It would be kill stealing
 					return true
 				end
@@ -1048,7 +1050,7 @@ do
 		end
 
 		-- Check if this actor is the target of anything
-		local i
+		-- Note: TargetOf table will always be fresh by the time this is called
 		for i=1,self.TargetOf:Size(),1 do
 			targ = self.TargetOf[i]
 
@@ -1058,7 +1060,7 @@ do
 				targ ~= RAIL.Self and				-- not ourself
 				not targ:IsEnemy() and				-- not an enemy
 				not targ:IsFriend() and				-- not a friend
-				math.abs(GetTick() - targ.LastUpdate) < 50	-- updated recently
+				true
 			then
 				-- Likely kill-stealing
 				return true

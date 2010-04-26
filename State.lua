@@ -72,15 +72,33 @@ end
 
 -- Loadfile protection
 do
+	RAIL.pcall = RAIL._G.pcall
+	if type(RAIL.pcall) ~= "function" then
+		if type(RAIL._G.xpcall) ~= "function" then
+			-- No protection possible
+			RAIL.pcall = function(f,...)
+				return true,f(unpack(arg))
+			end
+		else
+			-- Protect using xpcall
+			RAIL.pcall = function(f,...)
+				local f_closure = function()
+					return f(unpack(arg))
+				end
+
+				local err_f = function(obj)
+					return obj
+				end
+
+				return xpcall(f_closure, err_f)
+			end
+		end
+	end
+
 	-- Protected loadfile
 	RAIL.ploadfile = function(file)
-		-- Check for pcall
-		if RAIL._G.pcall == nil or type(RAIL._G.pcall) ~= "function" then
-			return RAIL._G.loadfile(file)
-		end
-
 		-- Run a protected call for loadfile
-		local ret1,ret2,ret3 = pcall(RAIL._G.loadfile,file)
+		local ret1,ret2,ret3 = RAIL.pcall(RAIL._G.loadfile,file)
 	
 		-- Check for success
 		if ret1 then
@@ -94,13 +112,8 @@ do
 
 	-- Protected loadstring
 	RAIL.ploadstring = function(string)
-		-- Check for pcall
-		if RAIL._G.pcall == nil or type(RAIL._G.pcall) ~= "function" then
-			return RAIL._G.loadstring(string)
-		end
-
 		-- Run a protected call for loadstring
-		local ret1,ret2,ret3 = pcall(RAIL._G.loadstring,string)
+		local ret1,ret2,ret3 = RAIL.pcall(RAIL._G.loadstring,string)
 
 		-- Check for success
 		if ret1 then
@@ -124,9 +137,17 @@ do
 			setfenv = RAIL._G.setfenv,
 
 			-- Memory
-			newproxy = RAIL._G.newproxy,
-			gcinfo = RAIL._G.gcinfo,
 			collectgarbage = RAIL._G.collectgarbage,
+			gcinfo = RAIL._G.gcinfo,
+			newproxy = RAIL._G.newproxy,
+
+			-- Misc Lua API
+			tostring = RAIL._G.tostring,
+			type = RAIL._G.type,
+			unpack = RAIL._G.unpack,
+
+			pcall = RAIL._G.pcall,
+			xpcall = RAIL._G.xpcall,
 
 			-- The ^ operator function
 			__pow = RAIL._G.__pow,
@@ -159,17 +180,16 @@ do
 		-- Create a new require function so setfenv on the original function won't result in strange behavior
 		env.require = function(virt_file)
 			-- Check if the file has been required before
-			local _G = getfenv(0)
-			if _G._LOADED[virt_file] then
-				return _G._LOADED[virt_file]
+			if _LOADED[virt_file] then
+				return _LOADED[virt_file]
 			end
 
 			-- Get LUA_PATH
 			local path
-			if type(_G.LUA_PATH) == "string" then
-				path = _G.LUA_PATH
-			elseif type(_G.os.getenv("LUA_PATH")) == "string" then
-				path = _G.os.getenv("LUA_PATH")
+			if type(LUA_PATH) == "string" then
+				path = LUA_PATH
+			elseif type(os.getenv("LUA_PATH")) == "string" then
+				path = os.getenv("LUA_PATH")
 			else
 				path = "?;?.lua"
 			end
@@ -178,23 +198,24 @@ do
 			local f
 			do
 				local start = 1
+				local pos
 				repeat
-					local pos = _G.string.find(path,";",start,true)
+					pos = string.find(path,";",start,true)
 
 					-- Get the pattern used for finding the file
 					local pattern
 					if pos then
-						pattern = _G.string.sub(path,start,pos)
+						pattern = string.sub(path,start,pos-1)
 						start = pos+1
 					else
-						pattern = _G.string.sub(path,start)
+						pattern = string.sub(path,start)
 					end
 
 					-- Replace "?" with virt_file
 					local file = string.gsub(pattern,"%?",virt_file)
 
 					-- Attempt to load the file
-					local new_f,err = _G.loadfile(file)
+					local new_f,err = loadfile(file)
 
 					if new_f ~= nil then
 						f = new_f
@@ -205,26 +226,36 @@ do
 
 			if type(f) == "function" then
 				-- Copy the previous value of _REQUIREDNAME
-				local prev_name = _G._REQUIREDNAME
+				local prev_name = _REQUIREDNAME
 
 				-- Set _REQUIREDNAME
-				_G._REQUIREDNAME = virt_file
+				_REQUIREDNAME = virt_file
 
-				-- Run the function with file contents
-				_G._LOADED[file] = f()
-				if _G._LOADED[virt_file] == nil then
-					_G._LOADED[virt_file] = true
+				-- Set the function environment
+				setfenv(f,getfenv(1))
+
+				-- Run a protected call
+				local pret = { pcall(f) }
+
+				-- Check the return
+				if pret[1] then
+					_LOADED[virt_file] = pret[2]
+					if _LOADED[virt_file] == nil then
+						_LOADED[virt_file] = true
+					end
+				else
+					return nil, string.format("could not load package `%s': %s", virt_file, pret[2])
 				end
 
 				-- Reset _REQUIREDNAME
-				_G._REQUIREDNAME = prev_name
+				_REQUIREDNAME = prev_name
 
 				-- Return the result of running the file
-				return _G._LOADED[file]
+				return _LOADED[virt_file]
 			end
 
 			-- Fail safely
-			return nil, _G.string.format("could not load package `%s' from path `%s'", virt_file, path)
+			return nil, string.format("could not load package `%s' from path `%s'", virt_file, path)
 		end
 		setfenv(env.require,env)
 
@@ -296,6 +327,12 @@ do
 			if type(data) ~= "number" then
 				-- Not a number, so use default instead
 				return validate[2]
+			end
+
+			-- Check if there's an exceptions table, and this value is in it
+			if type(validate[5]) == "table" and validate[5][data] then
+				-- It's acceptable
+				return data
 			end
 
 			-- Validate that the number is greater or equal to the minimum
@@ -552,10 +589,16 @@ do
 
 	-- Load function
 	rawset(RAIL.State,"Load",function(self,forced)
-		-- Load file for both ourself and other
+		-- Setup an environment for homu state-file and merc state-file
+		local self_env = ProtectedEnvironment()
+		local alt_env = ProtectedEnvironment()
+
+		-- Load the files into both
+		local self_ret,self_err = self_env.require(filename)
+		local alt_ret,alt_err = alt_env.require(alt_filename)
+
+		-- Use self-filename as default "from_file" (for logging)
 		local from_file = filename
-		local f_self,err_self = RAIL.ploadfile(filename)
-		local f_alt,err_alt = RAIL.ploadfile(alt_filename)
 
 		-- Get the other's name for logging purposes
 		local alt_name = "mercenary"
@@ -564,40 +607,36 @@ do
 		end
 
 		-- Check if self is nil, but we're forcing a load
-		if f_self == nil and forced then
+		if not self_ret and forced then
 			-- Log it
-			RAIL.LogT(3,"Failed to load state from \"{1}\": {2}",filename,err_self)
+			RAIL.LogT(3,"Failed to load state from \"{1}\": {2}",filename,self_err)
 			RAIL.LogT(3," --> Trying from {1}'s state file.",alt_name)
 
 			-- Check if alt is also nil
-			if f_alt == nil then
+			if not alt_ret then
 				-- Log it
-				RAIL.LogT(3,"Failed to load state from \"{1}\": {2}",alt_filename,err_alt)
+				RAIL.LogT(3,"Failed to load state from \"{1}\": {2}",alt_filename,alt_err)
 
 				-- Can't load, just return
 				return
 			end
 
 			-- Load from the alternate state file
-			f_self = f_alt
+			self_env = alt_env
+			self_ret = alt_ret
 			from_file = alt_filename
 		end
 
 		-- First, load alternate state, to see if we can find RAIL.Other's ID
 		-- Note: No reason to search for RAIL.Other if we don't have RAIL.Owner yet
-		if f_alt ~= nil and RAIL.Owner then
-			-- Get a clean, safe environment to load into
-			local f_G = ProtectedEnvironment()
-			setfenv(f_alt,f_G)
-
-			-- Run the function
-			f_alt()
+		if alt_ret and alt_env ~= self_env and RAIL.Owner then
+			local f_G = alt_env
 
 			-- Try to find the other's ID
 			local id
 			if
 				type(f_G.rail_state) == "table" and
-				type(f_G.rail_state.Information) == "table" and 
+				type(f_G.rail_state.Information) == "table" and
 				type(f_G.rail_state.Information.OwnerID) == "number" and
 				f_G.rail_state.Information.OwnerID == RAIL.Owner.ID and
 				type(f_G.rail_state.Information.SelfID) == "number"
@@ -641,13 +680,8 @@ do
 		end
 
 		-- Load our state
-		if f_self ~= nil then
-			-- Get a clean environment
-			local f_G = ProtectedEnvironment()
-			setfenv(f_self,f_G)
-
-			-- Run the contents of the state file
-			f_self()
+		if self_ret then
+			local f_G = self_env
 
 			-- See if it left us with a workable rail_state object
 			local rail_state = f_G.rail_state
