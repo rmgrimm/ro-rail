@@ -21,19 +21,19 @@ RAIL.Validate.SkillOptions = {is_subtable = true,
 	},
 
 	-- Options that all attack skills will have
-	atks_default = {
+	atks_default = {is_subtable = true,
 		PriorityOffset = {"number",0},
 	},
 
 	-- Options that all buff skills will have
-	buff_default = {
+	buff_default = {is_subtable = true,
 		MaxFailures = {"number",10,1},
 		PriorityOffset = {"number",0},
 		NextCastTime = {"number",0},
 	},
 
 	-- Options that all debuff skills will have
-	debuff_default = {
+	debuff_default = {is_subtable = true,
 		MaxFailures = {"number",10,1},
 		PriorityOffset = {"number",0.5},
 	},

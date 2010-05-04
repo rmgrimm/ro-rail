@@ -171,23 +171,61 @@ do
 
 		-- Check actor-tracking
 		if not GetV then
-			GetV = function(v,id)
-				if id == -1 then
-					return -1,-1
-				else
-					return 0,0
-				end
-			end
+			GetV = {
+				default = function(id)
+					if id == -1 then
+						return -1,-1
+					else
+						return 0,0
+					end
+				end,
+				[0] = function(id)	-- V_OWNER
+					return 0
+				end,
+				[7] = function(id)	-- V_HOMUNTYPE
+					if RAIL.Mercenary then
+						return
+					end
+
+					-- owner
+					if id == 0 then
+						-- Alchemist
+						return 18
+					end
+
+					-- self
+					if id == 1 then
+						-- evolved alternates:
+						-- Lif = 13
+						-- Amistr = 14
+						-- Filir = 15
+						-- Vani = 16
+						return 13
+					end
+
+					return -1
+				end,
+				[12] = function(id)	-- V_MERTYPE
+					if not RAIL.Mercenary then
+						return
+					end
+
+					return 1
+				end,
+			}
+			setmetatable(GetV,{
+				__call = function(self,v,id)
+					return (self[v] or self.default)(id)
+				end,
+			})
 			TraceAI("GetV() not supplied, undefined behavior may occur.")
 			sane = false
 		end
 		if not GetActors then
 			GetActors = function()
 				return {
-					0,
-					1,
-					--id,		-- self
-					--GetV(0,id),	-- owner: GetV(V_OWNER,id)
+					0,		-- owner
+					1,		-- self
 				}
 			end
 			TraceAI("GetActors() not supplied, undefined behavior may occur.")
