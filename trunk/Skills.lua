@@ -838,13 +838,16 @@ do
 		end
 	else
 		function GetSkillList(id)
-			if id == LIF or id == LIF2 or id == LIF_H or id == LIF_H2 then
+			if id == LIF or id == LIF2 then
 				return {
 					HealHands = AllSkills[8001],	-- healing hands
 					Buff = AllSkills[8002],		-- urgent escape
 					--AllSkills[8003],		-- brain surgery (passive)
-					Buff2 = AllSkills[8004],	-- mental charge
 				}
+			elseif id == LIF_H or id == LIF_H2 then
+				local ret = GetSkillList(LIF)
+				ret.Buff2 = AllSkills[8004]		-- mental charge
+				return ret
 			elseif id == AMISTR or id == AMISTR2 or id == AMISTR_H or id == AMISTR_H2 then
 				return {
 					Defense = AllSkills[8005],	-- castling
