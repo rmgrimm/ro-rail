@@ -289,7 +289,7 @@ For homunculi, this means that Rampage AI Lite will write a mapping of IDs into 
 
 For mercenaries, this means that Rampage AI Lite will load a table from the [StateFileIndex#MobIDFile MobID File] and use it to distinguish actor type IDs. When used properly, this enables mercenaries to distinguish different types of monsters, players, etc. This file is only loaded when a new actor ID is encountered.
 
-*Warning:* This ID-mapping table is specific for each Ragnarok Online map (eg, moc_fild01). An outdated MobID file, or one generated for a different Ragnarok map will cause unexpected behavior!
+*Warning:* This ID-mapping table is specific for each Ragnarok Online map (eg, moc_fild01) for each server (eg, iRO Ymir or iRO Valkyrie). An outdated MobID file, or one generated for a different Ragnarok map/server will cause unexpected behavior!
 
 _Note: When both homunculus and mercenary are used together (with UseMobID enabled for both), the MobID file will always be proper and usable._
 
@@ -298,7 +298,181 @@ _Note: When both homunculus and mercenary are used together (with UseMobID enabl
 
 == !ActorOptions Sub-table ==
 
+The !ActorOptions Sub-table contains what is sometimes referred to as "monster tactics". In order to determine the appropriate course of action, Rampage AI Lite separates options into three categories: `"Default"`, `"ByType"`, and `"ByID"`. Each category accepts identical options and can refer to both players and monsters. The categories are described in more detail below:
+
+  * `"ByID"` is the most specific category, and differentiates actors by their specific ID in Ragnarok. At most, ByID will refer to only one actor at a time. Because character IDs remain the same across all maps, this option is most useful when defining options for a specific player.
+  * `"ByType"` refers to actors by their type, which can be found in various online databases. For example, all non-rebirthed alchemists are of type `18` while a poring has type `1002`. It is important to remember that while many monsters may share the same name, they may have different types. A prominent example of this is with summoned mobs. As an example: [http://ro.amesani.org/db/monster-info/1120/ Ghostring] spawns with a different type of Giant Whisper than he later summons.
+    * When using [http://ro.amesani.org/db/monster-info/ Amesani RO - Monster Info], the monster ID will appear in the URL. With the example of Abysmal Knight, `http://ro.amesani.org/db/monster-info/`*1219*`/` shows the type as `1219`.
+    * _Note: Without help from a [StateFileIndex#MobIDFile Mob-ID File], Mercenaries are unable to distinguish monsters by type. Please refer to [StateFileIndex#MobIDMode MobIDMode] for information on creating and using Mob-ID files._
+  * `"Default"` contains the base options, used as defaults for all actors.
+
+When a specific option is not found under a `"ByID"` table, Rampage AI Lite will then check `"ByType"`. If the option is not found in `"ByType"`, then the `"Default"` option will used. In this way, `"ByID"` options override `"ByType"`, which override `"Default"`.
+
+For example:
+{{{
+rail_state["ActorOptions"]["Default"] = {}
+rail_state["ActorOptions"]["Default"]["Priority"] = 0
+rail_state["ActorOptions"]["ByType"][123] = {}
+rail_state["ActorOptions"]["ByType"][123]["Priority"] = 15
+rail_state["ActorOptions"]["ByID"][1234] = {}
+rail_state["ActorOptions"]["ByID"][1234]["Priority"] = 50
+}}}
+In this example, a monster with ID `1234` would have a [StateFileIndex#Priority Priority] value of 50, regardless of type. All monsters of type `123` would have a [StateFileIndex#Priority Priority] of 15. All _other_ monsters would have a [StateFileIndex#Priority Priority] of 0.
+
+*Warning:* Note that the first line for any `"ByType"` or `"ByID"` value must set the ID/type to `{}`. *This is very important* because it is required for proper [http://www.lua.org/ Lua]-file interpretation. Failure to include this will prevent Rampage AI Lite from loading any state-file settings, and RAIL will subsequently generate a new state-file from scratch. Please see the [ActorOptionsExample ActorOptions Example State-file] for more examples.
+
+=== !AttackAllowed ===
+
+*Type:* Boolean
+
+*Default:* `true`
+
+!AttackAllowed specifies whether Rampage AI Lite should use physical attacks against a target. When both !AttackAllowed and [StateFileIndex#SkillsAllowed SkillsAllowed] are set to `false`, Rampage AI Lite will never target the specified monster or monsters.
+
+_Note: When actor type can be distinguished (eg, on a homunculus), monsters of type `1555`, `1575`, `1579`, `1589`, and `1590` automatically use default setting of `false`. These are the 5 alchemist-summoned support monsters._
+
+*See also:* [StateFileIndex#SkillsAllowed SkillsAllowed]
+
+=== !DefaultIgnoreTicks ===
+
+*Type:* Number
+
+*Default:* `10000`
+
+*Minimum Value:* `1000`
+
 _Not written yet. Check back soon!_
+
+=== !DefendOnly ===
+
+*Type:* Boolean
+
+*Default:* `false`
+
+This option indicates that an actor should only be considered a target if it is attacking any of the following:
+  * The homunculus or mercenary that Rampage AI Lite is controlling,
+  * The owner of this homunculus or mercenary,
+  * The owner's other AI (if any),
+    * For a homunculus, this is the owner's mercenary.
+    * For a mercenary, this is the owner's homunculus.
+  * Any player that is marked as a [StateFileIndex#Friend Friend] by the [StateFileIndex#ActorOptions_Sub-table ActorOptions Sub-table]'s `"ByID"`, `"ByType"`, or `"Default"` categories, or
+  * Any player that is within a range specified by [StateFileIndex#TempFriendRange TempFriendRange].
+
+*See also:* [StateFileIndex#AttackAllowed AttackAllowed]; [StateFileIndex#SkillsAllowed SkillsAllowed]
+
+=== !FreeForAll ===
+
+*Type:* Boolean
+
+*Default:* `false`
+
+!FreeForAll indicates that specified target(s) should have kill-steal prevention code disabled. This is not recommended against non-MVP monsters, as players are often held accountable for their AI's behavior.
+
+=== Friend ===
+
+*Type:* Boolean
+
+*Default:* `false`
+
+The Friend option indicates that a player should be considered a friend. This option has no effect for monsters or other non-player actors.
+
+_Note: It is not advised to set this for the `"Default"` category of [StateFileIndex#ActorOptions_Sub-table ActorOptions] because it will circumvent kill-steal prevention for all monsters._
+
+=== !IgnoreAfterChaseFail ===
+
+*Type:* Number
+
+*Default:* `5000`
+
+*Minimum Value:* `2000`
+
+*Exceptional Values:* `-1` to disable
+
+_Not written yet. Check back soon!_
+
+=== !MaxCastsAgainst ===
+
+*Type:* Number
+
+*Default:* `-1`
+
+*Minimum Value:* `-1`
+
+!MaxCastsAgainst sets the maximum number of times that Rampage AI Lite should cast an attack skill (eg, Caprice or Pierce) against the specified target(s). A value of `-1` indicates "infinity"; in other words, `-1` means that there is no limit to the number of times it should cast against the target(s).
+
+_Note: If the target dies or moves off-screen, Rampage AI Lite will reset its count of casts against that target. Under certain circumstances, this may result in more casts against one target than !MaxCastsAgainst allows._
+
+*See also:* [StateFileIndex#MaxSkillLevel MaxSkillLevel]; [StateFileIndex#MinSkillLevel MinSkillLevel]; [StateFileIndex#SkillsAllowed SkillsAllowed]; [StateFileIndex#TicksBetweenSkills TicksBetweenSkills]
+
+=== !MaxSkillLevel ===
+
+*Type:* Number
+
+*Default:* `5` for homunculi; `10` for mercenaries
+
+*Minimum Value:* `1`
+
+*Maximum Value:* `5` for homunculi; `10` for mercenaries
+
+!MaxSkillLevel determines the maximum level of skill to be used against the specified target(s).
+
+*See also:* [StateFileIndex#MaxCastsAgainst MaxCastsAgainst]; [StateFileIndex#MinSkillLevel MinSkillLevel]; [StateFileIndex#SkillsAllowed SkillsAllowed]; [StateFileIndex#TicksBetweenSkills TicksBetweenSkills]
+
+=== !MinSkillLevel ===
+
+*Type:* Number
+
+*Default:* `1`
+
+*Minimum Value:* `1`
+
+*Maximum Value:* `5` for homunculi; `10` for mercenaries
+
+!MinSkillLevel determines the minimum level of skill to be used against the specified target(s).
+
+*See also:* [StateFileIndex#MaxCastsAgainst MaxCastsAgainst]; [StateFileIndex#MaxSkillLevel MaxSkillLevel]; [StateFileIndex#SkillsAllowed SkillsAllowed]; [StateFileIndex#TicksBetweenSkills TicksBetweenSkills]
+
+=== Name ===
+
+*Type:* String
+
+*Default:* `"unknown"`
+
+_Not written yet. Check back soon!_
+
+=== Priority ===
+
+*Type:* Number
+
+*Default:* `0`
+
+Priority specifies a numerical value assigned to each target. After evaluating each potential target, Rampage AI Lite selects the target with the highest value. If multiple targets share the same value, Rampage AI Lite will select the closest among them. This follows the idea that "highest number is highest priority" instead of the opposing idea that "number one is first priority".
+
+_Note: Certain options (such as the [StateFileIndex#AssistOptions_Sub-table AssistOptions Sub-table] options) will reduce the list of potential targets before Rampage AI Lite evaluates each target's Priority value._
+
+=== !SkillsAllowed ===
+
+*Type:* Boolean
+
+*Default:* `true`
+
+!SkillsAllowed specifies whether Rampage AI Lite should use skills against a target. When both !SkillsAllowed and [StateFileIndex#AttackAllowed AttackAllowed] are set to `false`, Rampage AI Lite will never target the specified monster(s).
+
+_Note: When actor type can be distinguished (eg, on a homunculus), monsters of type `1078`-`1085`, `1555`, `1575`, `1579`, `1589`, and `1590` automatically use default setting of `false`. These include the 5 alchemist-summoned support monsters and inactive plant monsters (eg, "Red Plant" or "Black Mushroom")._
+
+*See also:* [StateFileIndex#AttackAllowed AttackAllowed]; [StateFileIndex#MaxCastsAgainst MaxCastsAgainst]; [StateFileIndex#MaxSkillLevel MaxSkillLevel]; [StateFileIndex#MinSkillLevel MinSkillLevel]; [StateFileIndex#SkillOptions_Sub-table SkillOptions Sub-table]; [StateFileIndex#TicksBetweenSkills TicksBetweenSkills]
+
+=== !TicksBetweenSkills ===
+
+*Type:* Number
+
+*Default:* `0`
+
+*Minimum Value:* `0`
+
+_Not written yet. Check back soon!_
+
+*See also:* [StateFileIndex#MaxCastsAgainst MaxCastsAgainst]; [StateFileIndex#MaxSkillLevel MaxSkillLevel]; [StateFileIndex#MinSkillLevel MinSkillLevel]; [StateFileIndex#SkillsAllowed SkillsAllowed]
 
 == !AssistOptions Sub-table ==
 
@@ -307,7 +481,7 @@ The !AssistOptions Sub-table contains three settings related to the way Rampage 
   * `"Other"` refers _only_ to a paired homunculus or mercenary. For example, an alchemist's homunculus would refer to the same alchemist's mercenary as `"Other"`, and vice versa.
     * _Note: This only takes effect when both homunculus and mercenary are running Rampage AI Lite._
   * `"Friend"` refers to any player that is either:
-    * explicitly marked as a friend, or
+    * explicitly marked as a [StateFileIndex#Friend Friend], or
     * is within a certain number of tiles from your character (decided by [StateFileIndex#TempFriendRange TempFriendRange]).
 
 For clarity and simplicity, the following settings are described in terms of the above `"Owner"` category; however, each may be used for any category setting. The possible settings include: 
@@ -315,7 +489,7 @@ For clarity and simplicity, the following settings are described in terms of the
   * `"avoid"` causes Rampage AI Lite to attack your target _only_ when no other enemies are available. If multiple categories are set to `"avoid"`, Rampage AI Lite will group the targets together. In this way, it will avoid all `"avoid"`ed targets together, or none at all.
   * `"indifferent"` has no effect on the normal targeting routines of Rampage AI Lite. This option is default.
 
-Both `"assist"` and `"avoid"` take precedence over the [StateFileIndex#ActorOptions_Sub-table ActorOptions Sub-table]'s [UnwrittenThing Priority] option and all [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table] options.
+Both `"assist"` and `"avoid"` take precedence over the [StateFileIndex#ActorOptions_Sub-table ActorOptions Sub-table]'s [StateFileIndex#Priority Priority] option and all [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table] options.
 
 As an example, to optimize killing with a high-level pair of homunculus and mercenary:
 Set the following in *both* `homu` and `merc` state-files:
