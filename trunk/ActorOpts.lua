@@ -11,7 +11,7 @@ RAIL.Validate.ActorOptions.Default = {is_subtable=true,
 
 	SkillsAllowed = {"boolean",true},
 	MinSkillLevel = {"number",1,1,10},
-	MaxSkillLevel = {"number",5,1,10},
+	MaxSkillLevel = {"number",10,1,10},
 	TicksBetweenSkills = {"number",0,0},
 	MaxCastsAgainst = {"number",-1,-1},	-- -1 is unlimited
 
@@ -27,6 +27,7 @@ RAIL.Validate.ActorOptions.ByID = {is_subtable=true}
 -- Max homunculus skill level is 5
 if not RAIL.Mercenary then
 	RAIL.Validate.ActorOptions.Default.MinSkillLevel[4] = 5
+	RAIL.Validate.ActorOptions.Default.MaxSkillLevel[2] = 5
 	RAIL.Validate.ActorOptions.Default.MaxSkillLevel[4] = 5
 end
 
