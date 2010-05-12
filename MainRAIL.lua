@@ -25,6 +25,7 @@ require "Commands"		-- depends on Table
 require "DecisionSupport"	-- depends on Table
 require "Skills"		-- depends on Table
 require "SkillSupport"		-- depends on Actor
+require "TargetingSupport"	-- depends on Table
 
 -- State validation options
 RAIL.Validate.Information = {is_subtable = true,
@@ -78,14 +79,14 @@ function AI(id)
 	--	Note: Redundant, but will show up in the log now
 	RAIL.State:Load(true)
 
-	-- Initialize MobID support
-	RAIL.MobID:Init()
-
 	-- Store the initialization time
 	RAIL.State.Information.InitTime = GetTick()
 	RAIL.State.Information.OwnerID = RAIL.Owner.ID
 	RAIL.State.Information.SelfID = id
 	RAIL.State.Information.RAILVersion = RAIL.FullVersion
+
+	-- Initialize MobID support
+	RAIL.MobID:Init()
 
 	-- Get Owner and Self
 	RAIL.Owner = Actors[GetV(V_OWNER,id)]
@@ -94,6 +95,9 @@ function AI(id)
 		RAIL.Owner.BattleOpts.Name = RAIL.State.Information.OwnerName
 	end
 	RAIL.Self  = Actors[id]
+
+	-- Set idle begin to now; can't start idling from before the AI init
+	RAIL.Self.IdleBegin = GetTick()
 
 	-- Get AI type
 	if RAIL.Mercenary then
@@ -381,7 +385,7 @@ function RAIL.AI(id)
 	do
 		-- Skill
 		if RAIL.Target.Skill == nil and RAIL.Target.Chase ~= RAIL.Owner then
-			-- Select a skill to use
+			-- Select a skill to use (no idle time)
 			RAIL.Target.Skill = SelectSkill:Run()
 		end
 
@@ -410,6 +414,19 @@ function RAIL.AI(id)
 		then
 			RAIL.Target.Attack = nil
 		end
+	end
+
+	-- Idle-check
+	if
+		RAIL.Target.Attack ~= nil or
+		RAIL.Target.Skill ~= nil or
+		RAIL.Target.Chase ~= nil
+	then
+		-- Not idle; reset idle time
+		RAIL.Self.IdleBegin = GetTick()
+	else
+		-- Call the idle-handler functions
+		Idle:Run(math.abs(GetTick() - RAIL.Self.IdleBegin))
 	end
 
 	-- Record the targets

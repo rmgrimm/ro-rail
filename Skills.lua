@@ -39,6 +39,17 @@ do
 			SPCost = 100,
 			CastDelay = function(level) return (5 + level*5) * 60 * 1000 end,
 			Duration = function(level) return (-1 + level*2) * 60 * 1000 end,
+			Condition = function(_G)
+				-- Use only if we are going to engage something
+				if
+					_G.RAIL.TargetHistory.Chase[0] ~= -1 or
+					_G.RAIL.TargetHistory.Attack ~= -1
+				then
+					return true
+				end
+
+				return false
+			end,
 		},
 		-- Amistr
 		[8005] = {
@@ -76,7 +87,7 @@ do
 		[8009] = {
 			Name = "Moonlight",
 			CastFunction = "actor",
-			Range = function() return 15 end,
+			--Range = function() return 15 end,
 			MaxLevel = 5,
 			SPCost = function(level) return 4 * level end,
 			CastDelay = 500,
@@ -86,14 +97,19 @@ do
 			CastFunction = "self",
 			MaxLevel = 5,
 			SPCost = function(level) return 20 + level*10 end,
-			CastDelay = function(level)
+			-- Flitting's cast delay seems to be only for recast, so
+			--	we tell RAIL that the duration is the same as cast delay.
+			--	* - RAIL only cares about when it should be recast.
+			--
+			-- CastDelay = function(level)
+			Duration = function(level)
 				if level < 5 then
 					return (50 + level*10) * 1000
 				else
 					return 120 * 1000
 				end
 			end,
-			Duration = function(level) return (65 - level*5) * 1000 end,
+			-- Duration = function(level) return (65 - level*5) * 1000 end,
 			Condition = "attacking",
 		},
 		[8011] = {
@@ -846,7 +862,7 @@ do
 				}
 			elseif id == LIF_H or id == LIF_H2 then
 				local ret = GetSkillList(LIF)
-				ret.Buff2 = AllSkills[8004]		-- mental charge
+					ret.Buff2 = AllSkills[8004]	-- mental charge
 				return ret
 			elseif id == AMISTR or id == AMISTR2 or id == AMISTR_H or id == AMISTR_H2 then
 				return {
@@ -865,7 +881,7 @@ do
 			elseif id == VANILMIRTH or id == VANILMIRTH2 or id == VANILMIRTH_H or id == VANILMIRTH_H2 then
 				return {
 					Attack = AllSkills[8013],	-- caprice
-					ChaosHeal = AllSkills[8014],	-- chaotic blessings
+					HealChaos = AllSkills[8014],	-- chaotic blessings
 					--AllSkills[8015],		-- instruction change (passive)
 					AllSkills[8016],		-- self destruct
 				}

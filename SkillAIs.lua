@@ -38,21 +38,26 @@ RAIL.Validate.SkillOptions = {is_subtable = true,
 		PriorityOffset = {"number",0.5},
 	},
 
+	-- Options that all heal skills will have
+	heal_default = {is_subtalbe = true,
+		Priority = {"number",50},
+		EstimateFutureTicks = {"number",0,0},
+
+		-- Will only show up if the skill can cast on owner
+		OwnerHP = {"number",50,0},
+		OwnerHPisPercent = {"boolean",true},
+
+		-- Will only show up if the skill can cast on self
+		SelfHP = {"number",0,0},
+		SelfHPisPercent = {"boolean",false},
+		OnlyAfterIdleFor = {"number",3000,0},
+	},
+
 	-- Mental Charge
 	--	(inherits from debuff_default and all_default)
 	[8004] = {
-		MaxFailures = {"number",2},
+		MaxFailures = {"number",4},
 		PriorityOffset = {"number",15},
-	},
-	-- Chaotic Blessings
-	--	(inherits from all_default)
-	[8014] = {
-		Priority = {"number",50},
-		EstimateFutureTicks = {"number",0,0},
-		OwnerHP = {"number",50,0},
-		OwnerHPisPercent = {"boolean",true},
-		SelfHP = {"number",0,0},
-		SelfHPisPercent = {"boolean",false},
 	},
 	-- Provoke
 	--	(inherits from debuff_default and all_default)
@@ -315,40 +320,82 @@ do
 				return
 			end,
 		},
-		ChaosHeal = {
-			Select = function(skill)
-				-- Get the state skill options table
-				local state = RAIL.State.SkillOptions[8014]
+
+		generic_heal = {
+			Init = function(skill)
+				-- Add to the state validation options
+				do
+					-- Generate the table, based off of default options
+					local byID = RAIL.Validate.SkillOptions
+					-- Note: If the table exists, it will copy into it
+					byID[skill.ID] = Table.DeepCopy(byID.heal_default,byID[skill.ID],false)
+				end
+			end,
+			Select = function(skill,idletime,owner_skill,self_skill)
+				-- Get state skill options table
+				local state = RAIL.State.SkillOptions[skill.ID]
+
+				-- Check if we've been idle long enough
+				if (idletime or 0) < state.OnlyAfterIdleFor then
+					return
+				end
 
 				-- Get some skill options for use later
 				local priority = state.Priority
 				local advance_heal = -state.EstimateFutureTicks
 
-				-- Check if we're going for percentages
-				local owner_cur_hp = RAIL.Owner.HP[advance_heal]
-				if state.OwnerHPisPercent then
-					owner_cur_hp = math.floor(owner_cur_hp * 100 / RAIL.Owner:GetMaxHP())
-				end
-				local self_cur_hp = RAIL.Self.HP[advance_heal]
-				if state.SelfHPisPercent then
-					self_cur_hp = math.floor(self_cur_hp * 100 / RAIL.Self:GetMaxHP())
-				end
+				-- Check owner's HP level
+				if owner_skill ~= nil then
+					local hp = RAIL.Owner.HP[advance_heal]
+					local target = state.OwnerHP
+					if state.OwnerHPisPercent then
+						hp = math.floor(hp * 100 / RAIL.Owner:GetMaxHP())
+						target = math.min(99,target)
+					end
 
-				-- Check to see if we should try healing our owner
-				if owner_cur_hp <= state.OwnerHP then
-					-- Heal our owner
-					--	Note: level 3 has 50% chance to heal owner
-					return priority,skill[3],RAIL.Owner
-
-				elseif self_cur_hp <= state.SelfHP then
-					-- Heal our homunculus
-					--	Note: level 4 has a 60% chance to heal self
-					return priority,skill[4],RAIL.Self
-
+					if hp <= target then
+						return priority,owner_skill,RAIL.Owner
+					end
 				end
 
-				-- Return nothing
+				-- Check self HP level
+				if self_skill ~= nil then
+					local hp = RAIL.Self.HP[advance_heal]
+					local target = state.SelfHP
+					if state.SelfHPisPercent then
+						hp = math.min(99,math.floor(hp * 100 / RAIL.Self:GetMaxHP()))
+						target = math.min(99,target)
+					end
+
+					if hp <= target then
+						return priority,self_skill,RAIL.Self
+					end
+				end
+
 				return
+			end,
+		},
+		HealChaos = {
+			Init = function(skill)
+				return skills_key.generic_heal.Init(skill)
+			end,
+			Select = function(skill)
+				-- Level 3 has best chance for healing owner, 4 has best chance for healing self
+				return skills_key.generic_heal.Select(skill,nil,skill[3],skill[4])
+			end,
+			IdleSelect = function(skill,idletime)
+				return skills_key.generic_heal.Select(skill,idletime,skill[3],skill[4])
+			end,
+		},
+		HealHands = {
+			Init = function(skill)
+				return skills_key.generic_heal.Init(skill)
+			end,
+			Select = function(skill)
+				return skills_key.generic_heal.Select(skill,nil,skill)
+			end,
+			IdleSelect = function(skill,idletime)
+				return skills_key.generic_heal.Select(skill,idletime,skill)
 			end,
 		},
 		Debuff = {
@@ -420,7 +467,7 @@ do
 		[skills_key] = {},
 		Init = function(self,skills)
 			-- Types that we have
-			local cyclebegin,actorcheck,select = false,false,false
+			local cyclebegin,actorcheck,select,idle = false,false,false,false
 
 			-- Validate options table base
 			local byID = RAIL.Validate.SkillOptions
@@ -440,6 +487,7 @@ do
 					if skills_key[ai_type].CycleBegin then cyclebegin = true end
 					if skills_key[ai_type].ActorCheck then actorcheck = true end
 					if skills_key[ai_type].Select then select = true end
+					if skills_key[ai_type].IdleSelect then idle = true end
 
 					-- Set validation options
 					do
@@ -474,7 +522,10 @@ do
 				self.ActorCheck = function() end
 			end
 			if not select then
-				self.Select = function() return nil end
+				self.Run = function() return nil end
+			end
+			if not idle then
+				self.RunIdle = function() return nil end
 			end
 		end,
 		CycleBegin = function(self)
@@ -521,7 +572,7 @@ do
 				end
 			end
 		end,
-		Run = function(self)
+		generic_Run = function(self,func_name,...)
 			-- If skills aren't usable, do nothing
 			if RAIL.Self.SkillState:Get() ~= RAIL.Self.SkillState.Enum.READY then
 				return
@@ -532,11 +583,11 @@ do
 			for skill_obj,ai_obj in self[skills_key] do
 				local current = { best[1] }
 				if
-					ai_obj.Select and
+					ai_obj[func_name] and
 					skillEnabled(skill_obj) and
-					not ai_obj.wait_for_next_cycle
+					not ai_obj.wait_for_next_cycle 
 				then
-					current = { ai_obj.Select(skill_obj) }
+					current = { ai_obj[func_name](skill_obj,unpack(arg)) }
 
 					if current[1] == nil then
 						current[1] = min_priority
@@ -566,6 +617,12 @@ do
 
 			-- Return the skill and target that were selected (if target_x is an actor, target_y will be nil)
 			return { best[2], best[3], best[4] }
-		end
+		end,
+		Run = function(self)
+			return self:generic_Run("Select")
+		end,
+		RunIdle = function(self,idletime)
+			return self:generic_Run("IdleSelect",idletime)
+		end,
 	}
 end

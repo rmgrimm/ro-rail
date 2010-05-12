@@ -26,6 +26,7 @@ end
 --	Note: View the subversion commit notes for more full changelog.
 --		(This is maintained to regularly bump version number.)
 
+-- 2010-05-12 -- Split DecisionSupport.lua's targeting functions to TargetingSupport.lua; Added idle-handling code; Other small tweaks
 -- 2010-05-04 -- Fix for buff-initialization causing error; Added more to fake GetV() function to aid debugging.
 -- 2010-04-26 -- Replace AssistOwner and AssistOther with AssistOptions subtable
 -- 2010-04-26 -- Change FollowDistance to only take effect when Owner is still moving.

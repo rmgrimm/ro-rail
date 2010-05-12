@@ -1,5 +1,5 @@
 -- A few persistent-state options used
-RAIL.Validate.TempFriendRange = {"number",-1,-1,5}
+RAIL.Validate.TempFriendRange = {"number",-1,-1}
 
 -- Mob ID Support
 do
@@ -445,6 +445,12 @@ do
 					-- Players are potential enemies and should be tracked
 					return "Player",true,true
 
+				-- AI-controlled (homunc, mercenary)
+				--	TODO: Find what the cap for AI-controlled actors should properly be.
+				elseif 6000 < self.Type and self.Type <= 6046 then
+					-- AIs are similar to players: potential enemies, should be tracked
+					return "AI",true,true
+
 				-- NPCs (non-player jobs that are below 1000)
 				elseif self.Type < 1000 then
 					-- NPCs are never enemies and shouldn't be tracked
@@ -608,7 +614,7 @@ do
 			History.Update(self.Target,-1)
 		end
 
-		-- Clear the targeted by table if it's old
+		-- Clear the targeted-by table if it's old
 		if math.abs((self.TargetOf[targeted_time] or 0) - GetTick()) > 50 then
 			self.TargetOf = Table:New()
 		end
@@ -674,75 +680,109 @@ do
 	-- The following functions support other parts of the script
 
 	-- Check if the actor is an enemy (monster/pvp-player)
-	Actor.IsEnemy = function(self)
-		-- Check if it's a monster
-		if IsMonster(self.ID) ~= 1 then
-			return false
-		end
-
-		-- Check if it should be defended against only
-		if self.BattleOpts.DefendOnly then
-			-- Check if its target is owner, self, other, or a friend
-			local target = Actors[self.Target[0]]
-			if
-				target ~= RAIL.Owner and
-				target ~= RAIL.Self and
-				target ~= RAIL.Other and
-				not target:IsFriend()
-			then
-				-- Not attacking a friendly, so not an enemy
+	Actor.IsEnemy = {
+		["Actor"] = function(self)
+			-- Check if it's a monster
+			if IsMonster(self.ID) ~= 1 then
 				return false
 			end
-		end
-
-		-- Check if the monster is dead
-		if self.Motion[0] == MOTION_DEAD then
-			return false
-		end
-
-		-- Check if the monster is in a sane location
-		if self.X[0] == -1 or self.Y[0] == -1 then
-			return false
-		end
-
-		-- Default to true
-		return true
-	end
+	
+			-- Check if it should be defended against only
+			if self.BattleOpts.DefendOnly then
+				-- Check if its target is owner, self, other, or a friend
+				local target = Actors[self.Target[0]]
+				if
+					target ~= RAIL.Owner and
+					target ~= RAIL.Self and
+					target ~= RAIL.Other and
+					not target:IsFriend()
+				then
+					-- Not attacking a friendly, so not an enemy
+					return false
+				end
+			end
+	
+			-- Check if the monster is dead
+			if self.Motion[0] == MOTION_DEAD then
+				return false
+			end
+	
+			-- Check if the monster is in a sane location
+			if self.X[0] == -1 or self.Y[0] == -1 then
+				return false
+			end
+	
+			-- Default to true
+			return true
+		end,
+		["Player"] = function(self)
+			-- Check if the player is set as a friend
+			if self:IsFriend() then
+				-- Friends are never enemies
+				return false
+			end
+		end,
+	}
+	setmetatable(Actor.IsEnemy,{
+		__call = function(self,...)
+			-- Note: when calling actor:IsEnemy, self will be Actor.IsEnemy table and
+			--	arg[1] will be actor (true "self")
+			return (self[self.ActorType] or self["Actor"])(unpack(arg))
+		end,
+	})
 
 	-- Check if the actor is a friend
-	Actor.IsFriend = function(self,no_temp)
-		-- Make sure only players are counted as friends
-		if self.ActorType ~= "Player" then
+	Actor.IsFriend = {
+		["Actor"] = function(self,no_temp)
+			-- Non-players and non-AIs should never ocunt as friends
 			return false
-		end
+		end,
+		["Player"] = function(self,no_temp)
+			-- Check for temporary friends (players within <opt> range of owner)
+			if
+				not no_temp and
+				RAIL.Owner:DistanceTo(self) <= RAIL.State.TempFriendRange
+			then
+				return true
+			end
 
-		-- Check for temporary friends (players within <opt> range of owner)
-		if not no_temp and RAIL.Owner:DistanceTo(self) <= RAIL.State.TempFriendRange then
-			return true
-		end
+			-- Check if the actor is set as a permanent friend
+			return self.BattleOpts.Friend
+		end,
+		["AI"] = function(self,no_temp)
+			-- If disallowing temporary friends, AIs should never count
+			if no_temp then
+				return false
+			end
 
-		-- Check if actor is on the friend list
-		return self.BattleOpts.Friend
-	end
+			-- Only friend if within a certain range
+			return RAIL.Owner:DistanceTo(self) <= RAIL.State.TempFriendRange
+		end,
+	}
+	-- IsEnemy and IsFriend function essentially the same way
+	setmetatable(Actor.IsFriend,getmetatable(Actor.IsEnemy))
 
 	-- Set actor as a friend
-	Actor.SetFriend = function(self,bool)
-		-- Make sure only players are allowed on friend list
-		if self.ActorType ~= "Player" then
+	Actor.SetFriend = {
+		["Actor"] = function(self,bool)
+			-- Normal actors shouldn't be put on the permanent friend list
 			return
-		end
-
-		-- Check if there is already an ByID field for this actor
-		if not RAIL.State.ActorOptions.ByID[self.ID] then
-			-- No table exists for this actor, create it
-			RAIL.State.ActorOptions.ByID[self.ID] = {
-				["Friend"] = bool
-			}
-		else
-			-- Table exists, update the friend section
-			RAIL.State.ActorOptions.ByID[self.ID].Friend = bool
-		end
-	end
+		end,
+		["Player"] = function(self,bool)
+			-- Check if there is already a ByID field for this actor
+			if not RAIL.State.ActorOptions.ByID[self.ID] then
+				-- No table exists for this actor, create it
+				RAIL.State.ActorOptions.ByID[self.ID] = {
+					["Friend"] = bool,
+				}
+			else
+				-- Table exists, update the friend value
+				RAIL.State.ActorOptions.ByID[self.ID].Friend = bool
+			end
+		end,
+	}
+	-- SetFriend and IsFriend function the same way
+	setmetatable(Actor.SetFriend,getmetatable(Actor.IsFriend))
 
 	-- Check if the actor is ignored
 	Actor.IsIgnored = function(self)
