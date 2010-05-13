@@ -164,6 +164,10 @@ Once Rampage AI Lite begins following the owner (your character) due to [StateFi
 
 *See also:* [StateFileIndex#MaxDistance MaxDistance]
 
+=== !IdleMovement ===
+
+_Please refer to [StateFileIndex#IdleMovement_Sub-table IdleMovement Sub-table]._
+
 === !InterceptAlgorithm ===
 
 *Type:* String
@@ -253,8 +257,6 @@ _Please refer to [StateFileIndex#SkillOptions_Sub-table SkillOptions Sub-table].
 *Default:* `-1`
 
 *Minimum Value:* `-1`
-
-*Maximum Value:* `5`
 
 !TempFriendRange sets the distance at which players will be temporarily considered "friends" for the purpose of defending, assisting, and disabling kill-steal protection. Players are considered friends only for the duration that they are within this range, and no permanent record is kept.
 
@@ -500,6 +502,10 @@ rail_state["AssistOptions"]["Other"] = "avoid"
 *Warning:* Setting *both* `homu` and `merc` state-file settings of `"Other"` to `"assist"` (as opposed to the above example of `"avoid"`) may result in low-priority targeting or other undesirable behavior.
 
 == !DefendOptions Sub-table ==
+
+_Not written yet. Check back soon!_
+
+== !IdleMovement Sub-table ==
 
 _Not written yet. Check back soon!_
 
