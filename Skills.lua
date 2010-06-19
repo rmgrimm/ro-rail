@@ -91,6 +91,7 @@ do
 			MaxLevel = 5,
 			SPCost = function(level) return 4 * level end,
 			CastDelay = 500,
+			Condition = "attacking",
 		},
 		[8010] = {
 			Name = "Flitting",

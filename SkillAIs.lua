@@ -18,6 +18,8 @@ RAIL.Validate.SkillOptions = {is_subtable = true,
 		Enabled = {"boolean",true},
 		Name = {"string",nil},				-- (default set by init function)
 		Condition = {"function",nil,unsaved=true},	-- (default set by init function)
+		ReservedSP = {"number",0,0},
+		ReservedSPisPercent = {"boolean",false},
 	},
 
 	-- Options that all attack skills will have
@@ -29,6 +31,7 @@ RAIL.Validate.SkillOptions = {is_subtable = true,
 	buff_default = {is_subtable = true,
 		MaxFailures = {"number",10,1},
 		PriorityOffset = {"number",0},
+		LastCastSelfID = {"number",0},
 		NextCastTime = {"number",0},
 	},
 
@@ -39,7 +42,7 @@ RAIL.Validate.SkillOptions = {is_subtable = true,
 	},
 
 	-- Options that all heal skills will have
-	heal_default = {is_subtalbe = true,
+	heal_default = {is_subtable = true,
 		Priority = {"number",50},
 		EstimateFutureTicks = {"number",0,0},
 
@@ -78,6 +81,17 @@ do
 
 	local function next_key(s) return RAIL.formatT("NextSkill{1}Time",s.ID) end
 	local function failures_key(s) return RAIL.formatT("Skill{1}Failures",s.ID) end
+	
+	local function usable_sp(actor,skill)
+		local options = RAIL.State.SkillOptions[skill.ID]
+
+		local reserved_sp = options.ReservedSP
+		if options.ReservedSPisPercent then
+			reserved_sp = math.ceil(reserved_sp / 100 * actor:GetMaxSP())
+		end
+		
+		return math.max(0,actor.SP[0] - reserved_sp)
+	end
 
 	-- Private key to hold skills
 	local skills_key
@@ -169,7 +183,7 @@ do
 			end,
 			Select = function(skill,callbacks,level_ignore)
 				-- Find the level of skill usable this round
-				local level = FindSkillLevel(RAIL.Self.SP[0],skill)
+				local level = FindSkillLevel(usable_sp(RAIL.Self,skill),skill)
 
 				-- Get the level to indicate to the sieve functions
 				local level_override = level
@@ -259,9 +273,12 @@ do
 				end
 
 				-- Ensure that the NextCastTime is sane
-				if RAIL.State.Information.InitTime + skill.Duration <
-					RAIL.State.SkillOptions[skill.ID].NextCastTime
+				if
+					RAIL.State.SkillOptions[skill.ID].LastCastSelfID ~= RAIL.Self.ID or
+					RAIL.State.Information.InitTime + skill.Duration <
+						RAIL.State.SkillOptions[skill.ID].NextCastTime
 				then
+					RAIL.State.SkillOptions[skill.ID].LastCastSelfID = RAIL.Self.ID
 					RAIL.State.SkillOptions[skill.ID].NextCastTime = 0
 				end
 
@@ -313,7 +330,7 @@ do
 				if state.Condition(RAIL._G,nil) then
 					-- Return the skill priority and the skill
 					return RAIL.State.SkillOptions.BuffBasePriority + state.PriorityOffset
-					,skill,RAIL.Self
+						,skill,RAIL.Self
 				end
 
 				-- Otherwise, return nothing
@@ -447,21 +464,7 @@ do
 	--	TODO: clean this up, so they don't count targets twice, etc
 	skills_key.Attack2 = skills_key.Attack
 	skills_key.Buff2 = skills_key.Buff
-
-	local skillEnabled = function(skill)
-		-- If no validate options are set for this skill, assume its enabled
-		if
-			not RAIL.Validate.SkillOptions[skill.ID] or
-			not RAIL.Validate.SkillOptions[skill.ID].Enabled
-		then
-			return true
-		end
-
-		-- If validate options are set, use the state value for enabled
-		return RAIL.State.SkillOptions[skill.ID].Enabled
-	end
-
-
+	
 	SelectSkill = {
 		-- Private table of skills that will be checked
 		[skills_key] = {},
@@ -505,11 +508,8 @@ do
 							end
 						end
 
-						-- Condition
-						do
-							-- Set the default condition
-							byID[skill.ID].Condition[2] = AllSkills[skill.ID].Condition
-						end
+						-- Set the default condition
+						byID[skill.ID].Condition[2] = AllSkills[skill.ID].Condition
 					end
 				end
 			end
@@ -538,7 +538,7 @@ do
 			for skill,ai_obj in self[skills_key] do
 				-- Call the skill AI's cycle-begin function
 				local urgent
-				if skillEnabled(skill) then
+				if RAIL.State.SkillOptions[skill.ID].Enabled then
 					if ai_obj.CycleBegin then
 						urgent = ai_obj.CycleBegin(skill)
 					end
@@ -565,7 +565,7 @@ do
 			for skill,ai_obj in self[skills_key] do
 				if
 					ai_obj.ActorCheck and
-					skillEnabled(skill) and
+					RAIL.State.SkillOptions[skill.ID].Enabled and
 					not ai_obj.wait_for_next_cycle
 				then
 					ai_obj.ActorCheck(skill,actor)
@@ -577,15 +577,15 @@ do
 			if RAIL.Self.SkillState:Get() ~= RAIL.Self.SkillState.Enum.READY then
 				return
 			end
-
+			
 			-- Loop through each skill
 			local best = { min_priority }
 			for skill_obj,ai_obj in self[skills_key] do
 				local current = { best[1] }
 				if
 					ai_obj[func_name] and
-					skillEnabled(skill_obj) and
-					not ai_obj.wait_for_next_cycle 
+					RAIL.State.SkillOptions[skill_obj.ID].Enabled and
+					not ai_obj.wait_for_next_cycle
 				then
 					current = { ai_obj[func_name](skill_obj,unpack(arg)) }
 
@@ -610,7 +610,9 @@ do
 			-- Check if we don't have enough SP for the skill
 			-- Note: Skills don't seem to actually work unless they'll leave
 			--	the homunculus/mercenary at above 0 sp.
-			if RAIL.Self.SP[0] < best[2].SPCost + 1 then
+			if usable_sp(RAIL.Self,best[2]) < best[2].SPCost + 1 then
+				RAIL.LogT(65,"Not enough SP to cast highest priority skill; skill={1}, usable sp={2}.",
+					best[2],usable_sp(RAIL.Self,best[2]))
 				-- Don't use a skill yet
 				return nil
 			end
