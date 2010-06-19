@@ -105,6 +105,46 @@ This option takes precedence over all others, including [StateFileIndex#Aggressi
 
 _Not written yet. Check back soon!_
 
+=== AutoPassiveHP ===
+
+*Type:* Number
+
+*Default:* `0`
+
+*Minimum Value:* `0`
+
+*Maximum Value:* no maximum value if [StateFileIndex#AutoPassiveHPisPercent AutoPassiveHPisPercent] is `false`; otherwise, `99`
+
+When Rampage AI Lite determines that its HP value has dropped below the setting of AutoPassiveHP, it will enter a temporary passive mode. This temporary passive mode has the same effect as setting [StateFileIndex#Aggressive Aggressive] to `false`, but does not make any change to the state-file. This mode will automatically be disabled when the HP value rises to the value specified in the [StateFileIndex#AutoUnPassiveHP AutoUnPassiveHP] option.
+
+_Note: If the [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table] options [StateFileIndex#DefendWhilePassive DefendWhilePassive] is set to `false`, it is likely that this will cause Rampage AI Lite to stop attacking any monster that reduced its HP below the level set by this option._
+
+*See also:* [StateFileIndex#AutoPassiveHPisPercent AutoPassiveHPisPercent]; [StateFileIndex#AutoUnPassiveHP AutoUnPassiveHP]
+
+=== AutoPassiveHPisPercent ===
+
+*Type:* Boolean
+
+*Default:* `false`
+
+AutoPassiveHPisPercent specifies whether the values in [StateFileIndex#AutoPassiveHP AutoPassiveHP] and [StateFileIndex#AutoUnPassiveHP AutoUnPassiveHP] should be interpreted as percentages.
+
+*See also:* [StateFileIndex#AutoPassiveHP AutoPassiveHP]; [StateFileIndex#AutoUnPassiveHP AutoUnPassiveHP]
+
+=== AutoUnPassiveHP ===
+
+*Type:* Number
+
+*Default:* [StateFileIndex#AutoPassiveHP AutoPassiveHP] `+ 1`
+
+*Minimum Value:* [StateFileIndex#AutoPassiveHP AutoPassiveHP] `+ 1`
+
+*Maximum Value:* `unlimited` if [StateFileIndex#AutoPassiveHPisPercent AutoPassiveHPisPercent] is false; otherwise, `100`
+
+_Please see the description under [StateFileIndex#AutoPassiveHP AutoPassiveHP].
+
+*See also:* [StateFileIndex#AutoPassiveHP AutoPassiveHP]; [StateFileIndex#AutoPassiveHPisPercent AutoPassiveHPisPercent]
+
 === !DebugFile ===
 
 *Type:* String
