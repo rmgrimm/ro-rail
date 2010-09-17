@@ -548,43 +548,42 @@ do
 
 			return potentials,n,protected
 		end})
-
-		-- Sieve out targets that are not attack-allowed or skill-allowed
-		SelectTarget.Chase:Insert(2,{"NotAllowed",function(potentials,n,protected)
+		
+		-- Sieve out targets that are already close-enough or are not allowed
+		SelectTarget.Chase:Insert(2,{"NotAllowedOrTooClose",function(potentials,n,protected)
 			local ret,ret_n = {},0
 			for id,actor in potentials do
-				if actor:IsAttackAllowed() or actor:IsSkillAllowed(1) then
+				-- Don't sieve current target if not acquiring while locked
+				if not RAIL.State.AcquireWhileLocked and RAIL.Target.Attack == actor then
 					ret[id] = actor
 					ret_n = ret_n + 1
+				else
+					-- Get the range that the target should be
+					local range
+	
+					-- Check if attacks are allowed
+					if actor:IsAttackAllowed() then
+						range = RAIL.Self.AttackRange
+					elseif actor:IsSkillAllowed(1) then
+						range = RAIL.Self.MinOffensiveSkillRange
+					end
+					
+					-- If a range wasn't found, attacks/skills aren't allowed
+					if range then
+						-- Check that the actor isn't already within range
+						if RAIL.Self:DistanceTo(actor) > range then
+							ret[id] = actor
+							ret_n = ret_n + 1
+						end
+					end
 				end
 			end
-
-			return ret,ret_n,protected
-		end})
-
-		-- Sieve out targets that are already within range
-		SelectTarget.Chase:Insert(3,{"TooClose",function(potentials,n,protected)
-			-- Get attack range
-			local range = RAIL.Self.AttackRange
-
-			-- Sieve out actors that are too close
-			local ret,ret_n = {},0
-			for id,actor in potentials do
-				if
-					RAIL.Self:DistanceTo(actor) > range or
-					-- Don't sieve current target if not acquiring while locked
-					(not RAIL.State.AcquireWhileLocked and RAIL.Target.Attack == actor)
-				then
-					ret[id] = actor
-					ret_n = ret_n + 1
-				end
-			end
-
+			
 			return ret,ret_n,protected
 		end})
 
 		-- Ensure we won't move outside of RAIL.State.MaxDistance
-		SelectTarget.Chase:Insert(4,{"MaxDistance",function(potentials,n,protected)
+		SelectTarget.Chase:Insert(3,{"MaxDistance",function(potentials,n,protected)
 			-- MaxDistance is in block tiles, but attack range is in pythagorean distance...
 			local max_dist = RAIL.State.MaxDistance
 

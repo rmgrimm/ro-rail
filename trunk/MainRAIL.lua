@@ -109,7 +109,7 @@ function AI(id)
 
 	-- Get our attack range
 	RAIL.Self.AttackRange = GetV(V_ATTACKRANGE,id)
-
+	
 	-- AttackRange seems to be misreported for melee
 	if RAIL.Self.AttackRange <= 2 then
 		RAIL.Self.AttackRange = 1.5
@@ -158,15 +158,34 @@ function AI(id)
 
 	-- Extra info about skills
 	do
+		local min_offensive_range = 10000
 		local buf = StringBuffer.New()
 		for skill_type,skill in pairs(RAIL.Self.Skills) do
+			-- Collect skill type and name
 			buf:Append(skill)
 			if type(skill_type) == "string" then
 				buf:Append(" as AI's \""):Append(skill_type):Append("\"")
 			end
 			buf:Append("; ")
+			
+			-- Check if its offensive (attack, mobattack, debuff)
+			if
+				skill_type == "Attack" or skill_type == "Attack2" or
+				skill_type == "MobAttack" or skill_type == "MobAttack2" or
+				skill_type == "Debuff" or skill_type == "Debuff2"
+			then
+				local range = skill:GetRange()
+				if range < min_offensive_range then
+					min_offensive_range = range
+				end
+			end
 		end
 		RAIL.LogT(40," --> Skills: {1}",buf:Append(" "):Get())
+		
+		if min_offensive_range ~= 10000 then
+			RAIL.Self.MinOffensiveSkillRange = min_offensive_range
+			RAIL.LogT(40," --> Minimum skill range: {1}",RAIL.Self.MinOffensiveSkillRange)
+		end
 	end
 
 	-- Never show up as either enemies or friends

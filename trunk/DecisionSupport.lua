@@ -12,7 +12,7 @@ RAIL.Validate.IdleMovement = {is_subtable = true,
 	BeginAfterIdleTime = {"number",3000,0},
 }
 
-RAIL.Validate.MaxDistance = {"number", 13, 0, 14}
+RAIL.Validate.MaxDistance = {"number", 13, 0}
 RAIL.Validate.FollowDistance = {"number", 4, 0, nil}	-- maximum value will be MaxDistance
 setmetatable(RAIL.Validate.FollowDistance,{
 	__index = function(self,idx)
