@@ -721,13 +721,28 @@ do
 				-- Friends are never enemies
 				return false
 			end
+			
+			-- Otherwise, act like a regular actor
+			return Actor.IsEnemy["Actor"](self)
 		end,
 	}
 	setmetatable(Actor.IsEnemy,{
 		__call = function(self,...)
 			-- Note: when calling actor:IsEnemy, self will be Actor.IsEnemy table and
 			--	arg[1] will be actor (true "self")
-			return (self[self.ActorType] or self["Actor"])(unpack(arg))
+			local true_self = arg[1]
+			
+			-- Get the function based on the actor type
+			local f
+			if type(true_self) == "table" then
+				f = self[true_self.ActorType]
+			end
+			if not f then
+				f = self["Actor"]
+			end
+			
+			-- Call the actual function
+			return f(unpack(arg))
 		end,
 	})
 
