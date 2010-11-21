@@ -46,9 +46,9 @@ do
     end
   end
   GenerateConst("",    0)
-  GenerateConst("2",   3)
-  GenerateConst("_H",  7)
-  GenerateConst("_H2",11)
+  GenerateConst("2",   4)
+  GenerateConst("_H",  8)
+  GenerateConst("_H2",12)
 end
 
 -- Return values for GetV(V_MERTYPE,id)
