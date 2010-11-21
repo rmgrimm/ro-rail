@@ -6,11 +6,10 @@ do
   -- Function to command the AI to move to a specific spot
   local function ChaseTo(x,y)
     -- Get the tile located at (x,y)
-    x,y = RAIL.ChaseMap:TranslateFromParent(x,y)
-    local tile = RAIL.ChaseMap(x,y)
+    local tile = RAIL.ChaseMap(RAIL.ChaseMap:TranslateFromParent(x,y))
 
     -- Increase the chase priority
-    tile.priority = tile.priority + 1000
+    tile.Priority = tile.Priority + 1000
   end
 
   -- Function to log the information about an unknown message
