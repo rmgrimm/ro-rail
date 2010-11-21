@@ -10,43 +10,43 @@ do
       -- Generate a new node
       local new_handler = {
         -- Basic information
-        ["name"] = name,
-        ["priority"] = priority,
-        func = f,
-        runs_left = runs,
-        next = nil,
-        event = self,
+        Name = name,
+        Priority = priority,
+        Func = f,
+        RunsLeft = runs,
+        Next = nil,
+        Event = self,
       }
 
       -- Check if the new node should be inserted at the beginning
-      if not self.begin or self.begin.priority > priority then
-        new_handler.next = self.begin
-        self.begin = new_handler
+      if not self.Begin or self.Begin.Priority > priority then
+        new_handler.Next = self.Begin
+        self.Begin = new_handler
         return
       end
 
       -- Loop through the linked list
-      local cur_handler = self.begin
-      while cur_handler.next and cur_handler.next.priority <= priority do
-        cur_handler = cur_handler.next
+      local cur_handler = self.Begin
+      while cur_handler.Next and cur_handler.Next.Priority <= priority do
+        cur_handler = cur_handler.Next
       end
-      
+
       -- Insert the new node
-      new_handler.next = cur_handler.next
-      cur_handler.next = new_handler
+      new_handler.Next = cur_handler.Next
+      cur_handler.Next = new_handler
     end,
     Fire = function(self,...)
       -- Get the ticks at the beginning of the event
       local ticks = GetTick()
-      
+
       -- Increment the event depth
       RAIL.Event[performance].Depth = RAIL.Event[performance].Depth + 1
-      
+
       -- If this is the first call, reset the log
       if RAIL.Event[performance].Depth == 1 then
         RAIL.Event[performance].Log:Clear()
       end
-      
+
       -- Add a line to the event log to indicate entering an event
       local log_depth = string.rep(" ",RAIL.Event[performance].Depth - 1)
       RAIL.Event[performance].Log:Append(string.format("%s+%s\r\n",
@@ -57,24 +57,24 @@ do
       RAIL.LogT(95,"+Event \"{1}\" fired...",self.Name)
 
       -- Reset the event return
-      self.ret_val = nil
+      self.RetVal = {}
 
       -- Loop through the event list until one returns false
       local prev = nil
-      local cur = self.begin
+      local cur = self.Begin
       local continue,skip_from,skip_to = true,0,0
       while continue do
         -- Ensure the node has runs left
-        while cur and cur.runs_left == 0 do
+        while cur and cur.RunsLeft == 0 do
           -- Skip to the next handler
-          cur = cur.next
+          cur = cur.Next
         end
 
         -- Set the previous node's next
         if not prev then
-          self.begin = cur
+          self.Begin = cur
         else
-          prev.next = cur
+          prev.Next = cur
         end
 
         -- Ensure there's a node to use
@@ -85,14 +85,14 @@ do
         -- Check that the current node is outside the threshold of
         --    skipped nodes.
         local prev_from,prev_to = skip_from,skip_to
-        if cur.priority < skip_from or skip_to <= cur.priority then
+        if cur.Priority < skip_from or skip_to <= cur.Priority then
           -- Log it
-          RAIL.LogT(97,"..running event handler \"{1}\" (priority {2})",cur.name,cur.priority)
+          RAIL.LogT(97,"..running event handler \"{1}\" (priority {2})",cur.Name,cur.Priority)
 
           -- Add a line to the event log
           RAIL.Event[performance].Log:Append(string.format("%s *%s\r\n",
                                                            log_depth,
-                                                           cur.name))
+                                                           cur.Name))
 
           -- Increment the event depth
           RAIL.Event[performance].Depth = RAIL.Event[performance].Depth + 1
@@ -101,8 +101,8 @@ do
           local func_ticks = GetTick()
 
           -- Run the function
-          continue,skip_from,skip_to = cur:func(unpack(arg))
-          
+          continue,skip_from,skip_to = cur:Func(unpack(arg))
+
           -- Measure the time taken
           func_ticks = GetTick() - func_ticks
 
@@ -114,25 +114,25 @@ do
           if type(skip_to) ~= "number" then skip_to = prev_to end
 
           -- Subtract the runs_left if applicable
-          if cur.runs_left > 0 then
-            cur.runs_left = cur.runs_left - 1
+          if cur.RunsLeft > 0 then
+            cur.RunsLeft = cur.RunsLeft - 1
           end
-          
+
           -- Decrement the event depth
           RAIL.Event[performance].Depth = RAIL.Event[performance].Depth - 1
 
           -- Add a line to the event log
           RAIL.Event[performance].Log:Append(string.format("%s *%s (%dms)\r\n",
                                                            log_depth,
-                                                           cur.name,
+                                                           cur.Name,
                                                            func_ticks))
         end
 
         -- Go to the next
         prev = cur
-        cur = cur.next
+        cur = cur.Next
       end
-      
+
       -- Get the ticks at the end of the event
       local event_end = GetTick()
 
@@ -140,25 +140,25 @@ do
       local perf = self[performance]
       ticks = GetTick() - ticks
 
-      perf.runs = perf.runs + 1
-      perf.ticks = perf.ticks + ticks
-      if ticks > perf.longest then
-        perf.longest = ticks
+      perf.Runs = perf.Runs + 1
+      perf.Ticks = perf.Ticks + ticks
+      if ticks > perf.Longest then
+        perf.Longest = ticks
       end
       -- TODO: sub events
-      
+
       -- Log it
       RAIL.LogT(96,"-Event \"{1}\" finished; time spent = {2}ms",self.Name,ticks)
-      
+
       -- Add a line to the event log
       RAIL.Event[performance].Log:Append(string.format("%s-%s (%dms)\r\n",
                                                        log_depth,
                                                        self.Name,
                                                        ticks))
-                                                       
+
       -- Decrement event log depth
       RAIL.Event[performance].Depth = RAIL.Event[performance].Depth - 1
-      
+
       -- Check if we're at depth 0 now, and hit a relatively long cycle
       if RAIL.Event[performance].Depth == 0 and ticks > 400 then
         -- Log it to TraceAI
@@ -168,25 +168,25 @@ do
       end
 
       -- Return any return value set by the event handlers
-      return self.ret_val
+      return unpack(self.RetVal)
     end,
     ResetPerformanceData = function(self)
       local perf = self[performance]
-      perf.runs = 0
-      perf.ticks = 0
-      perf.longest = 0
-      perf.subevents = 0
+      perf.Runs = 0
+      perf.Ticks = 0
+      perf.Longest = 0
+      perf.Subevents = 0
     end,
     GetPerformanceData = function(self)
       local perf = self[performance]
-      
+
       -- If the event was never called, return 0ms average and longest
-      if perf.runs == 0 then
+      if perf.Runs == 0 then
         return 0,0
       end
-      
+
       -- Otherwise return the calculated average and longest
-      return math.ceil(perf.ticks / perf.runs), perf.longest
+      return math.ceil(perf.Ticks / perf.Runs), perf.Longest
     end,
   }
 
@@ -214,10 +214,10 @@ do
       self[idx] = setmetatable({
         Name = idx,
         [performance] = {
-          runs = 0,
-          ticks = 0,
-          longest = 0,
-          subevents = 0,
+          Runs = 0,
+          Ticks = 0,
+          Longest = 0,
+          Subevents = 0,
         },
       },event_mt)
       return self[idx]

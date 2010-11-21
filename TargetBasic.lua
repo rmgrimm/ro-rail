@@ -39,7 +39,7 @@ RAIL.Validate.DefendOptions = {is_subtable = true,
   SelfThreshold = {"number",5,0},
   FriendThreshold = {"number",4,0},
 }
--- removed: RAIL.Validate.AttackWhileChasing = {"boolean",false}
+RAIL.Validate.AttackWhileChasing = {"boolean",false}
 
 do
   -- Aggressive Support
@@ -85,25 +85,13 @@ do
 end
 
 do
-  local Potential = {
-    Attack = nil,
-    Skill = nil,
-    Chase = nil,
-  }
-
-  local function GenericPotential(t)
-    Potential.Attack:PushRight(t)
-    Potential.Skill:PushRight(t)
-    Potential.Chase:PushRight(t)
-  end
+  local Potential = List.New()
 
   RAIL.Event["AI CYCLE"]:Register(10,                         -- Priority
                                   "Reset Potential Targets",  -- Handler name
                                   -1,                         -- Max runs (negative means infinite)
                                   function()
-    Potential.Attack = List.New()
-    Potential.Skill = List.New()
-    Potential.Chase = List.New()
+    Potential:Clear()
   end)
 
   do
@@ -191,7 +179,7 @@ do
         if RAIL.ActorLists.Enemies[id] then
           -- Assist against this target; add a 1-item table of potentials to
           -- the potential target list
-          GenericPotential{ [id] = target }
+          Potential:PushRight{ [id] = target, Name = "Assist", }
   
           -- Continue handling the event
           return true
@@ -352,7 +340,7 @@ do
                                                           RAIL.State.DefendOptions.FriendThreshold)
   
       -- Create a table with potential defend targets
-      local defense = {}
+      local defense = { Name = "Defense", }
       for id,defend_actor in ipairs(defend_actors) do
         for idx,actor in ipairs(defend_actor.TargetOf) do
           if RAIL.ActorLists.Enemies[actor.ID] ~= nil then
@@ -362,7 +350,7 @@ do
       end
       
       -- Add the table to the potentials list
-      GenericPotential(defense)
+      Potential:PushRight(defense)
     end)
   end
   
@@ -376,7 +364,7 @@ do
     end
     
     -- Create a table with potential targets
-    local offense,n = {},0
+    local offense,n = { Name = "Aggro", },0
     for id,actor in pairs(RAIL.ActorLists.Enemies) do
       -- Check that attacking this target would not be kill-stealing
       if not actor:WouldKillSteal() then
@@ -387,7 +375,7 @@ do
     
     -- If there are targets, add to the potentials list
     if n > 0 then
-      GenericPotential(offense)
+      Potential:PushRight(offense)
     end
   end)
   
@@ -398,37 +386,59 @@ do
     -- Loop through each set of actors until attack and skill potentials
     -- have been selected
     local attack = (RAIL.Target.Attack ~= nil)
-    local skill  = (RAIL.Target.Skill  ~= nil)
+    local skill  = (RAIL.Target.Skill  ~= nil) or
+                   (RAIL.Self.SkillState:Get() ~= RAIL.Self.SkillState.Enum.READY)
+    local attack_oor = false
+    local skill_oor  = false
     repeat
       -- Get the farthest left set of tar
-      local targets = Potential.Attack:PopLeft()
+      local targets = Potential:PopLeft()
 
       -- Ensure there is a table of targets
       if not targets then break end
 
+      -- Argument to the events, whether out-of-range targets should be
+      -- added to the ChaseMap
+      local attack_arg = not attack_oor
+      local skill_arg  = not skill_oor
+
       -- Loop through each actor in the group
       for id,actor in pairs(targets) do
-        -- Check if a potential attack target has been found yet
-        if not attack then
-          -- Run this actor through the attack selection event
-          local ret = RAIL.Event["TARGET SELECT/ENEMY/ATTACK"]:Fire(actor)
+        if type(id) == "number" then
+          -- Check if a potential attack target has been found yet
+          if not attack then
+            -- Run this actor through the attack selection event
+            local r1,r2 = RAIL.Event["TARGET SELECT/ENEMY/ATTACK"]:Fire(actor,attack_arg)
 
-          -- If the actor was usable, don't continue checking other groups
-          -- of actors
-          if ret then
-            attack = true
+            -- If the actor was usable, don't continue checking other groups
+            -- of actors
+            if r1 then
+              attack = true
+            end
+  
+            -- If the actor is preferred but is out of range, don't add other
+            -- groups to the ChaseMap
+            if r2 then
+              attack_oor = true
+            end
           end
-        end
-
-        -- Check if a potential skill target has been found yet
-        if not skill then
-          -- Run this actor through the skill selection event
-          local ret = RAIL.Event["TARGET SELECT/ENEMY/SKILL"]:Fire(actor)
-
-          -- If the actor was usable, don't continue checking other groups
-          -- of actors
-          if ret then
-            skill = true
+  
+          -- Check if a potential skill target has been found yet
+          if not skill then
+            -- Run this actor through the skill selection event
+            local r1 = RAIL.Event["TARGET SELECT/ENEMY/SKILL"]:Fire(actor,skill_arg)
+  
+            -- If the actor was usable, don't continue checking other groups
+            -- of actors
+            if r1 then
+              skill = true
+            end
+  
+            -- If the actor is preferred but is out of range, don't add other
+            -- groups to the ChaseMap
+            if r2 then
+              skill_oor = true
+            end
           end
         end
       end
@@ -442,6 +452,7 @@ RAIL.Event["TARGET SELECT/ENEMY/ATTACK"]:Register(0,            -- Priority
                                                   function(self,actor)
   -- Check if the actor is allowed
   if not actor:IsAttackAllowed() then
+  RAIL.LogT(0,"allowed")
     -- Don't continue this event
     return false
   end
@@ -461,17 +472,25 @@ end)
 RAIL.Event["TARGET SELECT/ENEMY/ATTACK"]:Register(10,                 -- Priority
                                                   "Chase/range",      -- Handler name
                                                   -1,                 -- Max runs (negative means infinite)
-                                                  function(self,actor)
+                                                  function(self,actor,can_chase)
   -- Get the attack range
   local range = RAIL.Self.AttackRange
 
   -- If the actor was allowed it can be chased
-  RAIL.Event["TARGET SELECT/ENEMY/CHASE"]:Fire(actor,
-                                               range - 0.5,
-                                               actor.BattleOpts.Priority)
+  if can_chase then
+    -- Set the 2nd return value of the event to true
+    self.Event.RetVal[2] = true
+    
+    -- Ensure that it will unpack properly
+    if self.Event.RetVal[1] == nil then self.Event.RetVal[1] = false end
+
+    RAIL.Event["TARGET SELECT/ENEMY/CHASE"]:Fire(actor,
+                                                 range - 0.5,
+                                                 actor.BattleOpts.Priority)
+  end
 
   -- Check if the actor is outside attack range
-  if RAIL.Self:DistanceTo(actor) >= range then
+  if RAIL.Self:DistanceTo(actor) > range then
     -- Don't continue this event
     return false
   end
@@ -481,8 +500,8 @@ RAIL.Event["TARGET SELECT/ENEMY/ATTACK"]:Register(50,             -- Priority
                                                   "Acceptable",   -- Handler name
                                                   -1,             -- Max runs (negative means infinite)
                                                   function(self,actor)
-  -- Set the return value of the event to true
-  self.event.ret_val = true
+  -- Set the 1st return value of the event to true
+  self.Event.RetVal[1] = true
 
   -- If no attack target has been selected yet, this is the best one
   if not RAIL.Target.Attack then
@@ -578,6 +597,30 @@ RAIL.Event["TARGET SELECT/ENEMY/ATTACK"]:Register(90,                       -- P
   
   if actor_dist > target_dist then
     return false
+  end
+end)
+
+RAIL.Event["TARGET SELECT/POST"]:Register(25,                     -- Priority
+                                          "AttackWhileChasing",   -- Handler name
+                                          -1,                     -- Max runs (negative means infinite)
+                                          function()
+  -- Don't do anything if AttackWhileChasing is set
+  if RAIL.State.AttackWhileChasing then
+    return
+  end
+
+  -- Check if there is a chase target and an attack target
+  if not RAIL.Target.Chase or not RAIL.Target.Attack then
+    return
+  end
+
+  -- Get the distance of the movement
+  local dist = RAIL.Self:BlocksTo(unpack(RAIL.Target.Chase))
+  
+  -- Check if it's a significant enough move (not just a dance attack)
+  if dist > 3 then
+    -- Don't attack while chasing
+    RAIL.Target.Attack = nil
   end
 end)
 
