@@ -1,9 +1,25 @@
+-- Debugging support hook
+function DebugHook(func,arg_type)
+  return function(...)
+    local i = 1
+    while arg_type[i] do
+      if type(arg[i]) ~= arg_type[i] then
+        return nil
+      end
+      i = i + 1
+    end
+    
+    return func(unpack(arg))
+  end
+end
+
 -- Distance functions
 do
 	-- Pythagorean Distance
 	function PythagDistance(x1,y1,x2,y2)
 		return math.sqrt((x2-x1)^2 + (y2-y1)^2)
 	end
+	--PythagDistance = DebugHook(PythagDistance,{"number","number","number","number"})
 
 	-- Block Distance
 	function BlockDistance (x1,y1,x2,y2)
@@ -61,6 +77,7 @@ do
 		-- Return angle and radius
 		return angle,radius
 	end
+	--GetAngle = DebugHook(GetAngle,{"number","number","number","number"})
 
 	function PlotCircle(x,y,angle,radius)
 		-- Convert the angle to radians
@@ -260,6 +277,14 @@ do
 			end
 			TraceAI("GetTick() not supplied, undefined behavior may occur.")
 			sane = false
+		end
+		
+		if not Move then
+		  Move = function(id,x,y)
+		    TraceAI("Move(" .. x .. "," .. y .. ")")
+		  end
+		  TraceAI("Move() not supplied, undefined behavior may occur.")
+		  sane = false
 		end
 
 		-- Is the environment sane?
