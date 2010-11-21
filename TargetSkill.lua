@@ -97,7 +97,10 @@ do
     -- Loop through all skills that match the skill name
     for idx,skill in FindPairs(RAIL.Self.Skills,skill_name,nil,true) do
       -- Check that the skill is enabled
-      if RAIL.State.SkillOptions[skill.ID].Enabled then
+      if
+        RAIL.State.SkillOptions[skill.ID] and
+        RAIL.State.SkillOptions[skill.ID].Enabled
+      then
         -- Fire the event
         RAIL.Event[event_name]:Fire(skill,unpack(arg))
       end

@@ -884,7 +884,8 @@ do
       elseif id == VANILMIRTH or id == VANILMIRTH2 or id == VANILMIRTH_H or id == VANILMIRTH_H2 then
         return {
           Attack = AllSkills[8013],       -- caprice
-          HealChaos = AllSkills[8014],    -- chaotic blessings
+          HealSelf = AllSkills[8014],     -- chaotic blessings (heal homu  AI)
+          HealOwner = AllSkills[8014],    -- chaotic blessings (heal owner AI)
           --AllSkills[8015],              -- instruction change (passive)
           AllSkills[8016],                -- self destruct
         }
