@@ -179,23 +179,33 @@ do
     -- ...
 
 
-    [1038] = "Osiris",    -- MVP
-    [1039] = "Baphomet",    -- MVP
-    [1046] = "Doppelganger",  -- MVP
-    [1059] = "Mistress",    -- MVP
+    [1038] = "Osiris",            -- MVP
+    [1039] = "Baphomet",          -- MVP
+    [1042] = "Steel Chonchon",
+    [1046] = "Doppelganger",      -- MVP
+    [1059] = "Mistress",          -- MVP
     [1086] = "Golden Thief Bug",  -- MVP
-    [1087] = "Orc Hero",    -- MVP
+    [1087] = "Orc Hero",          -- MVP
+
+    -- ...
+    
+    [1111] = "Drainliar",
 
     -- ...
 
     [1139] = "Mantis",
     
     -- ...
+    
+    [1152] = "Orc Skeleton",
+    [1153] = "Orc Zombie",
+
+    -- ...
 
     [1177] = "Zenorc",
     
     -- ...
-    
+
     [1880] = "Wood Goblin",
     [1881] = "Les",
 
@@ -254,13 +264,16 @@ do
     -- Metatable to get default value from RAIL.State.ActorOptions.Default
     local plant_mt = {
       __index = function(t,idx)
-        if idx == 2 then
-          if RAIL.State.ActorOptions.Default.Priority > 1 then
-            return RAIL.State.ActorOptions.Default.Priority - 1
-          else
+        if idx == 2 or idx == 3 then
+          -- NOTE: Commented this out; the AI shouldn't prioritize a mob of
+          --       plants over a single real target unless priority is
+          --       specifically set in the state-file
+          --if RAIL.State.ActorOptions.Default.Priority > 1 then
+          --  return RAIL.State.ActorOptions.Default.Priority - 1
+          --else
             -- This is below the minimum of 1, but it won't affect ChaseMap
-            return 0.9
-          end
+            return 0.1
+          --end
         end
       end,
     }
@@ -268,8 +281,9 @@ do
       -- Get the validation table
       local validate = RAIL.Validate.ActorOptions.ByType[i]
 
-      -- Set default to nil
+      -- Set default and minimum priority to nil
       validate.Priority[2] = nil
+      validate.Priority[3] = nil
 
       -- Set metatable to return a default value at 1 below default actor priority
       setmetatable(validate.Priority,plant_mt)

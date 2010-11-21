@@ -505,7 +505,7 @@ RAIL.Event["AI CYCLE"]:Register(800,              -- Priority
   end
 
   -- The delay has expired, don't run this handler any more
-  self.runs_left = 0
+  self.RunsLeft = 0
 end)
 
 RAIL.Event["AI CYCLE"]:Register(940,                  -- Priority
@@ -566,7 +566,9 @@ RAIL.Event["AI CYCLE"]:Register(1000,                 -- Priority
       not RAIL.Target.Move
     then
       -- Don't let this get prevented by RAIL.Target.Chase action...
-      Move(id,GetV(V_POSITION,id))
+      local x,y = GetV(V_POSITION,id)
+      if RAIL.Owner.X[0] > x then x = x + 1 else x = x - 1 end
+      Move(id,x,y)
     end
   end
 end)

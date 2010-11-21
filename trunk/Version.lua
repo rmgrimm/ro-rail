@@ -26,6 +26,7 @@ end
 --	Note: View the subversion commit notes for more full changelog.
 --		(This is maintained to regularly bump version number.)
 
+-- 2010-11-21 -- Reimplement AttackWhileChasing, code clean ups, fix out-of-range targeting
 -- 2010-11-21 -- Rewrite TileMap.lua, optimize Chase selection to not generate tile tables.
 -- 2010-11-21 -- Fix for unimplemented skills, fix numbering of homunculi.
 -- 2010-11-21 -- Massive restructuring of code into event-based system. Most user options stayed the same, but performance should be better.

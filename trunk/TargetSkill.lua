@@ -298,11 +298,11 @@ do
   RAIL.Event["TARGET SELECT/ENEMY/SKILL"]:Register(0,                   -- Priority
                                                   "Offensive select",   -- Handler name
                                                   -1,                   -- Max runs
-                                                  function(self,actor)
+                                                  function(self,actor,can_chase)
     -- Ensure there are offensive skills
     if offensive_skills:GetN() < 1 then
       -- Don't check this anymore
-      self.runs_left = 0
+      self.RunsLeft = 0
     end
 
     -- Loop through each offensive skill
@@ -330,7 +330,16 @@ do
         end
     
         -- Fire an event for this potential skill-target combo
-        RAIL.Event["TARGET SELECT/ENEMY/SKILL/OFFENSIVE"]:Fire(skill,actor)
+        local r1,r2 = RAIL.Event["TARGET SELECT/ENEMY/SKILL/OFFENSIVE"]:Fire(skill,actor,can_chase)
+        
+        -- Set the return values of this event based on the child event
+        if r1 then
+          self.Event.RetVal[1] = true
+        end
+        if r2 then
+          if self.Event.RetVal[1] == nil then self.Event.RetVal[1] = false end
+          self.Event.RetVal[2] = true
+        end
       end
     end -- i=1,offensive_skills:GetN()
   end)
@@ -389,14 +398,23 @@ end)
 RAIL.Event["TARGET SELECT/ENEMY/SKILL/OFFENSIVE"]:Register(40,              -- Priority
                                                            "Range/chase",   -- Handler name
                                                            -1,              -- Max runs (infinite)
-                                                           function(self,skill,actor)
+                                                           function(self,skill,actor,can_chase)
   -- Get the skill range
   local srange = skill:GetRange(level)
 
   -- If the actor was allowed it can be chased
-  RAIL.Event["TARGET SELECT/ENEMY/CHASE"]:Fire(actor,
-                                               srange - 0.5,
-                                               skill:GetPriority(actor))
+  if can_chase then
+    -- Set the second return value of this event to true
+    self.Event.RetVal[2] = true
+
+    -- Ensure that it will unpack properly
+    if self.Event.RetVal[1] == nil then self.Event.RetVal[1] = false end
+
+    -- Fire an event to add the target to the ChaseMap
+    RAIL.Event["TARGET SELECT/ENEMY/CHASE"]:Fire(actor,
+                                                 srange - 0.5,
+                                                 skill:GetPriority(actor))
+  end
 
   -- Check the range
   if RAIL.Self:DistanceTo(actor) > srange then
@@ -409,8 +427,8 @@ RAIL.Event["TARGET SELECT/ENEMY/SKILL/OFFENSIVE"]:Register(50,            -- Pri
                                                            "Acceptable",  -- Handler name
                                                            -1,            -- Max runs (infinite)
                                                            function(self,skill,actor)
-  -- Set the return value from this event
-  self.event.ret_val = true
+  -- Set the 1st return value of this event to true
+  self.Event.RetVal[1] = true
   
   -- If no other skill has been selected yet, choose this
   if not RAIL.Target.Skill then
@@ -493,7 +511,7 @@ do
     -- Ensure that there are attack skills to check
     if not have_attacks then
       -- Don't check this again
-      self.runs_left = 0
+      self.RunsLeft = 0
       return
     end
     
