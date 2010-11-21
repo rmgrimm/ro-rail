@@ -32,13 +32,16 @@ RAIL.Event["AI CYCLE"]:Register(50,                 -- Priority
                                 function()          -- Handler function
   local MaxDistance = RAIL.State.MaxDistance
   local range = {
-    x = {-MaxDistance,MaxDistance},
-    y = {-MaxDistance,MaxDistance},
+    X = {-MaxDistance,MaxDistance},
+    Y = {-MaxDistance,MaxDistance},
   }
 
   -- Create a submap of the entire 1024x1024 map
-  RAIL.ChaseMap = TileMap:SubMap({x=RAIL.Owner.X[0],y=RAIL.Owner.Y[0]},     -- Center
-                            range)                                          -- Submap Range
+  RAIL.ChaseMap = TileMap:SubMap({X=RAIL.Owner.X[0],Y=RAIL.Owner.Y[0]},     -- Center
+                                 range,                                     -- Submap Range
+                                 { Priority = 0, },                         -- Defaults
+                                 { Priority = 0, },                         -- Invalid table
+                                 nil)                                       -- Passthrough
 end)
 
 RAIL.Event["TARGET SELECT/PRE"]:Register(0,               -- Priority
@@ -131,13 +134,13 @@ do
 
     -- Boost priority on the tiles that are within FollowDistance of the owner
     for tile in RAIL.ChaseMap:TilesAround(0,0,RAIL.State.FollowDistance) do
-      tile.priority = tile.priority + 1000
+      tile.Priority = tile.Priority + 1000
     end
     
     -- Reduce priority on tiles that are within a tile around ourself
     --local s_x,s_y = RAIL.ChaseMap:TranslateFromParent(RAIL.Self.X[0],RAIL.Self.Y[0])
     --for tile in RAIL.ChaseMap:TilesAround(s_x,s_y,1) do
-    --  tile.priority = tile.priority - 1
+    --  tile.Priority = tile.Priority - 1
     --end
   end)
 end
@@ -177,7 +180,7 @@ do
     local actor_x,actor_y = RAIL.ChaseMap:TranslateFromParent(actor.X[0],actor.Y[0])
     for tile,x,y in RAIL.ChaseMap:TilesAround(actor_x,actor_y,kite_range) do
       -- Subtract the monster's priority to the tile's priority
-      tile.priority = tile.priority - priority * RAIL.State.KitePriorityMultiplier
+      tile.Priority = tile.Priority - priority * RAIL.State.KitePriorityMultiplier
     end -- tile,x,y in RAIL.ChaseMap:TilesAround(actor_x,actor_y,kite_range)
   end)
   
@@ -217,7 +220,7 @@ do
         -- If the change is positive, apply it
         if delta > 0 then
           tile[actor] = priority
-          tile.priority = tile.priority + delta
+          tile.Priority = tile.Priority + delta
         end
       end
     end -- tile,x,y in RAIL.ChaseMap:TilesAround(actor_x,actor_y,range)
@@ -232,7 +235,7 @@ do
       -- Set the area around the self to have a lower priority
       local x,y = RAIL.ChaseMap:TranslateFromParent(RAIL.Self.X[0],RAIL.Self.Y[0])
       for tile in RAIL.ChaseMap:TilesAround(x,y,RAIL.State.DanceAttackTiles) do
-        tile.priority = tile.priority - 1000
+        tile.Priority = tile.Priority - 1000
       end
     end
   end)
@@ -242,64 +245,60 @@ RAIL.Event["TARGET SELECT/POST"]:Register(0,                  -- Priority
                                           "Move Targeting",   -- Handler name
                                           -1,                 -- Max runs (negative means infinite)
                                           function()          -- Handler function
-                                
-  -- The best tile found so far (none yet)
-  local best
-
-  -- Get our current position relative to the owner
+  -- Get current position relative to the owner
   local s_x,s_y = RAIL.ChaseMap:TranslateFromParent(RAIL.Self.X[0],RAIL.Self.Y[0])
+  
+  -- Get the maximum distance
+  local MaxDistance = RAIL.State.MaxDistance
 
   -- Loop through all the tiles around our owner
-  for tile,x,y in RAIL.ChaseMap:TilesAround(0,0,RAIL.State.MaxDistance) do
-    -- Check that the tile hasn't been determined to be unpassable
-    if tile.walkable ~= false then
-      local better = false
-      -- If there is no best, use the first tile returned
-      if not best then
-        better = true
-        
-      -- If this tile is higher priority than the last, use it
-      elseif tile.priority > best.priority then
-        better = true
-        
-      -- If this tile and the existing best have equal priority, more processing
-      --  needs to be done
-      elseif tile.priority == best.priority then
-        -- Get the distance between the tile and the AI
-        tile.s_dist = PythagDistance(s_x,s_y,x,y)
-
-        -- If this tile is equal priority and closer to the AI, it is better
-        if tile.s_dist < best.s_dist then
-          better = true
-          
-        -- If the tiles are equidistant, do more processing
-        elseif tile.s_dist == best.s_dist then
-        
-          -- Get the distance between the tile and the owner
-          tile.o_dist = PythagDistance(0,0,x,y)
-          
-          -- Prefer tiles that are closer to the owner
-          if tile.o_dist < best.o_dist then
-            better = true
-          end
-        end
-      end
-
-      -- Check if the current tile is better than the existing best
-      if better then
-        -- Copy the tiles information into the "best" variable
-        best = tile
-        best.s_dist = PythagDistance(s_x,s_y,x,y)
-        best.o_dist = PythagDistance(0,0,x,y)
-        best.x = x
-        best.y = y
-      end
-    end
-  end
+  -- NOTE: Do not use TileAround because it will generate tables for each tile,
+  --       even if it hasn't been accessed this cycle. Using rawget will yield
+  --       only tiles that have been accessed (and as such, probably have move
+  --       priorities
+  local best
+  for y=-MaxDistance,MaxDistance do
+    -- Check if this row has been accessed
+    local row = rawget(RAIL.ChaseMap,y)
+    if row ~= nil then
+      -- Loop through each tile within this row
+      for x=-MaxDistance,MaxDistance do
+        -- Check if this tile had been accessed and isn't known not to be
+        -- walkable
+        local tile = rawget(row,x)
+        if tile ~= nil and tile.Passable ~= false then
+          -- Check if a tile has been selected yet
+          if not best then
+            best = tile
+          else
+            -- Check this tile's priority against the current selection
+            if tile.Priority > best.Priority then
+              best = tile
+            elseif tile.Priority == best.Priority then
+              -- Check if the tile is closer to the AI
+              local tile_dist = PythagDistance(s_x,s_y,x,y)
+              local best_dist = PythagDistance(s_x,s_y,best.X,best.Y)
+              if tile_dist < best_dist then
+                best = tile
+              elseif tile_dist == best_dist then
+                -- Check if the tile is closer to the owner
+                if PythagDistance(0,0,x,y) < PythagDistance(0,0,best.X,best.Y) then
+                  best = tile
+                end
+              end
+            end -- tile.Priority > best.Priority
+          end -- not RAIL.Target.Chase
+        end -- tile ~= nil
+      end -- x=-MaxDistance,MaxDistance
+    end -- row ~= nil
+  end -- y=-MaxDistance,MaxDistance
 
   -- Check to see if we've found a tile better than the one we're on
-  if best and (best.x ~= s_x or best.y ~= s_y) then
-    RAIL.Target.Chase = {RAIL.ChaseMap:TranslateToParent(best.x,best.y)}
+  if best then
+    local x,y = TileMap:GetCoordsFromTile(best)
+    if x ~= RAIL.Self.X[0] or y ~= RAIL.Self.Y[0] then
+      RAIL.Target.Chase = { x, y }
+    end
   end
 end)
 
