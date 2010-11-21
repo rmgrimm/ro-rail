@@ -452,7 +452,6 @@ RAIL.Event["TARGET SELECT/ENEMY/ATTACK"]:Register(0,            -- Priority
                                                   function(self,actor)
   -- Check if the actor is allowed
   if not actor:IsAttackAllowed() then
-  RAIL.LogT(0,"allowed")
     -- Don't continue this event
     return false
   end
