@@ -250,6 +250,16 @@ RAIL.Event["TARGET SELECT/POST"]:Register(0,                  -- Priority
   
   -- Get the maximum distance
   local MaxDistance = RAIL.State.MaxDistance
+  
+  -- A table to use for tiles that haven't been accessed
+  local nil_tile = {
+    Priority = 0,
+    X = nil,
+    Y = nil,
+  }
+  
+  -- A table to use as place holder in case a nil_tile is best
+  local nil_best = Table.ShallowCopy(nil_tile)
 
   -- Loop through all the tiles around our owner
   -- NOTE: Do not use TileAround because it will generate tables for each tile,
@@ -258,44 +268,66 @@ RAIL.Event["TARGET SELECT/POST"]:Register(0,                  -- Priority
   --       priorities
   local best
   for y=-MaxDistance,MaxDistance do
-    -- Check if this row has been accessed
+    -- Get the row from the ChaseMap
     local row = rawget(RAIL.ChaseMap,y)
-    if row ~= nil then
-      -- Loop through each tile within this row
-      for x=-MaxDistance,MaxDistance do
-        -- Check if this tile had been accessed and isn't known not to be
-        -- walkable
-        local tile = rawget(row,x)
-        if tile ~= nil and tile.Passable ~= false then
-          -- Check if a tile has been selected yet
-          if not best then
+    -- Loop through each tile within this row
+    for x=-MaxDistance,MaxDistance do
+      -- Get the tile at (x,y)
+      local tile
+      if row ~= nil then
+        tile = rawget(row,x) or nil_tile
+      else
+        tile = nil_tile
+      end
+      
+      -- Check that the tile isn't known to be unpassable
+      if tile.Passable ~= false then
+        -- Check if a tile has been selected yet
+        if not best then
+          best = tile
+        else
+          -- Check this tile's priority against the current selection
+          if tile.Priority > best.Priority then
             best = tile
-          else
-            -- Check this tile's priority against the current selection
-            if tile.Priority > best.Priority then
+          elseif tile.Priority == best.Priority then
+            -- Check if the tile is closer to the AI
+            local tile_dist = PythagDistance(s_x,s_y,x,y)
+            local best_dist = PythagDistance(s_x,s_y,best.X,best.Y)
+            if tile_dist < best_dist then
               best = tile
-            elseif tile.Priority == best.Priority then
-              -- Check if the tile is closer to the AI
-              local tile_dist = PythagDistance(s_x,s_y,x,y)
-              local best_dist = PythagDistance(s_x,s_y,best.X,best.Y)
-              if tile_dist < best_dist then
+            elseif tile_dist == best_dist then
+              -- Check if the tile is closer to the owner
+              if PythagDistance(0,0,x,y) < PythagDistance(0,0,best.X,best.Y) then
                 best = tile
-              elseif tile_dist == best_dist then
-                -- Check if the tile is closer to the owner
-                if PythagDistance(0,0,x,y) < PythagDistance(0,0,best.X,best.Y) then
-                  best = tile
-                end
               end
-            end -- tile.Priority > best.Priority
-          end -- not RAIL.Target.Chase
-        end -- tile ~= nil
-      end -- x=-MaxDistance,MaxDistance
-    end -- row ~= nil
+            end
+          end -- tile.Priority > best.Priority
+        end -- not best
+        
+        -- Check if the best tile is the nil_tile
+        if best == nil_tile then
+          -- Change best to the nil_best
+          best = nil_best
+          
+          -- Set the coordinates of it
+          nil_best.X = x
+          nil_best.Y = y
+        end
+      end -- tile.Passable ~= nil
+    end -- x=-MaxDistance,MaxDistance
   end -- y=-MaxDistance,MaxDistance
 
   -- Check to see if we've found a tile better than the one we're on
   if best then
-    local x,y = TileMap:GetCoordsFromTile(best)
+    -- Transform the X,Y to map-wide coordinates
+    local x,y
+    if best ~= nil_best then
+      x,y = TileMap:GetCoordsFromTile(best)
+    else
+      x,y = RAIL.ChaseMap:TranslateToParent(best.X,best.Y)
+    end
+
+    -- If we're not already at that position, set it as the chase target
     if x ~= RAIL.Self.X[0] or y ~= RAIL.Self.Y[0] then
       RAIL.Target.Chase = { x, y }
     end

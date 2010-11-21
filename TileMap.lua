@@ -160,8 +160,13 @@ do
       return self[y][x]
     end,
     GetCoordsFromTile = function(self,tile)
-      -- Check that it's not an out-of-range tile
-      if type(tile) == "userdata" then
+      -- Check that the tile is a table (out-of-range tiles are "userdata")
+      if type(tile) ~= "table" then
+        return nil
+      end
+      
+      -- Check that the tile table has [key]
+      if not tile[key] then
         return nil
       end
 
