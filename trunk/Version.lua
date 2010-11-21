@@ -26,6 +26,7 @@ end
 --	Note: View the subversion commit notes for more full changelog.
 --		(This is maintained to regularly bump version number.)
 
+-- 2010-11-21 -- Massive restructuring of code into event-based system. Most user options stayed the same, but performance should be better.
 -- 2010-09-17 -- Fix IsEnemy's metatable (was preventing the friend system from working)
 -- 2010-09-16 -- Chase targeting will now check skill ranges as well; MaxDistance cap removed
 -- 2010-06-19 -- Add AutoPassiveHP, AutoPassiveHPisPercent, AutoUnPassiveHP options
