@@ -9,7 +9,7 @@ RAIL.Validate.IdleMovement = {is_subtable = true,
 }
 
 -- Hidden option; this probably shouldn't be changed
-RAIL.Validate.KitePriorityMultiplier = {"number",1,1,
+RAIL.Validate.KitePriorityMultiplier = {"number",3,1,
   unsaved = true,
 }
 
@@ -179,15 +179,24 @@ do
     -- Subtract the monster's priority level from the area it should be kited
     local actor_x,actor_y = RAIL.ChaseMap:TranslateFromParent(actor.X[0],actor.Y[0])
     for tile,x,y in RAIL.ChaseMap:TilesAround(actor_x,actor_y,kite_range) do
+      -- Calculate a modifier based on the distance of the tile to the actor in
+      -- relation to kite distance (so that the tiles closest are least
+      -- preferred)
+      local tile_dist_mod = BlockDistance(actor_x,actor_y,x,y) / kite_range
+      
+      -- Combine the modifiers so that the closest is multiplied by KitePriorityMultiplier
+      -- and the farthest has a minimum of 1
+      local modifier = math.min(1,tile_dist_mod * RAIL.State.KitePriorityMultiplier)
+
       -- Subtract the monster's priority to the tile's priority
-      tile.Priority = tile.Priority - priority * RAIL.State.KitePriorityMultiplier
+      tile.Priority = tile.Priority - priority * modifier
     end -- tile,x,y in RAIL.ChaseMap:TilesAround(actor_x,actor_y,kite_range)
   end)
   
   RAIL.Event["TARGET SELECT/ENEMY/CHASE"]:Register(0,                 -- Priority
                                                    "Disable Chase",   -- Handler name
                                                    -1,                -- Max runs (negative means infinite)
-                                                   function(self,actor,range,priority)
+                                                   function(self,actor)
     -- Check if we shouldn't chase after this monster
     if actor.BattleOpts.DisableChase then
       -- Don't continue this event
@@ -198,7 +207,7 @@ do
   RAIL.Event["TARGET SELECT/ENEMY/CHASE"]:Register(100,                 -- Priority
                                                    "Add to ChaseMap",   -- Handler name
                                                    -1,                  -- Max runs (infinite)
-                                                   function(self,actor,range,priority)
+                                                   function(self,actor,range,priority,pythag)
     -- Get the kite distance of this monster
     local kite_range = GetKiteRange(actor)
     
@@ -211,19 +220,22 @@ do
     -- Loop through all tiles that are within "range" blocks
     local actor_x,actor_y = RAIL.ChaseMap:TranslateFromParent(actor.X[0],actor.Y[0])
     for tile,x,y in RAIL.ChaseMap:TilesAround(actor_x,actor_y,range) do
-      -- Only modify tile priority when outside of kite range
-      if BlockDistance(actor_x,actor_y,x,y) > kite_range then
-        -- Get the change over any previous priority applied to this tile
-        -- from this actor
-        local delta = priority - (tile[actor] or 0)
-
-        -- If the change is positive, apply it
-        if delta > 0 then
-          tile[actor] = priority
-          tile.Priority = tile.Priority + delta
-        end
-      end
-    end -- tile,x,y in RAIL.ChaseMap:TilesAround(actor_x,actor_y,range)
+      -- Check if we're using PythagDistance or BlockDistance
+      if not pythag or PythagDistance(actor_x,actor_y,x,y) <= range then
+        -- Only modify tile priority when outside of kite range
+        if BlockDistance(actor_x,actor_y,x,y) > kite_range then
+          -- Get the change over any previous priority applied to this tile
+          -- from this actor
+          local delta = priority - (tile[actor] or 0)
+  
+          -- If the change is positive, apply it
+          if delta > 0 then
+            tile[actor] = priority
+            tile.Priority = tile.Priority + delta
+          end
+        end -- BlockDistance ...
+      end -- not pythag or ...
+    end -- tile,x,y in ...
   end)
 
   RAIL.Event["TARGET SELECT/POST"]:Register(-10,              -- Priority
