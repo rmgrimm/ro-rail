@@ -189,11 +189,11 @@ do
 
     -- Generate closures for callbacks on the skill
     local failures = 0
-    local function SuccessCallback(self,skill,ticks)
+    local function SuccessCallback(ticks,skill,target)
       -- Call the helper function
       RemoveSkillWait(skill_target)
     end
-    local function FailureCallback(self,skill,ticks)
+    local function FailureCallback(ticks,skill,target)
       -- If we failed more than 3 times, just forget the skill
       if failures > 3 then
         RemoveSkillWait(skill_target)
@@ -205,10 +205,10 @@ do
     end
     
     -- Set the callbacks for the skill
-    RAIL.Self.SkillState.Callbacks:Add(skill_target[1],   -- The skill
-                                       SuccessCallback,
-                                       FailureCallback,
-                                       false)             -- Do not persist
+    RAIL.SkillState.Callbacks:Add(skill_target[1],  -- The skill
+                                  SuccessCallback,
+                                  FailureCallback,
+                                  false)            -- Do not persist
   end
 
   -- Process commands that have been queued up
@@ -258,7 +258,7 @@ do
       end,
       [SKILL_OBJECT_CMD] = function(msg)
         -- Check if a skill is usable now
-        if RAIL.Self.SkillState:Get() == RAIL.Self.SkillState.Enum.READY then
+        if RAIL.SkillState == RAIL.SkillState.READY then
           -- Get the skill and actor from msg
           local skill_obj = msg[2]
           local actor = Actors[msg[3]]
@@ -286,7 +286,7 @@ do
       end,
       [SKILL_AREA_CMD] = function(msg)
         -- Check if a skill is usable now
-        if RAIL.Self.SkillState:Get() == RAIL.Self.SkillState.Enum.READY then
+        if RAIL.SkillState == RAIL.SkillState.READY then
           -- Gather information about the skill command
           local x,y = msg[3],msg[4]
           local skill_obj = msg[2]
