@@ -182,7 +182,7 @@ do
       -- Calculate a modifier based on the distance of the tile to the actor in
       -- relation to kite distance (so that the tiles closest are least
       -- preferred)
-      local tile_dist_mod = BlockDistance(actor_x,actor_y,x,y) / kite_range
+      local tile_dist_mod = 1 - (BlockDistance(actor_x,actor_y,x,y) / kite_range)
       
       -- Combine the modifiers so that the closest is multiplied by KitePriorityMultiplier
       -- and the farthest has a minimum of 1
