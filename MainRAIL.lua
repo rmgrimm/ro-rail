@@ -342,7 +342,7 @@ RAIL.Event["AI CYCLE"]:Register(-45,                -- Priority
   end
 
   -- Get our attack range
-  RAIL.Self.AttackRange = GetV(V_ATTACKRANGE,id) - 0.5
+  RAIL.Self.AttackRange = GetV(V_ATTACKRANGE,id)
 
   -- AttackRange seems to be rounded up for melee
   --if RAIL.Self.AttackRange <= 2 then
