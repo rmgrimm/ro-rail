@@ -484,8 +484,9 @@ RAIL.Event["TARGET SELECT/ENEMY/ATTACK"]:Register(10,                 -- Priorit
     if self.Event.RetVal[1] == nil then self.Event.RetVal[1] = false end
 
     RAIL.Event["TARGET SELECT/ENEMY/CHASE"]:Fire(actor,
-                                                 range - 0.5,
-                                                 actor.BattleOpts.Priority)
+                                                 range,
+                                                 actor.BattleOpts.Priority,
+                                                 true)      -- range uses PythagDistance
   end
 
   -- Check if the actor is outside attack range

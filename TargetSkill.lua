@@ -414,8 +414,9 @@ RAIL.Event["TARGET SELECT/ENEMY/SKILL/OFFENSIVE"]:Register(40,              -- P
 
     -- Fire an event to add the target to the ChaseMap
     RAIL.Event["TARGET SELECT/ENEMY/CHASE"]:Fire(actor,
-                                                 srange - 0.5,
-                                                 skill:GetPriority(actor))
+                                                 srange,
+                                                 skill:GetPriority(actor),
+                                                 true)    -- srange uses PythagDistance
   end
 
   -- Check the range

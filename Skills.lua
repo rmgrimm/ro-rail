@@ -614,7 +614,7 @@ do
       end)
       local range_func = function_or_string(parameters.Range,{},function(self)
         -- Use GetV to determine the range
-        return GetV(V_SKILLATTACKRANGE,RAIL.Self.ID,self.ID) - 0.5
+        return GetV(V_SKILLATTACKRANGE,RAIL.Self.ID,self.ID)
       end)
 
       local condition_func = function_or_string(parameters.Condition,CastConditions,function(_G)
