@@ -171,12 +171,15 @@ require "ActorOpts"
 require "Actor"
 
 require "Skills"
-require "SkillSupport"
+require "SkillState"
+--require "SkillSupport"
 
 -- AI modules
 require "TargetBasic"
 require "TargetChase"
+--require "TargetChaseSimple"
 require "TargetSkill"
+--require "TargetSkillAoE"
 require "Commands"
 
 ------------------------------
@@ -339,7 +342,7 @@ RAIL.Event["AI CYCLE"]:Register(-45,                -- Priority
   end
 
   -- Get our attack range
-  RAIL.Self.AttackRange = GetV(V_ATTACKRANGE,id)
+  RAIL.Self.AttackRange = GetV(V_ATTACKRANGE,id) - 0.5
 
   -- AttackRange seems to be rounded up for melee
   --if RAIL.Self.AttackRange <= 2 then

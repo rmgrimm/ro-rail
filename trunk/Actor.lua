@@ -913,7 +913,7 @@ do
     end
 
     -- Check if we should wait before casting against this actor
-    if RAIL.Self.SkillState:CompletedTime() + self.BattleOpts.TicksBetweenSkills > GetTick() then
+    if RAIL.SkillState:CompletedTime() + self.BattleOpts.TicksBetweenSkills > GetTick() then
       return false
     end
 

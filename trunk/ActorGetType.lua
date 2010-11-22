@@ -193,7 +193,7 @@ do
                                   "MobID Init",   -- Handler name
                                   1,              -- Max runs
                                   function()      -- Function handler
-    self = RAIL.MobID
+    local self = RAIL.MobID
   
     -- Check for a sane GetType
     for i,V_ in TypeNums do

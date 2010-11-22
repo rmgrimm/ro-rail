@@ -502,7 +502,7 @@ do
       RAIL.LogT(60,"Casting {1}.",self)
 
       -- Set the skill state
-      RAIL.Self.SkillState:WaitFor(self,RAIL.Self)
+      RAIL.SkillState:WaitFor(self,RAIL.Self)
 
       -- Use the skill
       SkillObject(RAIL.Self.ID,self.Level,self.ID,RAIL.Self.ID)
@@ -515,7 +515,7 @@ do
       RAIL.LogT(60,"Casting {1} against {2}.",self,actor)
 
       -- Set the skill state
-      RAIL.Self.SkillState:WaitFor(self,actor)
+      RAIL.SkillState:WaitFor(self,actor)
 
       -- Use the skill
       SkillObject(RAIL.Self.ID,self.Level,self.ID,actor.ID)
@@ -524,7 +524,7 @@ do
       -- Ensure we've got coordinates
       if RAIL.IsActor(x) then
         -- Set the skill state
-        RAIL.Self.SkillState:WaitFor(self,x)
+        RAIL.SkillState:WaitFor(self,x)
 
         -- Log it
         RAIL.LogT(60,"Casting {1} against {2}.",self,x)
@@ -534,8 +534,7 @@ do
         x = x.X[0]
       else
         -- Set the skill state
-        -- TODO: Allow SkillState:WaitFor to take a ground location
-        --RAIL.Self.SkillState:WaitFor(self,x,y)
+        RAIL.SkillState:WaitFor(self,x,y)
 
         -- Log it
         RAIL.LogT(60,"Casting {1} on ({2},{3}).",self,x,y)
@@ -615,7 +614,7 @@ do
       end)
       local range_func = function_or_string(parameters.Range,{},function(self)
         -- Use GetV to determine the range
-        return GetV(V_SKILLATTACKRANGE,RAIL.Self.ID,self.ID)
+        return GetV(V_SKILLATTACKRANGE,RAIL.Self.ID,self.ID) - 0.5
       end)
 
       local condition_func = function_or_string(parameters.Condition,CastConditions,function(_G)
