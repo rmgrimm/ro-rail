@@ -387,7 +387,7 @@ do
     -- have been selected
     local attack = (RAIL.Target.Attack ~= nil)
     local skill  = (RAIL.Target.Skill  ~= nil) or
-                   (RAIL.Self.SkillState:Get() ~= RAIL.Self.SkillState.Enum.READY)
+                   (RAIL.SkillState    ~= RAIL.SkillState.READY)
     local attack_oor = false
     local skill_oor  = false
     repeat

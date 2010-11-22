@@ -122,9 +122,8 @@ do
     if Table.GetN(t) < pos then
       return
     end
-  
-    -- Shift everythign forward
-    local i
+
+    -- Shift everything forward
     for i=pos,t[key_n]-num do
       t[i]=t[i+num]
       t[i+num]=nil

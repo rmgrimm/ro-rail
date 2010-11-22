@@ -2,14 +2,16 @@
 -- Validation Options --
 ------------------------
 
-RAIL.Validate.SkillOptions = {is_subtable = true,
-  BuffBasePriority = {"number",40,0},
-  
-  -- Mental Charge
-  [8004] = {
+if not RAIL.Validate.SkillOptions then
+  RAIL.Validate.SkillOptions = {is_subtable = true}
+end
+
+RAIL.Validate.SkillOptions.BuffBasePriority = {"number",40,0}
+
+-- Mental Charge
+RAIL.Validate.SkillOptions[8004] = {
     MaxFailures = {"number",4},
     PriorityOffset = {"number",15},
-  },
 }
 
 --------------------------
@@ -111,7 +113,7 @@ do
                                   "Casting Terminate",    -- Handler name
                                   -1,                     -- Max runs (negative means infinite)
                                   function()              -- Handler function
-    if RAIL.Self.SkillState:Get() == RAIL.Self.SkillState.Enum.CASTING then
+    if RAIL.SkillState == RAIL.SkillState.CASTING then
       RAIL.LogT(7,"Casting motion prevents action; cycle terminating after data collection.")
 
       -- Discontinue this AI CYCLE
@@ -143,7 +145,7 @@ do
                                            -1,            -- Max runs (negative means infinite)
                                            function()
     -- Check if skills are ready
-    if RAIL.Self.SkillState:Get() ~= RAIL.Self.SkillState.Enum.READY then
+    if RAIL.SkillState ~= RAIL.SkillState.READY then
       -- Skills aren't ready
       return false
     end
@@ -165,7 +167,7 @@ do
                                             -1,               -- Max runs (negative means infinite)
                                             function()
     -- Check if skills are ready
-    if RAIL.Self.SkillState:Get() ~= RAIL.Self.SkillState.Enum.READY then
+    if RAIL.SkillState ~= RAIL.SkillState.READY then
       -- Skills aren't ready
       return false
     end
@@ -185,7 +187,7 @@ do
                               "Idle Skills",        -- Handler name
                               -1,                   -- Max runs (negative means infinite)
                               function(self,idletime)
-      if RAIL.Self.SkillState:Get() == RAIL.Self.SkillState.Enum.READY then
+      if RAIL.SkillState == RAIL.SkillState.READY then
         FireSkillEvent("TARGET SELECT/SKILL/HEAL OWNER", "HealOwner", idletime)
         FireSkillEvent("TARGET SELECT/SKILL/HEAL SELF",  "HealSelf",  idletime)
 
@@ -238,22 +240,22 @@ do
   local offensive_skills = Table.New()
   
   -- Callbacks for the skills
-  local function SuccessCallback(self,target,ticks)
+  local function SuccessCallback(ticks,skill,target)
     -- Reset the failure count
-    target.BattleOpts[self.ID .. "failures"] = 0
+    target.BattleOpts[skill.ID .. "failures"] = 0
 
     -- Set the next time that the skill should be cast
-    if self.Duration > 0 then
-      target.BattleOpts[self.ID .. "next"] = GetTick() - ticks + self.Duration
+    if skill.Duration > 0 then
+      target.BattleOpts[skill.ID .. "next"] = GetTick() - ticks + skill.Duration
     end
   end
 
-  local function FailureCallback(self,target,ticks)
+  local function FailureCallback(ticks,skill,target)
     -- Increment the failure count if the skill hasn't been confirmed
-    local key = self.ID .. "failures"
+    local key = skill.ID .. "failures"
     target.BattleOpts[key] = (target.BattleOpts[key] or 0) + 1
   end
-  
+
   -- Helper function to get priority level of a skill against an actor
   local function GetPriority(self,actor)
     local actor_prio = actor.BattleOpts.Priority
@@ -275,10 +277,10 @@ do
     offensive_skills:Append(skill)
 
     -- Add the callbacks
-    RAIL.Self.SkillState.Callbacks:Add(skill,           -- Skill to add callbacks to
-                                       SuccessCallback,
-                                       FailureCallback,
-                                       true)            -- Persist past the first call
+    RAIL.SkillState.Callbacks:Add(skill,            -- Skill to add callbacks to
+                                  SuccessCallback,
+                                  FailureCallback,
+                                  true)             -- Persist past the first call
 
     -- Add the GetPriority support function
     if not skill[1] then
@@ -464,7 +466,7 @@ end)
 -- Offensive Skiils: Attack --
 ------------------------------
 do
-  local function SuccessCallback(self,target,ticks)
+  local function SuccessCallback(ticks,skill,target)
     -- Increment skill counter
     -- NOTE: This is checked in Actor.lua's IsSkillAllowed()
     target.BattleOpts.CastsAgainst = (target.BattleOpts.CastsAgainst or 0) + 1
@@ -526,10 +528,10 @@ do
     -- Check if the selected skill is an attack skill
     if skill_ids[RAIL.Target.Skill[1].ID] then
       -- Add the callback for the next cast
-      RAIL.Self.SkillState.Callbacks:Add(skill,
-                                         SuccessCallback,
-                                         nil,
-                                         false)             -- not permanent
+      RAIL.SkillState.Callbacks:Add(skill,
+                                    SuccessCallback,
+                                    nil,
+                                    false)            -- not persistent
     end
   end)
 end
@@ -608,6 +610,19 @@ do
     return base_prio + prio_offset
   end
 
+  local function SuccessCallback(ticks,skill)
+    -- Reset the failure count
+    failures[skill.ID] = 0
+
+    -- Set the next time we can use the buff
+    RAIL.State.SkillOptions[skill.ID].NextCastTime = GetTick() + skill.Duration - ticks
+  end
+
+  local function FailureCallback(ticks,skill)
+    -- Increment the failure count if the skill hasn't been confirmed
+    failures[skill.ID] = failures[skill.ID] + 1
+  end
+
   -- Initialization
   RAIL.Event["SKILL INIT/BUFF"]:Register(0,             -- Priority
                                          "Buff init",   -- Handler name
@@ -617,32 +632,20 @@ do
 
     -- Copy validation options from defaults, but don't overwrite
     byID[skill.ID] = Table.DeepCopy(defaults,byID[skill.ID],false)
-    
+
     -- Check if our ID has changed, which indicates that we'll have to recast
     -- buffs
     if RAIL.Self.ID ~= RAIL.State.Information.SelfID then
       RAIL.State.SkillOptions[skill.ID].NextCastTime = 0
     end
-    
+
     -- Add callbacks to the skill
     failures[skill.ID] = 0
-    local function SuccessCallback(self,target,ticks)
-      -- Reset the failure count
-      failures[self.ID] = 0
 
-      -- Set the next time we can use the buff
-      RAIL.State.SkillOptions[self.ID].NextCastTime = GetTick() + skill.Duration - ticks
-    end
-
-    local function FailureCallback(self,target,ticks)
-      -- Increment the failure count if the skill hasn't been confirmed
-      failures[self.ID] = failures[self.ID] + 1
-    end
-
-    RAIL.Self.SkillState.Callbacks:Add(skill,           -- Skill to add callbacks to
-                                       SuccessCallback,
-                                       FailureCallback,
-                                       true)            -- Persist past the first call
+    RAIL.SkillState.Callbacks:Add(skill,            -- Skill to add callbacks to
+                                  SuccessCallback,
+                                  FailureCallback,
+                                  true)             -- Persist past the first call
 
 
     -- Add the GetPriority support function

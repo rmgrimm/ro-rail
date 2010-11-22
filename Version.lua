@@ -26,6 +26,7 @@ end
 --	Note: View the subversion commit notes for more full changelog.
 --		(This is maintained to regularly bump version number.)
 
+-- 2010-11-22 -- Various bug fixes; Refactoring of SkillSupport into SkillState, now supports ground-skill targeting; New state-file options: SkillOptions.RampageMode and SkillOptions.Timeout
 -- 2010-11-21 -- Fix Chase selection so that it assumes non-generated ChaseMap locations have priority 0; this fixes kiting mode.
 -- 2010-11-21 -- Reimplement AttackWhileChasing, code clean ups, fix out-of-range targeting
 -- 2010-11-21 -- Rewrite TileMap.lua, optimize Chase selection to not generate tile tables.
