@@ -510,7 +510,7 @@ do
   RAIL.Event["TARGET SELECT/POST"]:Register(0,                  -- Priority
                                             "Attack callback",  -- Handler name
                                             -1,                 -- Max runs (negative means infinite)
-                                            function()
+                                            function(self)
     -- Ensure that there are attack skills to check
     if not have_attacks then
       -- Don't check this again
