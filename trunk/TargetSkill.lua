@@ -28,9 +28,10 @@ RAIL.Event["AI CYCLE"]:Register(-35,                    -- Priority
     Buff          = "SKILL INIT/BUFF",
     Debuff        = "SKILL INIT/OFFENSIVE",
     --Defense       = "SKILL INIT/DEFENSE",
+    --Emergency     = "SKILL INIT/EMERGENCY",
     --HealOwner     = "SKILL INIT/HEAL OWNER",
     --HealSelf      = "SKILL INIT/HEAL SELF",
-    --PartyBuff     = "SKILL INIT/PARTY BUFF",
+    --PartySupport  = "SKILL INIT/PARTY BUFF",
     Provoke       = "SKILL INIT/PROVOKE",       -- also fires SKILL INIT/OFFENSIVE
     --Pushback      = "SKILL INIT/PUSHBACK",
     --Recover       = "SKILL INIT/RECOVER",

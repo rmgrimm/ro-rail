@@ -382,7 +382,7 @@ RAIL.Event["AI CYCLE"]:Register(-2,               -- Priority
   RAIL.State.Information.InitTime = GetTick()
   RAIL.State.Information.OwnerID = RAIL.Owner.ID
   RAIL.State.Information.SelfID = RAIL.Self.ID
-  RAIL.State.Information.Version = RAIL.FullVersion
+  RAIL.State.Information.RAILVersion = RAIL.FullVersion
 
   -- Log information
   RAIL.LogT(0,"RAIL initialization complete.")
@@ -501,14 +501,35 @@ RAIL.Event["AI CYCLE"]:Register(800,              -- Priority
                                 "Delay action",   -- Handler name
                                 -1,               -- Max runs
                                 function(self)
-  -- Check if the delay for after-init action has expired
-  if GetTick() - RAIL.State.Information.InitTime < RAIL.State.DelayFirstAction then
-    -- Not expired yet, don't continue this cycle
-    return false
+  local finished = false
+
+  -- Check if the owner has acted at all, which would cause DelayFirstAction
+  -- to be useless.
+  if RAIL.Owner.Motion[0] ~= MOTION_STAND then
+    -- Owner doesn't have invulnerability any more, start acting
+    finished = true
+  end
+  
+  -- Check if the owner requested a motion from the AI, overriding DelayFirstAction
+  if RAIL.Cmd.Queue:Size() > 0 then
+    -- Delay overridden
+    finished = true
   end
 
-  -- The delay has expired, don't run this handler any more
-  self.RunsLeft = 0
+  -- Check if the delay for after-init action has expired
+  if GetTick() - RAIL.State.Information.InitTime >= RAIL.State.DelayFirstAction then
+    -- Expired, the Delay action is finished
+    finished = true
+  end
+
+  -- Check if the delay is expired or otherwise aborted
+  if finished then
+    -- The delay has expired, don't run this handler any more
+    self.RunsLeft = 0
+  end
+
+  -- If the AI is still waiting, don't continue this cycle
+  return false
 end)
 
 RAIL.Event["AI CYCLE"]:Register(940,                  -- Priority

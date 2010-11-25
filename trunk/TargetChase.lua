@@ -26,6 +26,24 @@ setmetatable(RAIL.Validate.FollowDistance,{
   end,
 })
 
+-- If the optional BeginFollowDistance is unspecified, it will be calculated
+-- based on MaxDistance
+RAIL.Validate.BeginFollowDistance = {"number", -1, nil, nil, { [-1] = true, }, }
+setmetatable(RAIL.Validate.BeginFollowDistance,{
+  __index = function(self,idx)
+    -- Minimum value is FollowDistance
+    if idx == 3 then
+      return RAIL.State.FollowDistance
+
+    -- Maximum value is MaxDistance
+    elseif idx == 4 then
+      return RAIL.State.MaxDistance
+    end
+  end,
+})
+
+-- removed: InterceptAlgorithm
+
 RAIL.Event["AI CYCLE"]:Register(50,                 -- Priority
                                 "Chase Map Begin",  -- Handler name
                                 -1,                 -- Max runs (negative means infinite)
@@ -79,6 +97,7 @@ do
 
     -- Check if we were already chasing our owner
     if last then
+      -- Check if the owner is still moving
       if
         RAIL.Owner.Motion[0] == MOTION_MOVE or
         History.FindMostRecent(RAIL.Owner.Motion,MOTION_MOVE,nil,500)
@@ -90,12 +109,19 @@ do
       -- Also chase to a closer distance
       max = RAIL.State.FollowDistance
     else
+      -- Check if the owner is moving away from the AI
       if
         RAIL.Owner.Motion[0] == MOTION_MOVE and
         RAIL.Self:DistanceTo(0)(RAIL.Owner.X[-500],RAIL.Owner.Y[-500])
           > RAIL.Self:DistanceTo(0)(RAIL.Owner)
       then
+        -- Set the moving flag
         moving = true
+        
+        -- Use BeginChaseDistance if it has been set
+        if RAIL.State.BeginChaseDistance ~= -1 then
+          max = RAIL.State.BeginChaseDistance
+        end
       end
     end
     
@@ -105,8 +131,8 @@ do
       return true
     end
     
-    -- Check if owner is moving
-    if moving then
+    -- Check if owner is moving and max is still MaxDistance
+    if moving and max == RAIL.State.MaxDistance then
       -- Estimate the movement speed of the owner
       local speed = RAIL.Owner:EstimateMove()
       
@@ -136,12 +162,6 @@ do
     for tile in RAIL.ChaseMap:TilesAround(0,0,RAIL.State.FollowDistance) do
       tile.Priority = tile.Priority + 1000
     end
-    
-    -- Reduce priority on tiles that are within a tile around ourself
-    --local s_x,s_y = RAIL.ChaseMap:TranslateFromParent(RAIL.Self.X[0],RAIL.Self.Y[0])
-    --for tile in RAIL.ChaseMap:TilesAround(s_x,s_y,1) do
-    --  tile.Priority = tile.Priority - 1
-    --end
   end)
 end
 
@@ -220,7 +240,7 @@ do
     -- Loop through all tiles that are within "range" blocks
     local actor_x,actor_y = RAIL.ChaseMap:TranslateFromParent(actor.X[0],actor.Y[0])
     for tile,x,y in RAIL.ChaseMap:TilesAround(actor_x,actor_y,range) do
-      -- Check if we're using PythagDistance or BlockDistance
+      -- Check if we're using PythagDistance instead of BlockDistance
       if not pythag or PythagDistance(actor_x,actor_y,x,y) <= range then
         -- Only modify tile priority when outside of kite range
         if BlockDistance(actor_x,actor_y,x,y) > kite_range then
