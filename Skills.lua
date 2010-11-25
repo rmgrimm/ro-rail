@@ -749,9 +749,9 @@ do
         }
       elseif id == LANCER03 then
         return {
-          Attack = AllSkills[8216][2],      -- pierce
-          Recover = AllSkills[8229][1],     -- recuperate
-          PartyBuff = AllSkills[8221][1],   -- sacrifice
+          Attack = AllSkills[8216][2],        -- pierce
+          Recover = AllSkills[8229][1],       -- recuperate
+          PartySupport = AllSkills[8221][1],  -- sacrifice
         }
       elseif id == LANCER04 then
         return {
@@ -770,8 +770,8 @@ do
         }
       elseif id == LANCER07 then
         return {
-          --AllSkills[8223][1],             -- berserk (passive)
-          PartyBuff = AllSkills[8221][1],   -- sacrifice
+          --AllSkills[8223][1],               -- berserk (passive)
+          PartySupport = AllSkills[8221][1],  -- sacrifice
         }
       elseif id == LANCER08 then
         return {
@@ -787,10 +787,10 @@ do
         }
       elseif id == LANCER10 then
         return {
-          Attack = AllSkills[8218][5],      -- clashing spiral
-          Buff = AllSkills[8220][10],       -- guard
-          PartyBuff = AllSkills[8221][3],   -- sacrifice
-          Buff2 = AllSkills[8223][5],       -- weapon quicken
+          Attack = AllSkills[8218][5],        -- clashing spiral
+          Buff = AllSkills[8220][10],         -- guard
+          PartySupport = AllSkills[8221][3],  -- sacrifice
+          Buff2 = AllSkills[8223][5],         -- weapon quicken
         }
       elseif id == SWORDMAN01 then
         return {
