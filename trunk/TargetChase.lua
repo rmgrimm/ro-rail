@@ -118,9 +118,9 @@ do
         -- Set the moving flag
         moving = true
         
-        -- Use BeginChaseDistance if it has been set
-        if RAIL.State.BeginChaseDistance ~= -1 then
-          max = RAIL.State.BeginChaseDistance
+        -- Use BeginFollowDistance if it has been set
+        if RAIL.State.BeginFollowDistance ~= -1 then
+          max = RAIL.State.BeginFollowDistance
         end
       end
     end
