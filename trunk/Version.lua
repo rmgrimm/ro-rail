@@ -26,6 +26,7 @@ end
 --	Note: View the subversion commit notes for more full changelog.
 --		(This is maintained to regularly bump version number.)
 
+-- 2010-11-26 -- Implement PartySupport skills
 -- 2010-11-25 -- Added new state-file option BeginChaseDistance; Added early-cancelation conditions to DelayFirstAction
 -- 2010-11-23 -- Fix a bugs for AI types without attack skills
 -- 2010-11-22 -- Fix commands to work with new SkillState
