@@ -149,7 +149,11 @@ do
     if self ~= enum.READY then
       -- If not in DELAY state, fire the failure callbacks
       if self ~= enum.DELAY then
-        -- TODO: Fire failure callback
+        -- Fire failure callbacks
+        self.Callbacks:Fire(false,                                          -- Failure
+                            GetTick() - self[key].Ticks[self[key].State],   -- Time since failure
+                            self[key].Skill,                                -- Used skill
+                            unpack(self[key].Target))                       -- Skill target
       end
 
       -- Reset any callbacks on the old skill
@@ -393,7 +397,7 @@ do
       if sp_delta < 0 then
         -- Transition to DELAY_ACK, and reuse code for SP check
         state_obj:Set(enum.DELAY_ACK,ticks_in_state)
-        
+
         -- Continue processing skill state update functions
         return true
       end
@@ -456,10 +460,36 @@ do
         -- Make sp_delta positive for easier comparison of SP costs
         sp_delta = -sp_delta
 
-        -- Get the skill
-        local skill = state_obj[key].Skill
-        
-        -- TODO: Check if a different level has possibly been used
+        -- Get the original skill
+        local orig_skill = state_obj[key].Skill
+
+        -- Check if a different level has possibly been used
+        if orig_skill.SPCost ~= sp_delta then
+          -- Get the skill object from AllSkills (so level is selectable)
+          local skill = AllSkills[orig_skill.ID]
+
+          -- Look for another level
+          local level = skill.Level
+          while level > 1 do
+            if skill[level] and sp_delta >= skill[level].SPCost then
+              break
+            end
+
+            level = level - 1
+          end
+          
+          -- Check if the level is different
+          if level ~= orig_skill.Level then
+            RAIL.LogT(60,
+                      "Cast of {1} seems to have used level {2}; SP used = {3}.",
+                      orig_skill,
+                      level,
+                      sp_delta)
+            
+            -- Replace the skill, so delay/duration time will be more accurate
+            self[key].Skill = skill[level]
+          end
+        end
         
         -- Transition to DELAY
         -- NOTE: Use half of ticks_in_state as an estimation of when the skill

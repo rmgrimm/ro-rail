@@ -86,6 +86,9 @@ do
       return RAIL.State.SkillOptions[self.ID].Name
     end
     
+    -- Get the name, just so it'll show up in the state file
+    AllSkills[skill.ID]:GetName()
+
     -- Set the default condition function
     byID[skill.ID].Condition[2] = AllSkills[skill.ID].Condition
   end)

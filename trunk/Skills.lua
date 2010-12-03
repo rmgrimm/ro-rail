@@ -323,6 +323,7 @@ do
     [8221] = {
       Name = "Sacrifice",
       CastFunction = "actor",
+      Range = function(self) return 6 + self.Level end,
       MaxLevel = 5,
       SPCost = 25,
       CastTime = 3 * 1000,
