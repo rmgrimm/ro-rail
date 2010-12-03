@@ -487,7 +487,7 @@ do
                       sp_delta)
             
             -- Replace the skill, so delay/duration time will be more accurate
-            self[key].Skill = skill[level]
+            state_obj[key].Skill = skill[level]
           end
         end
         
