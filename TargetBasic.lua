@@ -13,6 +13,7 @@ RAIL.Validate.DefendOptions = {is_subtable = true,
   FriendThreshold = {"number",4,0},
 }
 RAIL.Validate.AttackWhileChasing = {"boolean",false}
+RAIL.Validate.MaintainTargetsWhilePassive = {"boolean",true}
 
 do
   local Potential = List.New()
@@ -283,6 +284,36 @@ do
       Potential:PushRight(defense)
     end)
   end
+  
+  RAIL.Event["TARGET SELECT/ENEMY"]:Register(30,                  -- Priority
+                                             "Previous Targets",  -- Handler name
+                                             -1,                  -- Max runs
+                                             function()
+    -- Maintain previous targets only when passive
+    if RAIL.IsAggressive() then
+      return true
+    end
+    
+    -- If not finishing targets while passive, don't maintain any
+    if not RAIL.State.MaintainTargetsWhilePassive then
+      return true
+    end
+    
+    -- Create a table with potential targets
+    local maintain,n = { Name = "Maintain", },0
+    for id,actor in pairs(RAIL.ActorLists.Enemies) do
+      -- Check that the actor has been targeted before
+      if actor.BattleOpts.PreviouslyTargeted then
+        maintain[id] = actor
+        n = n + 1
+      end
+    end
+    
+    -- If there are targets, add to the potentials list
+    if n > 0 then
+      Potential:PushRight(maintain)
+    end
+  end)
   
   RAIL.Event["TARGET SELECT/ENEMY"]:Register(30,                -- Priority
                                              "Aggressive/KS",   -- Handler name
