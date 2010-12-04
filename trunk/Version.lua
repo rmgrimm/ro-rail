@@ -26,7 +26,7 @@ end
 --	Note: View the subversion commit notes for more full changelog.
 --		(This is maintained to regularly bump version number.)
 
--- 2010-12-03 -- Implementation of some TODOs
+-- 2010-12-03 -- Implementation of some TODOs; rewrite of AutoPassive
 -- 2010-11-26 -- Implement PartySupport skills; Fix accidental naming error
 -- 2010-11-25 -- Added new state-file option BeginChaseDistance; Added early-cancelation conditions to DelayFirstAction
 -- 2010-11-23 -- Fix a bugs for AI types without attack skills
