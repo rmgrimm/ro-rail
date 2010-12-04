@@ -126,6 +126,10 @@ do
 
   -- BattleOpts metatable
   local battleopts_parent = {}
+  local seen_types = {
+    ["NPC"] = true,
+    [45] = true,
+  }
   local battleopts_mt = {
     __index = function(self,key)
       self = self[battleopts_parent]
@@ -138,7 +142,34 @@ do
 
       -- Then, check ByType table
       if self.Type ~= -2 then
-        ret = RAIL.State.ActorOptions.ByType[self.Type][key]
+        -- Get the table for this type
+        local type_state = rawget(RAIL.State.ActorOptions.ByType,self.Type)
+
+        -- If there was no table yet, log it and then generate it
+        if not type_state then
+          -- Generate the table automatically
+          type_state = RAIL.State.ActorOptions.ByType[self.Type]
+          
+          -- Check if this is the first instance
+          if not seen_types[self.Type] and not seen_types[self.ActorType] then
+            local type_name = ""
+            if
+              type(type_state.Name) == "string" and
+              type_state.Name ~= RAIL.State.ActorOptions.Default.Name
+            then
+              type_name = " (" .. type_state.Name .. ")"
+            end
+            -- Log it
+            RAIL.LogT(55,
+                      "Actor type #{1}{2} not in state-file; only logging first occurrence.",
+                      self.Type,
+                      type_name)
+
+            -- Set this type as seen
+            seen_types[self.Type] = true
+          end
+        end
+        ret = type_state[key]
         if ret ~= nil then
           return ret
         end
