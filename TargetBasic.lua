@@ -1,37 +1,10 @@
 -- Validation options
 RAIL.Validate.AcquireWhileLocked = {"boolean",false}
-RAIL.Validate.Aggressive = {"boolean",false}
 RAIL.Validate.AssistOptions = {is_subtable = true,
   Owner = {"string","indifferent",nil},
   Other = {"string","indifferent",nil},   -- allowed options are set further down this file
   Friend = {"string","indifferent",nil},  --  (search "RAIL.Validate.AssistOptions.Owner")
 }
-RAIL.Validate.AutoPassiveHP = {"number",0,0}
-setmetatable(RAIL.Validate.AutoPassiveHP,{
-  __index = function(self,idx)
-    -- If percentages, then maximum should be 99
-    if idx == 4 and RAIL.State.AutoPassiveHPisPercent then
-      return 99
-    end
-  end,
-})
-RAIL.Validate.AutoPassiveHPisPercent = {"boolean",false}
-RAIL.Validate.AutoUnPassiveHP = {"number"}
-setmetatable(RAIL.Validate.AutoUnPassiveHP,{
-  __index = function(self,idx)
-    -- AutoUnPassiveHP should have a default and minimum of AutoPassiveHP
-    if idx == 2 or idx == 3 then
-      return RAIL.State.AutoPassiveHP + 1
-    end
-    
-    -- And maximum should be 100 if using percents
-    if idx == 4 and RAIL.State.AutoPassiveHPisPercent then
-      return 100
-    end
-
-    return nil
-  end,
-})
 RAIL.Validate.DefendOptions = {is_subtable = true,
   DefendWhilePassive = {"boolean",true},
   DefendWhileAggro = {"boolean",true},
@@ -40,49 +13,6 @@ RAIL.Validate.DefendOptions = {is_subtable = true,
   FriendThreshold = {"number",4,0},
 }
 RAIL.Validate.AttackWhileChasing = {"boolean",false}
-
-do
-  -- Aggressive Support
-  RAIL.IsAggressive = function(actor)
-    -- TODO: Add support for checking RAIL.Other's aggressive state
-
-    -- Non-aggressive means always non-aggressive
-    if not RAIL.State.Aggressive then
-      return false
-    end
-    
-    -- Check for HP changes updating auto-passive mode
-    do
-      local hp = actor.HP[0]
-      local log_percent = ""
-      if RAIL.State.AutoPassiveHPisPercent then
-        hp = math.floor(hp / actor:GetMaxHP() * 100)
-        log_percent = "%"
-      end
-      
-      if not actor.AutoPassive then
-        if hp < RAIL.State.AutoPassiveHP then
-          RAIL.LogT(10,"Temporarily entering passive mode due to HP below threshold; hp={1}{3}, threshold={2}{3}.",
-            hp, RAIL.State.AutoPassiveHP, log_percent)
-          actor.AutoPassive = true
-        end
-      else
-        if hp >= RAIL.State.AutoUnPassiveHP then
-          RAIL.LogT(10,"Disabling temporary passive mode due to HP above threshold; hp={1}{3}, threshold={2}{3}.",
-            hp, RAIL.State.AutoUnPassiveHP, log_percent)
-          actor.AutoPassive = nil
-        end
-      end
-    end
-    
-    -- If auto-passive, don't return aggressive mode
-    if actor.AutoPassive then
-      return false
-    end
-
-    return true
-  end
-end
 
 do
   local Potential = List.New()
@@ -264,7 +194,7 @@ do
                                                "Defense",   -- Handler name
                                                -1,          -- Max runs (negative means infinite)
                                                function()   -- Handler function
-      if not RAIL.IsAggressive(RAIL.Self) then
+      if not RAIL.IsAggressive() then
         -- If not aggressive and not defending while passive, don't run
         -- defense code
         if not RAIL.State.DefendOptions.DefendWhilePassive then
@@ -359,7 +289,7 @@ do
                                              -1,                -- Max runs (negative means infinite)
                                              function()         -- Handler function
     -- If not aggressive, don't add any potential targets table
-    if not RAIL.IsAggressive(RAIL.Self) then
+    if not RAIL.IsAggressive() then
       return true
     end
     

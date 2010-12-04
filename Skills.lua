@@ -566,7 +566,6 @@ do
         return true
       end
 
-
       return false
     end,
     ["defending_self"] = function(_G)

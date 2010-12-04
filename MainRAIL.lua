@@ -176,6 +176,7 @@ require "SkillState"
 
 -- AI modules
 require "TargetBasic"
+require "TargetBasicAggressive"
 require "TargetChase"
 --require "TargetChaseSimple"
 require "TargetSkill"
