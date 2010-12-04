@@ -1251,6 +1251,10 @@ do
 
     -- After sending an attack, this actor can never be kill-stealed (until Actor.Expire)
     self.BattleOpts.FreeForAll = true
+    
+    -- Set the target as previously-targeted so that it will not be removed if
+    -- aggressive mode turns off
+    self.BattleOpts.PreviouslyTargeted = true
   end
 
   Actor.SkillObject = function(self,skill)
@@ -1259,6 +1263,10 @@ do
 
     -- And never see this actor as kill-stealing
     self.BattleOpts.FreeForAll = true
+
+    -- Set the target as previously-targeted so that it will not be removed if
+    -- aggressive mode turns off
+    self.BattleOpts.PreviouslyTargeted = true
   end
 
   -----------------------
