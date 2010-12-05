@@ -111,14 +111,14 @@ do
   local targeted_time = {}
 
   -- Position tracking uses a specialty "diff" function
-  local pos_diff = function(a,b)
+  local pos_diff = function(a_value,a_time,b_value,b_time)
     -- If a tile changed, then the position is different
-    if math.abs(a[1]-b[1]) >= 1 then return true end
+    if math.abs(a_value-b_value) >= 1 then return true end
 
     -- If enough time has passed, count the position as different
     --  Note: This ensures that subvalues will be accurately calculated
     --  Note: This isn't really needed...
-    --if math.abs(a[2]-b[2]) > 500 then return true end
+    --if math.abs(a_time-b_time) > 500 then return true end
 
     -- Otherwise, the position is still the same
     return false
