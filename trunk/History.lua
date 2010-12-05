@@ -53,7 +53,7 @@ do
   local History_mt = {
     __index = function(self,key)
       local list = self[list_key]
-
+      
       -- Check if we have any history
       if list:Size() < 1 then
         -- No history, return the default
@@ -106,7 +106,7 @@ do
     end,
   }
 
-  local default_Different = function(a,b) return a[1] ~= b[1] end
+  local default_Different = function(a_value,a_time,b_value,b_time) return a_value ~= b_value end
 
   History.New = function(default_value,calc_sub_vals,diff_func)
     local ret = {
@@ -131,26 +131,26 @@ do
     -- Keep memory size down a bit; clear values older than 10 seconds
     History.ClearOldValues(table,10000)
 
-    -- New value
-    value = {value,GetTick()}
-
     -- Make sure it's not a duplicate
-    if list:Size() < 1 or diff(list[list.last],value) then
-      list:PushRight(value)
+    local list_last = list[list.last]
+    if list:Size() < 1 or diff(list_last[1],list_last[2],value,GetTick()) then
+      list:PushRight{value,GetTick()}
       return
     end
-    
+
     -- If we don't calculate sub-values, it won't matter
     if not table[subtimes_key] then return end
 
     -- Since sub-values are calculated, keep the beginning and end times
-    if list:Size() < 2 or diff(list[list.last-1],list[list.last]) then
-      list:PushRight(value)
+    local a = list[list.last-1]
+    if list:Size() < 2 or diff(a[1],a[2],list_last[1],list_last[2]) then
+      list:PushRight{value,GetTick()}
       return
     end
 
     -- If there's already beginning and end, update the end
-    list[list.last] = value
+    list[list.last][1] = value
+    list[list.last][2] = GetTick()
   end
   
   History.ClearOldValues = function(table,tick_age)

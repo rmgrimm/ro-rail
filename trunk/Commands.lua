@@ -269,7 +269,7 @@ do
           end
 
           -- Check if we're in range to use the skill
-          local srange = skill_obj:GetRange()
+          local srange = skill_obj.Range
           if RAIL.Self:DistanceTo(actor) <= srange then
             -- Set the skill target
             -- Note: Even without enough SP, we want this to block the skill
@@ -290,7 +290,7 @@ do
           -- Gather information about the skill command
           local x,y = msg[3],msg[4]
           local skill_obj = msg[2]
-          local srange = skill_obj:GetRange()
+          local srange = skill_obj.Range
 
           -- Check if the target is within range
           if RAIL.Self:DistanceTo(x,y) < srange then

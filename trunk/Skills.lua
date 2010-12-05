@@ -84,7 +84,7 @@ do
     [8009] = {
       Name = "Moonlight",
       CastFunction = "actor",
-      --Range = function() return 15 end,
+      --Range = 15,
       MaxLevel = 5,
       SPCost = function(level) return 4 * level end,
       CastDelay = 500,
@@ -133,7 +133,7 @@ do
     [8013] = {
       Name = "Caprice",
       CastFunction = "actor",
-      Range = function() return 15 end,
+      Range = 15,
       MaxLevel = 5,
       SPCost = function(level) return 20 + level*2 end,
       CastDelay = function(level) return (0.8 + level*0.2) * 1000 end,
@@ -204,6 +204,7 @@ do
       CastFunction = "self",
       MaxLevel = 1,
       SPCost = 200,
+
       -- TODO: special duration (lasts until HP < 100)
     },
 
@@ -323,12 +324,13 @@ do
     [8221] = {
       Name = "Sacrifice",
       CastFunction = "actor",
-      Range = function(self) return 6 + self.Level end,
+      Range = function(level) return 6 + level end,
       MaxLevel = 5,
       SPCost = 25,
       CastTime = 3 * 1000,
       CastDelay = 3 * 1000,
       Duration = function(level) return (15 + level*15) * 1000 end,
+      MaxTargets = function(level) return level end,
     },
 
     -- Mercenary inspecific
@@ -379,7 +381,7 @@ do
     [8224] = {
       Name = "Sight",
       CastFunction = "self",
-      Range = function() return 3 end,
+      Range = 3,
       MaxLevel = 1,
       SPCost = 10,
       Duration = 10 * 1000,
@@ -446,6 +448,60 @@ do
       SPCost = function(level) return 3 + level*1 end,
       CastDelay = 500,
       Duration = 30 * 1000,
+      Condition = function(_G,actor)
+        -- Separate decision based on the target being an actor
+        if actor:IsEnemy() then
+          -- Target like a debuff
+          return true
+        else
+          -- Target like a buff
+
+          -- TODO: Test this more fully
+          do
+            -- Disabled for now.
+            return false
+          end
+          
+          -- Check if the actor's HP is checked
+          if actor.HP then
+            -- Check if the actor's HP is below 30%
+            if _G.math.floor(actor.HP[0] / actor:GetMaxHP() * 100) < 30 then
+              -- Don't provoke
+              return false
+            end
+          end
+
+          local list = _G.History.GetConstList(actor.Motion)
+          local now = GetTick()
+          local i = list.last
+          local attacks = 0
+          while i > list.first do
+            -- Get the motion table
+            local motion = list[i]
+
+            -- Check if it's too old (5 seconds old)
+            if now - motion[2] > 5000 then
+              break
+            end
+            
+            -- Check if the motion is MOTION_ATTACK or MOTION_ATTACK2
+            if motion[1] == _G.MOTION_ATTACK or motion[2] == _G.MOTION_ATTACK2 then
+              attacks = attacks + 1
+            end
+            
+            -- Decrement i
+            i = i - 1
+          end
+
+          -- If there were 3 or more attacks in 5 seconds, allow buff-provoke
+          if attacks >= 3 then
+            return true
+          end
+
+          -- Not attacking fast enough, don't provoke
+          return false
+        end
+      end,
     },
     [8233] = {
       Name = "Berserk",
@@ -578,13 +634,16 @@ do
     end,
   }
 
-  local function_or_number = function(f,arg)
+  local function_or_number = function(f,arg,default)
     if type(f) == "function" then
       return f(arg)
     elseif type(f) == "number" then
       return f
     end
-    return 0
+    if not default then
+      return 0
+    end
+    return default
   end
 
   local function_or_string = function(f,table,default)
@@ -598,7 +657,10 @@ do
   end
 
   -- Build a RAIL-usable skill table
-  do
+  RAIL.Event["AI CYCLE"]:Register(-41,
+                                  "AllSkills rebuild",
+                                  1,
+                                  function(self)
     local AllSkills_rebuild = { }
     for id,parameters in AllSkills do
       -- Create a skill table
@@ -607,20 +669,21 @@ do
         GetName = function(self) return tostring(name) end,
       }
 
-      -- Select the cast and range functions
+      -- Select the cast and condition functions
       local cast_func = function_or_string(parameters.CastFunction,CastFunctions,function(self,...)
         -- Log
         RAIL.LogT(0,"Unknown cast type for skill {1}.",self)
       end)
-      local range_func = function_or_string(parameters.Range,{},function(self)
-        -- Use GetV to determine the range
-        return GetV(V_SKILLATTACKRANGE,RAIL.Self.ID,self.ID)
-      end)
-
       local condition_func = function_or_string(parameters.Condition,CastConditions,function(_G)
         -- Unspecified condition; just use the skill
         return true
       end)
+      
+      -- Determine the target type
+      local target_type = parameters.CastFunction
+      if type(target_type) ~= "string" then
+        target_type = "unknown"
+      end
 
       -- Build the skill-level tables
       for i=1,parameters.MaxLevel do
@@ -636,13 +699,15 @@ do
           end,
           ID = id,
           Level = i,
+          TargetType = target_type,
           Cast = cast_func,
-          GetRange = range_func,
+          Range = function_or_number(parameters.Range,i,GetV(V_SKILLATTACKRANGE,RAIL.Self.ID,id)),
           SPCost = function_or_number(parameters.SPCost,i),
           CastTime = function_or_number(parameters.CastTime,i),
           CastDelay = function_or_number(parameters.CastDelay,i),
           Duration = function_or_number(parameters.Duration,i),
           Condition = condition_func,
+          MaxTargets = function_or_number(parameters.MaxTargets,i),
         }
         -- Set the metatable
         setmetatable(skill[i],{
@@ -671,7 +736,7 @@ do
 
     -- Replace the skills table
     AllSkills = AllSkills_rebuild
-  end
+  end)
 end
 
 -- Skill Mappings
@@ -686,87 +751,89 @@ do
         }
       elseif id == ARCHER02 then
         return {
-          AreaOfEffect = AllSkills[8208][2],  -- arrow shower
-          Reveal = AllSkills[8224][1],        -- sight
+          AreaOfEffect  = AllSkills[8208][2],   -- arrow shower
+          Reveal        = AllSkills[8224][1],   -- sight
         }
       elseif id == ARCHER03 then
         return {
-          Pushback = AllSkills[8214][1],    -- arrow repel
-          Buff = AllSkills[8223][1],        -- weapon quicken
+          Pushback  = AllSkills[8214][1],   -- arrow repel
+          Buff      = AllSkills[8223][1],   -- weapon quicken
         }
       elseif id == ARCHER04 then
         return {
-          Buff = AllSkills[8222][1],        -- magnificat
-          AllSkills[8237][1],               -- sense
-          Recover = AllSkills[8227][1],     -- tender
+          Buff      = AllSkills[8222][1],   -- magnificat
+                      AllSkills[8237][1],   -- sense
+          Recover   = AllSkills[8227][1],   -- tender
         }
       elseif id == ARCHER05 then
         return {
-          Attack = AllSkills[8207][5],      -- double strafe
-          AllSkills[8213][1],               -- remove trap
-          Provoke = AllSkills[8232][1],     -- provoke
+          Attack        = AllSkills[8207][5], -- double strafe
+                          AllSkills[8213][1], -- remove trap
+          Debuff        = AllSkills[8232][1], -- provoke
+          PartySupport  = AllSkills[8232][1], -- provoke
         }
       elseif id == ARCHER06 then
         return {
-          Attack = AllSkills[8207][7],      -- double strafe
-          Pushback = AllSkills[8209][3],    -- skid trap
-          Debuff = AllSkills[8234][1],      -- decrease agi
+          Attack    = AllSkills[8207][7],   -- double strafe
+          Pushback  = AllSkills[8209][3],   -- skid trap
+          Debuff    = AllSkills[8234][1],   -- decrease agi
         }
       elseif id == ARCHER07 then
         return {
-          AreaOfEffect = AllSkills[8208][10], -- arrow shower
-          AllSkills[8212][2],                 -- freezing trap
-          Recover = AllSkills[8230][1],       -- mental cure
+          AreaOfEffect  = AllSkills[8208][10],  -- arrow shower
+                          AllSkills[8212][2],   -- freezing trap
+          Recover       = AllSkills[8230][1],   -- mental cure
         }
       elseif id == ARCHER08 then
         return {
-          AllSkills[8211][5],               -- sandman
-          Buff = AllSkills[8223][2],        -- weapon quicken
-          Provoke = AllSkills[8232][3],     -- provoke
+                          AllSkills[8211][5],   -- sandman
+          Buff          = AllSkills[8223][2],   -- weapon quicken
+          Debuff        = AllSkills[8232][3],   -- provoke
+          PartySupport  = AllSkills[8232][3],   -- provoke
         }
       elseif id == ARCHER09 then
         return {
-          Attack = AllSkills[8207][10],     -- double strafe
-          Attack2 = AllSkills[8210][5],     -- land mine
-          Pushback = AllSkills[8214][1],    -- arrow repel
+          Attack    = AllSkills[8207][10],  -- double strafe
+          Attack2   = AllSkills[8210][5],   -- land mine
+          Pushback  = AllSkills[8214][1],   -- arrow repel
         }
       elseif id == ARCHER10 then
         return {
-          Pushback = AllSkills[8214][1],    -- arrow repel
+          Pushback  = AllSkills[8214][1],   -- arrow repel
           --AllSkills[8223][1],             -- berserk (passive)
-          Attack = AllSkills[8215][1],      -- focused arrow strike
-          Buff = AllSkills[8223][5],        -- weapon quicken
+          Attack    = AllSkills[8215][1],   -- focused arrow strike
+          Buff      = AllSkills[8223][5],   -- weapon quicken
         }
       elseif id == LANCER01 then
         return {
-          Attack = AllSkills[8216][1],      -- pierce
+          Attack  = AllSkills[8216][1],     -- pierce
           Recover = AllSkills[8226][1],     -- regain
         }
       elseif id == LANCER02 then
         return {
-          AreaOfEffect = AllSkills[8217][2],  -- brandish spear
-          Debuff = AllSkills[8236][1],        -- lex divina
+          AreaOfEffect  = AllSkills[8217][2],   -- brandish spear
+          Debuff        = AllSkills[8236][1],   -- lex divina
         }
       elseif id == LANCER03 then
         return {
-          Attack = AllSkills[8216][2],        -- pierce
-          Recover = AllSkills[8229][1],       -- recuperate
-          PartySupport = AllSkills[8221][1],  -- sacrifice
+          Attack        = AllSkills[8216][2],   -- pierce
+          Recover       = AllSkills[8229][1],   -- recuperate
+          PartySupport  = AllSkills[8221][1],   -- sacrifice
         }
       elseif id == LANCER04 then
         return {
-          Attack = AllSkills[8225][1],      -- crash
-          Buff = AllSkills[8219][1],        -- defending aura
+          Attack  = AllSkills[8225][1],   -- crash
+          Buff    = AllSkills[8219][1],   -- defending aura
         }
       elseif id == LANCER05 then
         return {
-          Buff = AllSkills[8220][3],        -- guard
-          Attack = AllSkills[8216][5],      -- pierce
+          Buff    = AllSkills[8220][3],   -- guard
+          Attack  = AllSkills[8216][5],   -- pierce
         }
       elseif id == LANCER06 then
         return {
-          AreaOfEffect = AllSkills[8217][5],  -- brandish spear
-          Buff = AllSkills[8223][2],          -- weapon quicken
+          AreaOfEffect  = AllSkills[8217][5],   -- brandish spear
+          Buff          = AllSkills[8223][2],   -- weapon quicken
         }
       elseif id == LANCER07 then
         return {
@@ -775,80 +842,82 @@ do
         }
       elseif id == LANCER08 then
         return {
-          Attack = AllSkills[8216][10],     -- pierce
-          Provoke = AllSkills[8232][5],     -- provoke
-          Emergency = AllSkills[8235][1],   -- scapegoat
+          Attack        = AllSkills[8216][10],  -- pierce
+          Debuff        = AllSkills[8232][5],   -- provoke
+          PartySupport  = AllSkills[8232][5],   -- provoke
+          Emergency     = AllSkills[8235][1],   -- scapegoat
         }
       elseif id == LANCER09 then
         return {
-          AreaOfEffect = AllSkills[8217][10],   -- brandish spear
-          Buff = AllSkills[8219][3],            -- defending aura
-          Buff2 = AllSkills[8220][7],           -- guard
+          AreaOfEffect  = AllSkills[8217][10],  -- brandish spear
+          Buff          = AllSkills[8219][3],   -- defending aura
+          Buff2         = AllSkills[8220][7],   -- guard
         }
       elseif id == LANCER10 then
         return {
-          Attack = AllSkills[8218][5],        -- clashing spiral
-          Buff = AllSkills[8220][10],         -- guard
-          PartySupport = AllSkills[8221][3],  -- sacrifice
-          Buff2 = AllSkills[8223][5],         -- weapon quicken
+          Attack        = AllSkills[8218][5],   -- clashing spiral
+          Buff          = AllSkills[8220][10],  -- guard
+          PartySupport  = AllSkills[8221][3],   -- sacrifice
+          Buff2         = AllSkills[8223][5],   -- weapon quicken
         }
       elseif id == SWORDMAN01 then
         return {
-          Attack = AllSkills[8201][1],      -- bash
-          Debuff = AllSkills[8234][1],      -- decrease agi
+          Attack  = AllSkills[8201][1],     -- bash
+          Debuff  = AllSkills[8234][1],     -- decrease agi
         }
       elseif id == SWORDMAN02 then
         return {
-          AreaOfEffect = AllSkills[8202][3],  -- magnum break
-          Provoke = AllSkills[8232][5],       -- provoke
+          AreaOfEffect  = AllSkills[8202][3],   -- magnum break
+          Debuff        = AllSkills[8232][5],   -- provoke
+          PartySupport  = AllSkills[8232][5],   -- provoke
         }
       elseif id == SWORDMAN03 then
         return {
-          Recover = AllSkills[8228][1],     -- benediction
-          Buff = AllSkills[8223][1],        -- weapon quicken
+          Recover   = AllSkills[8228][1],   -- benediction
+          Buff      = AllSkills[8223][1],   -- weapon quicken
         }
       elseif id == SWORDMAN04 then
         return {
-          Attack = AllSkills[8225][1],        -- crash
-          AreaOfEffect = AllSkills[8202][5],  -- magnum break
+          Attack        = AllSkills[8225][1],   -- crash
+          AreaOfEffect  = AllSkills[8202][5],   -- magnum break
         }
       elseif id == SWORDMAN05 then
         return {
-          Attack = AllSkills[8201][5],      -- bash
-          Recover = AllSkills[8228][1],     -- benediction
-          Attack2 = AllSkills[8225][4],     -- crash
+          Attack  = AllSkills[8201][5],   -- bash
+          Recover = AllSkills[8228][1],   -- benediction
+          Attack2 = AllSkills[8225][4],   -- crash
         }
       elseif id == SWORDMAN06 then
         return {
-          Debuff = AllSkills[8234][3],      -- decrease agi
-          AllSkills[8237][1],               -- sense
-          Buff = AllSkills[8223][5],        -- weapon quicken
+          Debuff  = AllSkills[8234][3],   -- decrease agi
+                    AllSkills[8237][1],   -- sense
+          Buff    = AllSkills[8223][5],   -- weapon quicken
         }
       elseif id == SWORDMAN07 then
         return {
-          Attack = AllSkills[8201][10],     -- bash
+          Attack    = AllSkills[8201][10],  -- bash
           --AllSkills[8223][1],             -- berserk (passive)
           Emergency = AllSkills[8235][1],   -- scapegoat
         }
       elseif id == SWORDMAN08 then
         return {
-          AreaOfEffect = AllSkills[8203][5],  -- bowling bash
-          Recover = AllSkills[8231][1],       -- compress
-          Buff = AllSkills[8204][4],          -- parry
-          Buff2 = AllSkills[8223][10],        -- weapon quicken
+          AreaOfEffect  = AllSkills[8203][5],   -- bowling bash
+          Recover       = AllSkills[8231][1],   -- compress
+          Buff          = AllSkills[8204][4],   -- parry
+          Buff2         = AllSkills[8223][10],  -- weapon quicken
         }
       elseif id == SWORDMAN09 then
         return {
-          Buff = AllSkills[8205][5],          -- shield reflect
-          Attack = AllSkills[8225][3],        -- crash
-          AreaOfEffect = AllSkills[8203][8],  -- bowling bash
+          Buff          = AllSkills[8205][5],   -- shield reflect
+          Attack        = AllSkills[8225][3],   -- crash
+          AreaOfEffect  = AllSkills[8203][8],   -- bowling bash
         }
       elseif id == SWORDMAN10 then
         return {
-          Attack = AllSkills[8201][10],         -- bash
-          AreaOfEffect = AllSkills[8203][10],   -- bowling bash
-          AllSkills[8206][1],                   -- frenzy
-          Buff = AllSkills[8223][10],           -- weapon quicken
+          Attack        = AllSkills[8201][10],  -- bash
+          AreaOfEffect  = AllSkills[8203][10],  -- bowling bash
+                          AllSkills[8206][1],   -- frenzy
+          Buff          = AllSkills[8223][10],  -- weapon quicken
         }
       end
 
@@ -859,7 +928,7 @@ do
       if id == LIF or id == LIF2 then
         return {
           HealOwner = AllSkills[8001],    -- healing hands
-          Buff = AllSkills[8002],         -- urgent escape
+          Buff      = AllSkills[8002],    -- urgent escape
           --AllSkills[8003],              -- brain surgery (passive)
         }
       elseif id == LIF_H or id == LIF_H2 then
@@ -869,24 +938,24 @@ do
       elseif id == AMISTR or id == AMISTR2 or id == AMISTR_H or id == AMISTR_H2 then
         return {
           Defense = AllSkills[8005],      -- castling
-          Buff = AllSkills[8006],         -- amistr bulwark
+          Buff    = AllSkills[8006],      -- amistr bulwark
           --AllSkills[8007],              -- adamantium skin (passive)
-          AllSkills[8008],                -- blood lust
+                    AllSkills[8008],      -- blood lust
         }
       elseif id == FILIR or id == FILIR2 or id == FILIR_H or id == FILIR_H2 then
         return {
-          Attack = AllSkills[8009],       -- moonlight
-          Buff = AllSkills[8010],         -- flitting
-          Buff2 = AllSkills[8011],        -- accelerated flight
-          AllSkills[8012],                -- sbr 44
+          Attack  = AllSkills[8009],    -- moonlight
+          Buff    = AllSkills[8010],    -- flitting
+          Buff2   = AllSkills[8011],    -- accelerated flight
+                    AllSkills[8012],    -- sbr 44
         }
       elseif id == VANILMIRTH or id == VANILMIRTH2 or id == VANILMIRTH_H or id == VANILMIRTH_H2 then
         return {
-          Attack = AllSkills[8013],       -- caprice
-          HealSelf = AllSkills[8014],     -- chaotic blessings (heal homu  AI)
-          HealOwner = AllSkills[8014],    -- chaotic blessings (heal owner AI)
-          --AllSkills[8015],              -- instruction change (passive)
-          AllSkills[8016],                -- self destruct
+          Attack      = AllSkills[8013],    -- caprice
+          HealSelf    = AllSkills[8014],    -- chaotic blessings (heal homu  AI)
+          HealOwner   = AllSkills[8014],    -- chaotic blessings (heal owner AI)
+          --AllSkills[8015],                -- instruction change (passive)
+                        AllSkills[8016],    -- self destruct
         }
       end
       return {}

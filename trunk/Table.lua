@@ -293,7 +293,7 @@ do
   end
 
   function List.Clear (list)
-    for i,v in ipairs(list) do
+    for i=list.first,list.last do
       list[i] = nil
     end
 

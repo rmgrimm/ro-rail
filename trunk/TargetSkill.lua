@@ -32,7 +32,6 @@ RAIL.Event["AI CYCLE"]:Register(-35,                    -- Priority
     --HealOwner     = "SKILL INIT/HEAL OWNER",
     --HealSelf      = "SKILL INIT/HEAL SELF",
     PartySupport  = "SKILL INIT/PARTY BUFF",
-    Provoke       = "SKILL INIT/PROVOKE",       -- also fires SKILL INIT/OFFENSIVE
     --Pushback      = "SKILL INIT/PUSHBACK",
     --Recover       = "SKILL INIT/RECOVER",
     Reveal        = "SKILL INIT/REVEAL",        -- also fires SKILL INIT/OFFENSIVE
@@ -432,7 +431,7 @@ RAIL.Event["TARGET SELECT/ENEMY/SKILL/OFFENSIVE"]:Register(40,              -- P
                                                            -1,              -- Max runs (infinite)
                                                            function(self,skill,actor,can_chase)
   -- Get the skill range
-  local srange = skill:GetRange()
+  local srange = skill.Range
 
   -- If the actor was allowed it can be chased
   if can_chase then
@@ -564,29 +563,6 @@ do
                                     nil,
                                     false)            -- not persistent
     end
-  end)
-end
-
--------------
--- Provoke --
--------------
-do
-  local defaults = {
-  }
-
-  RAIL.Event["SKILL INIT/PROVOKE"]:Register(0,                -- Priority
-                                            "Provoke init",   -- Handler name
-                                            -1,               -- Max runs (infinite)
-                                            function(self,skill)
-    local byID = RAIL.Validate.SkillOptions
-
-    -- Copy validation options from defaults, but don't overwrite
-    byID[skill.ID] = Table.DeepCopy(defaults,byID[skill.ID],false)
-
-    -- Count provoke as an offensive skill too
-    RAIL.Event["SKILL INIT/OFFENSIVE"]:Fire(skill)
-
-    -- TODO: Target owner
   end)
 end
 
@@ -875,8 +851,10 @@ do
       return
     end
     
+    local skill = RAIL.Target.Skill[1]
+
     -- Check that the skill is a party buff skill
-    local list = targets[RAIL.Target.Skill[1].ID]
+    local list = targets[skill.ID]
     if not list then
       return
     end
@@ -893,20 +871,20 @@ do
     end
     
     -- Log that a new target was added
-    RAIL.LogT(60,"New party-support target for {1}: {2}",RAIL.Target.Skill[1],target)
+    RAIL.LogT(60,"New party-support target for {1}: {2}",skill,target)
 
     -- Add this target to the list
     list:PushRight(target)
 
     -- Ensure the list isn't too big
-    -- TODO: Incorporate a different way to specify the max number of
-    -- simultaneous targets
-    while list:Size() > RAIL.Target.Skill[1].Level do
-      -- Remove a target
-      local old_target = list:PopLeft()
+    if skill.MaxTargets > 0 then
+      while list:Size() > skill.MaxTargets do
+        -- Remove a target
+        local old_target = list:PopLeft()
 
-      -- Log the removal of this target
-      RAIL.LogT(60,"Party-support target for {1} removed: {2}",RAIL.Target.Skill[1],target)
+        -- Log the removal of this target
+        RAIL.LogT(60,"Party-support target for {1} removed: {2}",RAIL.Target.Skill[1],target)
+      end
     end
   end)
   
@@ -986,7 +964,7 @@ RAIL.Event["TARGET SELECT/SKILL/PARTY BUFF/BY ACTOR"]:Register(40,            --
                                                                "Range/Chase", -- Handler name
                                                                -1,            -- Max runs (infinite)
                                                                function(self,skill,actor)
-  local srange = skill:GetRange()
+  local srange = skill.Range
 
   -- Fire an event to add the target to the ChaseMap
   RAIL.Event["TARGET SELECT/ENEMY/CHASE"]:Fire(actor,
