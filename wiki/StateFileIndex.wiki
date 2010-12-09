@@ -39,6 +39,9 @@ The names of the options in the state-file (eg, "[StateFileIndex#Aggressive Aggr
 
 === !AcquireWhileLocked ===
 
+_This option was removed in [http://code.google.com/p/ro-rail/source/detail?r=191 revision 191]. Please refer to [StateFileIndex#AutoPassive_Sub-table AutoPassive Sub-table]._
+
+<wiki:comment>
 *Type:* Boolean
 
 *Default:* `false`
@@ -46,10 +49,7 @@ The names of the options in the state-file (eg, "[StateFileIndex#Aggressive Aggr
 When set to `true`, !AcquireWhileLocked will cause the AI to actively seek targets that are outside of its attack range, even while attacking. Because this causes melee-range mercenaries/homunculi to run away from their attack target, it is recommended to enable only for long-range mercenaries.
 
 *See also:* [StateFileIndex#AttackWhileChasing AttackWhileChasing]
-
-=== !ActorOptions ===
-
-_Please refer to [StateFileIndex#ActorOptions_Sub-table ActorOptions Sub-table]._
+</wiki:comment>
 
 === Aggressive ===
 
@@ -61,52 +61,21 @@ When set to `true`, Aggressive will cause the AI to actively search for new targ
 
 _Note: This option can be changed from inside the Ragnarok Online client by pressing `<ALT+T>` for a homunculus, or `<CTRL+T>` for a mercenary. Changes made by this key-press will be saved._
 
-=== !AssistOptions ===
-
-_Please refer to [StateFileIndex#AssistOptions_Sub-table AssistOptions Sub-table]._
-
-=== ~~!AssistOther~~ ===
-
-_This option was removed in [http://code.google.com/p/ro-rail/source/detail?r=164 revision 164]. Please refer to [StateFileIndex#AssistOptions_Sub-table AssistOptions Sub-table]._
-
-<wiki:comment>
-*Type:* Boolean
-
-*Default:* `false`
-
-!AssistOther operates like !AssistOwner, but causes the AI to assist its counterpart. For example, if both homunculus and mercenary are active, !AssistOther in the mercenary state-file would cause a passive mercenary to target enemies that the homunculus is attacking.
-
-This option takes precedence over [StateFileIndex#Aggressive Aggressive] and [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table] options.
-
-*See also:* [StateFileIndex#AssistOwner AssistOwner]
-</wiki:comment>
-
-=== ~~!AssistOwner~~ ===
-
-_This option was removed in [http://code.google.com/p/ro-rail/source/detail?r=164 revision 164]. Please refer to [StateFileIndex#AssistOptions_Sub-table AssistOptions Sub-table]._
-
-<wiki:comment>
-*Type:* Boolean
-
-*Default:* `false`
-
-When set to `true`, !AssistOwner will cause the AI to select targets that the owner is hostile against. This includes attacks, skill charge-up, and skill casts against enemy targets.
-
-This option takes precedence over all others, including [StateFileIndex#Aggressive Aggressive], [StateFileIndex#AssistOther AssistOther], and [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table] options.
-
-*See also:* [StateFileIndex#AssistOther AssistOther]
-</wiki:comment>
-
 === !AttackWhileChasing ===
 
 *Type:* Boolean
 
 *Default:* `false`
 
-_Not written yet. Check back soon!_
+!AttackWhileChasing allows Rampage AI Lite to attack a target that is within range even if it is moving toward a higher priority monster that is outside range. When set to `true`, this allows Rampage AI Lite to maximize the number of attacks it makes. When set to `false`, Rampage AI Lite will be able to move more quickly to the highest priority target.
 
-=== AutoPassiveHP ===
+_Note: This is only recommended for long-range attacks such as archer mercenaries._
 
+=== ~~AutoPassiveHP~~ ===
+
+_This option was removed in [http://code.google.com/p/ro-rail/source/detail?r=191 revision 191]. Please refer to [StateFileIndex#AutoPassive_Sub-table AutoPassive Sub-table]._
+
+<wiki:comment>
 *Type:* Number
 
 *Default:* `0`
@@ -120,9 +89,13 @@ When Rampage AI Lite determines that its HP value has dropped below the setting 
 _Note: If the [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table] options [StateFileIndex#DefendWhilePassive DefendWhilePassive] is set to `false`, it is likely that this will cause Rampage AI Lite to stop attacking any monster that reduced its HP below the level set by this option._
 
 *See also:* [StateFileIndex#AutoPassiveHPisPercent AutoPassiveHPisPercent]; [StateFileIndex#AutoUnPassiveHP AutoUnPassiveHP]
+</wiki:comment>
 
-=== AutoPassiveHPisPercent ===
+=== ~~AutoPassiveHPisPercent~~ ===
 
+_This option was removed in [http://code.google.com/p/ro-rail/source/detail?r=191 revision 191]. Please refer to [StateFileIndex#AutoPassive_Sub-table AutoPassive Sub-table]._
+
+<wiki:comment>
 *Type:* Boolean
 
 *Default:* `false`
@@ -130,9 +103,13 @@ _Note: If the [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table] o
 AutoPassiveHPisPercent specifies whether the values in [StateFileIndex#AutoPassiveHP AutoPassiveHP] and [StateFileIndex#AutoUnPassiveHP AutoUnPassiveHP] should be interpreted as percentages.
 
 *See also:* [StateFileIndex#AutoPassiveHP AutoPassiveHP]; [StateFileIndex#AutoUnPassiveHP AutoUnPassiveHP]
+</wiki:comment>
 
-=== AutoUnPassiveHP ===
+=== ~~AutoUnPassiveHP~~ ===
 
+_This option was removed in [http://code.google.com/p/ro-rail/source/detail?r=191 revision 191]. Please refer to [StateFileIndex#AutoPassive_Sub-table AutoPassive Sub-table]._
+
+<wiki:comment>
 *Type:* Number
 
 *Default:* [StateFileIndex#AutoPassiveHP AutoPassiveHP] `+ 1`
@@ -144,6 +121,39 @@ AutoPassiveHPisPercent specifies whether the values in [StateFileIndex#AutoPassi
 _Please see the description under [StateFileIndex#AutoPassiveHP AutoPassiveHP].
 
 *See also:* [StateFileIndex#AutoPassiveHP AutoPassiveHP]; [StateFileIndex#AutoPassiveHPisPercent AutoPassiveHPisPercent]
+</wiki:comment>
+
+=== !BeginFollowDistance ===
+
+*Type:* Number
+
+*Default:* -1
+
+*Minimum Value:* _The value of [StateFileIndex#FollowDistance FollowDistance]_
+
+*Maximum Value:* _The value of [StateFileIndex#MaxDistance MaxDistance]_
+
+This option specifies the number of tiles away from the owner before Rampage AI Lite begins chasing after its owner. If Rampage AI Lite detects your character begins movement that will place it outside of this range, it will spend all resources in attempt to move within the the range specified by [StateFileIndex#FollowDistance FollowDistance].
+
+If the value of !BeginFollowDistance is set to `-1`, then it will be automatically calculated based on [StateFileIndex#MaxDistance MaxDistance].
+
+*See also:* [StateFileIndex#FollowDistance FollowDistance]; [StateFileIndex#MaxDistance MaxDistance]
+
+=== !DanceAttackTiles ===
+
+*Type:* Number
+
+*Default:* -1
+
+*Minimum Value:* -1
+
+*Maximum Value:* 1
+
+This option specifies the number of tiles that the AI should attempt to move away from itself after every attack or skill. This allows homunculi to ignore sprite-delay in attacks and mercenaries to ignore sprite-delay in skills.
+
+_Note: Rampage AI Lite will stay within [StateFileIndex#MaxDistance MaxDistance] while "dancing"._
+
+*See also:* [StateFileIndex#MaxDistance MaxDistance]
 
 === !DebugFile ===
 
@@ -171,21 +181,21 @@ _Note: Debug levels for various log messages can be found at the top of [http://
 
 *See also:* [StateFileIndex#DebugFile DebugFile]; [StateFileIndex#ProfileMark ProfileMark]
 
-=== !DefendOptions ===
+=== !DelayFirstAction ===
 
-_Please refer to [StateFileIndex#DefendOptions_Sub-table DefendOptions Sub-table]._
+*Type:* Number
 
-=== !DisableChase ===
+*Default:* `0`
 
-*Type:* Boolean
+*Minimum Value:* `0`
 
-*Default:* `false`
+This option prevents Rampage AI Lite from taking action for the specified number of milliseconds. This will cancel automatically if the owner moves, or manually issues a command to the AI.
 
-When !DisableChase is set to `true`, Rampage AI Lite will not attempt to move toward enemies. This setting removes offensive chase-targeting, and brings movement to a bare minimum. Take note that unlike restricting [StateFileIndex#MaxDistance MaxDistance], this still allows manually-controlled movement within the [StateFileIndex#MaxDistance MaxDistance] area.
+_Note: This may be desirable in order to maintain the invulnerability time of the player. If the AI moves the homunculus before the invulnerability time has worn off, then the *player* becomes vulnerable to attacks. Due to the way homunculus and mercenaries are treated, they will *never* have invulnerable time._
 
-_Note: Manually moving is possible on the homunculus with _`<ALT+Right Click>`_, and on the mercenary with _`<ALT+Left Click>`_._
+=== ~~!DisableChase~~ ===
 
-*See also:* [StateFileIndex#MaxDistance MaxDistance]
+_This option was removed in [http://code.google.com/p/ro-rail/source/detail?r=175 revision 175]. Please refer to [StateFileIndex#ActorOptions_Sub-table ActorOptions Sub-table]._
 
 === !FollowDistance ===
 
@@ -202,25 +212,7 @@ Once Rampage AI Lite begins following the owner (your character) due to [StateFi
   # Rampage AI Lite manages to get close enough to its owner.
 !FollowDistance indicates how close RAIL needs to be before it decides it is "close enough" and resumes normal operation.
 
-*See also:* [StateFileIndex#MaxDistance MaxDistance]
-
-=== !IdleMovement ===
-
-_Please refer to [StateFileIndex#IdleMovement_Sub-table IdleMovement Sub-table]._
-
-=== !InterceptAlgorithm ===
-
-*Type:* String
-
-*Default:* `"normal"`
-
-!InterceptAlgorithm specifies the method that RAIL should use to chase a moving target. There are four accepted values for this option:
-  * `"none"` makes no future estimation, and moves toward the current location.
-  * `"sloppy"` estimates where the target will be after 500ms, and moves toward that location.
-  * `"normal"` makes a rough estimation where the target will be by the time the AI reaches it. This is recommended for regular use.
-  * ~~`"advanced"`~~ _This option is not implemented yet._
-
-_Note: This algorithm is also used when chasing after the owner to stay on screen._
+*See also:* [StateFileIndex#BeginFollowDistance BeginFollowDistance]; [StateFileIndex#MaxDistance MaxDistance]
 
 === !MaxDistance ===
 
@@ -230,13 +222,9 @@ _Note: This algorithm is also used when chasing after the owner to stay on scree
 
 *Minimum Value:* `0`
 
-*Maximum Value:* `14`
+This option specifies the maximum distance (in tiles) that Rampage AI Lite should stray. RAIL will still move to attack enemies outside of this area, provided it has a long enough attack or skill range (eg, archer mercenaries).
 
-This option specifies the maximum distance (in tiles) that Rampage AI Lite should stray. RAIL will still move to attack enemies outside of this area, provided it has a long enough  attack range (eg, archer mercenaries).
-
-If Rampage AI Lite detects that your character begins movement that will place it outside of this range, it will spend all resources in attempt to stay within this number of tiles.
-
-*See also:* [StateFileIndex#FollowDistance FollowDistance]; [StateFileIndex#DisableChase DisableChase]
+*See also:* [StateFileIndex#BeginFollowDistance BeginFollowDistance]; [StateFileIndex#FollowDistance FollowDistance];
 
 === MobIDFile ===
 
@@ -286,10 +274,6 @@ The !ProfileMark option specifies how often Rampage AI Lite should log profiling
 
 *See also:* [StateFileIndex#DebugFile DebugFile]; [StateFileIndex#DebugLevel DebugLevel]
 
-=== !SkillOptions ===
-
-_Please refer to [StateFileIndex#SkillOptions_Sub-table SkillOptions Sub-table]._
-
 === !TempFriendRange ===
 
 *Type:* Number
@@ -316,27 +300,6 @@ _Note: Because this is a hidden option, it will only appear in the state-file af
 
 *Warning:* Please notice that the first letter is not capitalized. This option must be entered completely lowercase to take effect.
 
-=== ~~UseMobID~~ ===
-
-_This option was removed in [http://code.google.com/p/ro-rail/source/detail?r=158 revision 158]. Please refer to [StateFileIndex#MobIDMode MobIDMode]._
-
-<wiki:comment>
-*Type:* Boolean
-
-*Default:* `false`
-
-When UseMobID is set to `true`, Rampage AI Lite will begin to use the [StateFileIndex#MobIDFile MobID File] to communicate monster types. 
-
-For homunculi, this means that Rampage AI Lite will write a mapping of IDs into the [StateFileIndex#MobIDFile MobID File]. This file will only be written when a new actor ID is encountered, or when an actor changes type ID.
-
-For mercenaries, this means that Rampage AI Lite will load a table from the [StateFileIndex#MobIDFile MobID File] and use it to distinguish actor type IDs. When used properly, this enables mercenaries to distinguish different types of monsters, players, etc. This file is only loaded when a new actor ID is encountered.
-
-*Warning:* This ID-mapping table is specific for each Ragnarok Online map (eg, moc_fild01) for each server (eg, iRO Ymir or iRO Valkyrie). An outdated MobID file, or one generated for a different Ragnarok map/server will cause unexpected behavior!
-
-_Note: When both homunculus and mercenary are used together (with UseMobID enabled for both), the MobID file will always be proper and usable._
-
-*See also:* [StateFileIndex#MobIDFile MobIDFile]; [StateFileIndex#MobIDMode MobIDMode]
-</wiki:comment>
 
 == !ActorOptions Sub-table ==
 
@@ -375,16 +338,6 @@ _Note: When actor type can be distinguished (eg, on a homunculus), monsters of t
 
 *See also:* [StateFileIndex#SkillsAllowed SkillsAllowed]
 
-=== !DefaultIgnoreTicks ===
-
-*Type:* Number
-
-*Default:* `10000`
-
-*Minimum Value:* `1000`
-
-_Not written yet. Check back soon!_
-
 === !DefendOnly ===
 
 *Type:* Boolean
@@ -401,6 +354,14 @@ This option indicates that an actor should only be considered a target if it is 
   * Any player that is within a range specified by [StateFileIndex#TempFriendRange TempFriendRange].
 
 *See also:* [StateFileIndex#AttackAllowed AttackAllowed]; [StateFileIndex#SkillsAllowed SkillsAllowed]
+
+=== !DisableChase ===
+
+*Type:* Boolean
+
+*Default:* `false`
+
+When !DisableChase is set to `true`, Rampage AI Lite will not attempt to move toward an enemy. The AI will only target the enemy if it is already in range of attacks or skills.
 
 === !FreeForAll ===
 
@@ -420,17 +381,33 @@ The Friend option indicates that a player should be considered a friend. This op
 
 _Note: It is not advised to set this for the `"Default"` category of [StateFileIndex#ActorOptions_Sub-table ActorOptions] because it will circumvent kill-steal prevention for all monsters._
 
-=== !IgnoreAfterChaseFail ===
+=== !KiteDistance ===
 
 *Type:* Number
 
-*Default:* `5000`
+*Default:* `-1`
 
-*Minimum Value:* `2000`
+*Minimum Value:* `1`
 
 *Exceptional Values:* `-1` to disable
 
-_Not written yet. Check back soon!_
+!KiteDistance specifies the number of tiles that Rampage AI Lite should stay away from actor. The priority of the kiting will be the same as the actor's [StateFileIndex#Priority Priority]. Rampage AI Lite is designed in a way that will kite specified enemies at all times, even if they are not the primary target.
+
+_Note: This only takes effect if the actor is an enemy. In non-PVP maps, for example, specified players will not be "kited" away from._
+
+*See also:* [StateFileIndex#KiteMode KiteMode]
+
+=== !KiteMode ===
+
+*Type:* String
+
+*Default:* `"always"`
+
+!KiteMode specifies when Rampage AI Lite should begin keeping distance away from an enemy. The possible values are as follows:
+  * `"always"` specifies that the AI should always maneuver away from the specified enemy.
+  * `"tank"` will only cause the AI to move away from the specified enemy when the homunculus or mercenary is the target. Note that this will require the enemy to attack the homunculus or mercenary at least once before kiting is enabled
+  
+*See also:* [StateFileIndex#KiteDistance KiteDistance]
 
 === !MaxCastsAgainst ===
 
@@ -480,13 +457,17 @@ _Note: If the target dies or moves off-screen, Rampage AI Lite will reset its co
 
 *Default:* `"unknown"`
 
-_Not written yet. Check back soon!_
+This is the name of the actor as it will show up in the TraceAI.txt or [StateFileIndex#DebugFile DebugFile] files.
+
+_Note: If the value is equal to the specified default name, then no name will be written to the log._
 
 === Priority ===
 
 *Type:* Number
 
-*Default:* `0`
+*Default:* `1`
+
+*Minimum Value:* `1`
 
 Priority specifies a numerical value assigned to each target. After evaluating each potential target, Rampage AI Lite selects the target with the highest value. If multiple targets share the same value, Rampage AI Lite will select the closest among them. This follows the idea that "highest number is highest priority" instead of the opposing idea that "number one is first priority".
 
@@ -512,7 +493,7 @@ _Note: When actor type can be distinguished (eg, on a homunculus), monsters of t
 
 *Minimum Value:* `0`
 
-_Not written yet. Check back soon!_
+This option specifies the number of ticks (or milliseconds) that Rampage AI Lite will wait between using skills against the specified actor.
 
 *See also:* [StateFileIndex#MaxCastsAgainst MaxCastsAgainst]; [StateFileIndex#MaxSkillLevel MaxSkillLevel]; [StateFileIndex#MinSkillLevel MinSkillLevel]; [StateFileIndex#SkillsAllowed SkillsAllowed]
 
@@ -541,13 +522,43 @@ rail_state["AssistOptions"]["Other"] = "avoid"
 
 *Warning:* Setting *both* `homu` and `merc` state-file settings of `"Other"` to `"assist"` (as opposed to the above example of `"avoid"`) may result in low-priority targeting or other undesirable behavior.
 
+== !AutoPassive Sub-table ==
+
+_Not written yet. Check back soon!_
+
 == !DefendOptions Sub-table ==
 
 _Not written yet. Check back soon!_
 
 == !IdleMovement Sub-table ==
 
-_Not written yet. Check back soon!_
+The !IdleMovement sub-table contains options specific to how Rampage AI Lite should act when it is idle. RAIL is considered idle when it has not selected an attack target, a skill to use, or a desired position to move to.
+
+=== !MoveType ===
+
+*Type:* String
+
+*Default:* `"none"`
+
+This option specifies the form of movement that Rampage AI Lite should take after it has been idle for the time specified in [StateFileIndex#BeginAfterIdleTime BeginAfterIdleTime].
+
+The possible values are:
+  * `"none"` - No action will be taken while idle.
+  * `"return"` - If the homunculus/mercenary is outside of [StateFileIndex#FollowDistance FollowDistance], then it will return to its owner while idle.
+
+=== !BeginAfterIdleTime ===
+
+*Type:* Number
+
+*Default:* `3000`
+
+*Minimum Value:* `0`
+
+This specifies the number of milliseconds to wait before taking action while idle.
+
+== Information Sub-table ==
+
+The Information sub-table contains only settings used for diagnostic purposes. None of the values contained in the Information sub-table affect the way in which Rampage AI Lite operates.
 
 == !SkillOptions Sub-table ==
 
