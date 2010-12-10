@@ -13,6 +13,16 @@ Rampage AI Lite relies on the use of Subversion (SVN) for distribution. To use S
 
 You may also use other SVN clients; however, this guide will only give example screenshots using TortoiseSVN.
 
+== Alternate Installation ==
+
+If you do not wish to install a SVN client to download Rampage AI Lite, you may download the latest source files individually at the following URL:
+
+*[http://ro-rail.googlecode.com/svn/trunk/]*
+
+Please make sure to download all files listed within, and to place them inside of your _USER`_`AI_ directory unmodified. This link will always contain the latest version, and newer files can be downloaded to update a copy of RAIL that was downloaded directly.
+
+_Note: The direct download of Rampage AI Lite from this website is more prone to user error. Because of this, support will not be given for problems related to direct download._
+
 = Step-by-Step Install =
 
 == Before You Begin: Locate your Ragnarok Online directory ==
