@@ -1,5 +1,5 @@
 -- Validation options
-RAIL.Validate.AcquireWhileLocked = {"boolean",false}
+-- removed: RAIL.Validate.AcquireWhileLocked = {"boolean",false}
 RAIL.Validate.AssistOptions = {is_subtable = true,
   Owner = {"string","indifferent",nil},
   Other = {"string","indifferent",nil},   -- allowed options are set further down this file

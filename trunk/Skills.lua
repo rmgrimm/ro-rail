@@ -6,6 +6,7 @@ do
     [8001] = {
       Name = "Healing Hands",
       CastFunction = "actor",
+      Range = 15,
       MaxLevel = 5,
       SPCost = function(level) return 10 + level*3 end,
     },
@@ -141,6 +142,7 @@ do
     [8014] = {
       Name = "Chaotic Blessings",
       CastFunction = "self",
+      Range = 15,
       MaxLevel = 5,
       SPCost = 40,
     },

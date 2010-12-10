@@ -262,8 +262,8 @@ do
                                             "Dance attack",   -- Handler name
                                             -1,               -- Max runs (negative means infinite)
                                             function()
-    -- Check if an attack target was selected
-    if RAIL.IsActor(RAIL.Target.Attack) then
+    -- Check if an attack or skill was selected
+    if RAIL.IsActor(RAIL.Target.Attack) or RAIL.Target.Skill then
       -- Set the area around the self to have a lower priority
       local x,y = RAIL.ChaseMap:TranslateFromParent(RAIL.Self.X[0],RAIL.Self.Y[0])
       for tile in RAIL.ChaseMap:TilesAround(x,y,RAIL.State.DanceAttackTiles) do

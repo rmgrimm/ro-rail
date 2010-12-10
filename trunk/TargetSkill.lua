@@ -29,8 +29,8 @@ RAIL.Event["AI CYCLE"]:Register(-35,                    -- Priority
     Debuff        = "SKILL INIT/OFFENSIVE",
     --Defense       = "SKILL INIT/DEFENSE",
     --Emergency     = "SKILL INIT/EMERGENCY",
-    --HealOwner     = "SKILL INIT/HEAL OWNER",
-    --HealSelf      = "SKILL INIT/HEAL SELF",
+    HealOwner     = "SKILL INIT/HEAL OWNER",
+    HealSelf      = "SKILL INIT/HEAL SELF",
     PartySupport  = "SKILL INIT/PARTY BUFF",
     --Pushback      = "SKILL INIT/PUSHBACK",
     --Recover       = "SKILL INIT/RECOVER",
@@ -737,6 +737,197 @@ RAIL.Event["TARGET SELECT/SKILL/BUFF"]:Register(60,             -- Priority
     return false
   end
 end)
+
+---------------------
+-- Heal Self/Other --
+---------------------
+
+do
+  -- Defaults
+  local defaults = {
+    Priority = {"number",50},
+    MaxFailures = {"number",10,1},
+    EstimateFutureTicks = {"number",0,0},
+    OnlyAfterIdleFor = {"number",3000,0},
+  }
+  
+  -- Closure to keep track of skill failures
+  local failures = {}
+
+  -- Function to get the buff priority
+  local function GetPriority(skill)
+    return RAIL.State.SkillOptions[skill.ID].Priority
+  end
+  
+  local function SuccessCallback(ticks,skill)
+    -- Reset the failure count
+    failures[skill.ID] = 0
+  end
+
+  local function FailureCallback(ticks,skill)
+    -- Increment the failure count if the skill hasn't been confirmed
+    failures[skill.ID] = failures[skill.ID] + 1
+  end
+
+  -- Generate healing skill
+  local function Generate(event_name,option_name,heal_actor,default_hp,default_percent)
+    -- Option names
+    local percent = option_name .. "isPercent"
+
+    local init = "SKILL INIT/" .. event_name
+    RAIL.Event[init]:Register(0,
+                              "heal skill init",
+                              -1,
+                              function(self,skill)
+      local byID = RAIL.Validate.SkillOptions
+
+      -- Copy validation options from defaults, but don't overwrite
+      byID[skill.ID] = Table.DeepCopy(defaults,byID[skill.ID],false)
+
+      -- Setup specific validation
+      byID[skill.ID][option_name] = {"number",default_hp,0}
+      byID[skill.ID][percent] = {"boolean",default_percent}
+
+      -- Add callbacks to the skill
+      if failures[skill.ID] == nil then
+        failures[skill.ID] = 0
+  
+        RAIL.SkillState.Callbacks:Add(skill,            -- Skill to add callbacks to
+                                      SuccessCallback,
+                                      FailureCallback,
+                                      true)             -- Persist past the first call
+      end
+
+  
+      -- Add the GetPriority support function
+      if not skill[1] then
+        -- Skill level not selectable
+        skill.GetPriority = GetPriority
+      else
+        -- Skill level selectable
+        local i=1
+        while skill[i] do
+          skill[i].GetPriority = GetPriority
+          i = i + 1
+        end
+      end
+    end)
+    
+    local select = "TARGET SELECT/SKILL/" .. event_name
+    RAIL.Event[select]:Register(0,                  -- Priority
+                                "Failures check",   -- Handler name
+                                -1,                 -- Max runs
+                                function(self,skill,idleticks)
+      -- Check if the skill has failed too many times
+      if failures[skill.ID] >= RAIL.State.SkillOptions[skill.ID].MaxFailures then
+        -- Probably don't have the skill; stop trying
+        return false
+      end
+    end)
+    
+    RAIL.Event[select]:Register(10,
+                                "Idle time",
+                                -1,
+                                function(self,skill,idleticks)
+      if (idleticks or 0) < RAIL.State.SkillOptions[skill.ID].OnlyAfterIdleFor then
+        return false
+      end
+    end)
+
+    RAIL.Event[select]:Register(20,
+                                "HP check",
+                                -1,
+                                function(self,skill)
+      local hp = heal_actor.HP[-RAIL.State.SkillOptions[skill.ID].EstimateFutureTicks]
+
+      local target = RAIL.State.SkillOptions[skill.ID][option_name]
+
+      if RAIL.State.SkillOptions[skill.ID][percent] then
+        hp = math.floor(hp / heal_actor:GetMaxHP() * 100)
+        target = math.min(99,target)
+      end
+
+      if hp > target then
+        return false
+      end
+    end)
+
+    RAIL.Event[select]:Register(30,
+                                "Condition",
+                                -1,
+                                function(self,skill)
+      -- Check any custom condition
+      if not RAIL.State.SkillOptions[skill.ID].Condition(RAIL._G,heal_actor) then
+        return false
+      end
+    end)
+    
+    if heal_actor ~= RAIL.Self then
+      RAIL.Event[select]:Register(40,
+                                  "Range/chase",
+                                  -1,
+                                  function(self,skill)
+        -- Get the skill range
+        local srange = skill.Range
+        
+        -- Fire an event to add the target to the ChaseMap
+        RAIL.Event["TARGET SELECT/ENEMY/CHASE"]:Fire(heal_actor,
+                                                     srange,
+                                                     skill:GetPriority(),
+                                                     true)    -- srange uses PythagDistance
+        
+        -- Check the range
+        if RAIL.Self:DistanceTo(heal_actor) > srange then
+          -- Don't continue this event
+          return false
+        end
+      end)
+    end
+
+    RAIL.Event[select]:Register(50,             -- Priority
+                                "Acceptable",   -- Handler name
+                                -1,             -- Max runs
+                                function(self,skill)
+      -- If there's not a selected skill, use this one
+      if not RAIL.Target.Skill then
+        RAIL.Target.Skill = { skill, heal_actor }
+        return false
+      end
+    end)
+    
+    
+    RAIL.Event[select]:Register(60,             -- Priority
+                                "Priority",     -- Handler name
+                                -1,             -- Max runs
+                                function(self,skill,idleticks)
+      -- Get the priority levels
+      local new_prio = skill:GetPriority()
+      local old_prio = RAIL.Target.Skill[1]:GetPriority(RAIL.Target.Skill[2],   -- X or actor
+                                                        RAIL.Target.Skill[3])   -- Y
+      -- Check if this skill is lower priority
+      if new_prio < old_prio then
+        -- Interrupt this event
+        return false
+      end
+
+      -- Check if this skill is highest priority
+      if new_prio > old_prio then
+        -- Set the skill to this one and then interrupt the event
+        RAIL.Target.Skill = { skill, heal_actor }
+        return false
+      end
+    end)
+  end
+
+  -- Generate HealOwner and HealSelf
+  RAIL.Event["AI CYCLE"]:Register(-42,
+                                  "Heal skill AI generation",
+                                  1,
+                                  function()
+    Generate("HEAL OWNER","OwnerHP",RAIL.Owner, 50, true)
+    Generate("HEAL SELF", "SelfHP", RAIL.Self,  0,  false)
+  end)
+end
 
 -----------------
 -- Party Buffs --
