@@ -13,8 +13,25 @@ RAIL.Validate.ActorOptions.Default = {is_subtable=true,
   -- KiteMode options are:
   --    always    - will always run away from the monster
   --    tanking   - will only run away when the monster is targeting RAIL.Self
-  KiteMode = {"string","always",{["always"] = true, ["tank"] = true,},},
+  --    custom    - will be determined by custom function specified in KiteCondition
+  KiteMode = {"string","always",{
+    ["always"] = function() return true end,
+    ["tank"] = function(actor) return actor.Target[0] == RAIL.Self.ID end,
+    ["custom"] = function(actor)
+      -- Get the condition for this actor
+      local f = actor.BattleOpts.KiteCondition
+
+      -- Ensure the kite condition is a function
+      if type(f) ~= "function" then
+        return false
+      end
+
+      -- Call the kite condition
+      return f(RAIL._G,actor)
+    end,
+  },},
   KiteDistance = {"number",-1,1,nil,{ [-1] = true, },},
+  KiteCondition = {"function",function() return false end,unsaved = true},
 
   SkillsAllowed = {"boolean",true},
   MinSkillLevel = {"number",1,1,10},

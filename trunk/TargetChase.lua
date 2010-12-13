@@ -166,16 +166,10 @@ do
 end
 
 do
-  -- Make a table of kite mode functions
-  local kite_modes = setmetatable({
-    ["always"] = function() return true end,
-    ["tank"] = function(actor) return actor.Target[0] == RAIL.Self.ID end,
-  },{
-    __index = function() return false end,
-  })
-
-
   local function GetKiteRange(actor)
+    -- Get the table of kite modes (specified in ActorOpts.lua)
+    local kite_modes = RAIL.Validate.ActorOptions.Default.KiteMode[3]
+
     -- Check if the KiteMode allows kiting right now
     if kite_modes[actor.BattleOpts.KiteMode](actor) then
       -- Get the kite range
@@ -413,14 +407,17 @@ RAIL.Event["IDLE"]:Register(10,                       -- Priority
     end
 
     -- Log it
-    RAIL.LogT(0,"Returning to owner; idle for {1}ms",idletime)
+    if idletime > 1000 then
+      RAIL.LogT(0,"Returning to owner; idle for {1}ms",idletime)
+    end
 
     -- Set the chase target to our owner
-    --RAIL.Target.Chase = RAIL.Owner
-    -- TODO: Since RAIL.Target.Chase now requires (x,y) and this takes place
-    --    after the RAIL.ChaseMap parsing, figure out a better way to return
-    MoveToOwner(RAIL.Self.ID)
-    
+    do
+      local angle,dist = RAIL.Owner:AngleTo(RAIL.Self)
+      local x,y = RoundNumber(RAIL.Owner:AnglePlot(angle,RAIL.State.FollowDistance))
+      RAIL.Target.Chase = {x,y}
+    end
+
     -- Reset idle time
     RAIL.Self.IdleBegin = GetTick()
 
