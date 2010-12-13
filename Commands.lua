@@ -443,7 +443,26 @@ do
     function(shift,target)
       -- Check if the target is our owner
       if target == RAIL.Owner then
-        -- TODO: Remove all players on screen from friend list.
+        -- Remove all friends on screen from friend list.
+        local removed = false
+        for id,actor in pairs(RAIL.ActorLists.Friends) do
+          -- Check if it's a permanent, not-temporary friend
+          if actor:IsFriend(true) then
+            actor:SetFriend(false)
+            removed = true
+          end
+        end
+        
+        -- Ensure an actor was removed
+        if not removed then
+          RAIL.LogT(1,"No friends on screen to remove.")
+          return false
+        end
+
+        -- Log it
+        RAIL.LogT(1,"All players on screen removed from friends list.")
+
+        -- Intercept movement command; advanced command accepted
         return true
       end
 
@@ -463,7 +482,10 @@ do
       end
 
       -- Non-friends can't be removed
-      if not target:IsFriend(true) then
+      if
+        target ~= RAIL.Owner and
+        not target:IsFriend(true)
+      then
         return false
       end
 
@@ -476,7 +498,25 @@ do
     function(shift,target)
       -- Check if the target is our owner
       if target == RAIL.Owner then
-        -- TODO: Set all players on screen as friend.
+        -- Set all players on screen as friend.
+        local added = false
+        for id,actor in pairs(RAIL.ActorLists.Other) do
+          if actor.ActorType == "Player" then
+            actor:SetFriend(true)
+            added = true
+          end
+        end
+
+        -- Ensure an actor was added
+        if not added then
+          RAIL.LogT(1,"No non-friend players on screen.")
+          return false
+        end
+
+        -- Log it
+        RAIL.LogT(1,"All players on screen added to friends list.")
+
+        -- Intercept movement command
         return true
       end
 
@@ -496,7 +536,10 @@ do
       end
 
       -- Friends can't be added again
-      if target:IsFriend(true) then
+      if
+        target ~= RAIL.Owner and
+        target:IsFriend(true)
+      then
         return false
       end
 
