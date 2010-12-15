@@ -26,6 +26,7 @@ end
 --	Note: View the subversion commit notes for more full changelog.
 --		(This is maintained to regularly bump version number.)
 
+-- 2010-12-14 -- Revision 200: Implement AoE skills
 -- 2010-12-13 -- Move KiteMode options to ActorOpts.lua; implement better idle-return; implemented screen-wide actor friending/unfriending.
 -- 2010-12-05 -- Reimplement HealOwner and HealSelf skill AIs
 -- 2010-12-04 -- Implemented logging for first occurrence of actor types not in state-file; Changed Provoke skill AI type to Debuff and PartySupport.

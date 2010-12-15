@@ -96,19 +96,32 @@ do
       CastFunction = "self",
       MaxLevel = 5,
       SPCost = function(level) return 20 + level*10 end,
-      -- Flitting's cast delay seems to be only for recast, so
-      --  we tell RAIL that the duration is the same as cast delay.
-      --  * - RAIL only cares about when it should be recast.
-      --
-      -- CastDelay = function(level)
-      Duration = function(level)
-        if level < 5 then
-          return (50 + level*10) * 1000
+      CastDelay = function(level)
+        -- Flitting's cast delay seems to be properly implemented with renewal
+        if RAIL.Renewal then
+          if level < 5 then
+            return (50 + level * 10) * 1000
+          else
+            return 120 * 1000
+          end
         else
-          return 120 * 1000
+          return 0
         end
       end,
-      -- Duration = function(level) return (65 - level*5) * 1000 end,
+      Duration = function(level)
+        if RAIL.Renewal then
+          return (65 - level * 5) * 1000
+        else
+          -- Flitting's cast delay seems to be only for recast, so
+          -- we tell RAIL that the duration is calculation for cast delay.
+          -- (RAIL only cares about when it should be recast.)
+          if level < 5 then
+            return (50 + level*10) * 1000
+          else
+            return 120 * 1000
+          end
+        end
+      end,
       Condition = "attacking",
     },
     [8011] = {
@@ -174,6 +187,8 @@ do
     [8202] = {
       Name = "Magnum Break",
       CastFunction = "self",
+      Range = 0,
+      SplashRange = 2,  -- 0 = 1; 1 = 3x3; 2 = 5x5; 3 = 7x7; ...
       MaxLevel = 10,
       SPCost = function(level) return 21 - math.ceil(level/2) end,
       CastDelay = 2 * 1000,
@@ -181,6 +196,7 @@ do
     [8203] = {
       Name = "Bowling Bash",
       CastFunction = "actor",
+      SplashRange = 1,  -- 0 = 1; 1 = 3x3; 2 = 5x5; 3 = 7x7; ...
       MaxLevel = 10,
       SPCost = function(level) return 12 + level end,
     },
@@ -221,6 +237,15 @@ do
     [8208] = {
       Name = "Arrow Shower",
       CastFunction = "ground",
+      SplashRange = function(level)
+        if RAIL.Renewal and level <= 5 then
+          -- 1-tile distance from the center (3x3)
+          return 1
+        end
+
+        -- 2-tile radius after center tile (5x5)
+        return 2
+      end,
       MaxLevel = 10,
       SPCost = 15,
       CastDelay = 1 * 1000,
@@ -240,12 +265,14 @@ do
     [8211] = {
       Name = "Sandman",
       CastFunction = "ground",
+      SplashRange = 1,    -- 1-tile radius from center (3x3)
       MaxLevel = 5,
       SPCost = 12,
     },
     [8212] = {
       Name = "Freezing Trap",
       CastFunction = "ground",
+      SplashRange = 1,    -- 1-tile radius from center (3x3)
       MaxLevel = 5,
       SPCost = 10,
     },
@@ -267,6 +294,8 @@ do
     [8215] = {
       Name = "Focused Arrow Strike",
       CastFunction = "actor",
+      -- TODO: Implement behavior to count enemies in between self and target
+      SplashRange = 0,    -- Only splashes onto the target tile (1x1)
       MaxLevel = 5,
       SPCost = function(level) return 15 + level*3 end,
       CastTime = 2 * 1000,
@@ -283,6 +312,7 @@ do
     [8217] = {
       Name = "Brandish Spear",
       CastFunction = "actor",
+      -- TODO: Implement Range and SplashRange for this...
       MaxLevel = 10,
       SPCost = 12,
       CastTime = 1 * 1000,
@@ -704,6 +734,7 @@ do
           TargetType = target_type,
           Cast = cast_func,
           Range = function_or_number(parameters.Range,i,GetV(V_SKILLATTACKRANGE,RAIL.Self.ID,id)),
+          SplashRange = function_or_number(parameters.SplashRange,i,0),
           SPCost = function_or_number(parameters.SPCost,i),
           CastTime = function_or_number(parameters.CastTime,i),
           CastDelay = function_or_number(parameters.CastDelay,i),
