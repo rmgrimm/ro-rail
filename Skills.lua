@@ -237,6 +237,7 @@ do
     [8208] = {
       Name = "Arrow Shower",
       CastFunction = "ground",
+      Range = 10,
       SplashRange = function(level)
         if RAIL.Renewal and level <= 5 then
           -- 1-tile distance from the center (3x3)
