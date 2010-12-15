@@ -172,7 +172,6 @@ require "Actor"
 
 require "Skills"
 require "SkillState"
---require "SkillSupport"
 
 -- AI modules
 require "TargetBasic"
@@ -180,7 +179,7 @@ require "TargetBasicAggressive"
 require "TargetChase"
 --require "TargetChaseSimple"
 require "TargetSkill"
---require "TargetSkillAoE"
+require "TargetSkillAoE"
 require "Commands"
 
 ------------------------------

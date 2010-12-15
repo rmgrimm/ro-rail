@@ -23,7 +23,7 @@ RAIL.Event["AI CYCLE"]:Register(-35,                    -- Priority
                                 function()
   -- Map of patterns to event names
   local pattern_event_map = {
-    --AreaOfEffect  = "SKILL INIT/AREA EFFECT",   -- TODO: Use custom TileMap for AoE skills
+    AreaOfEffect  = "SKILL INIT/AREA EFFECT",   -- TODO: Use custom TileMap for AoE skills
     Attack        = "SKILL INIT/ATTACK",        -- also fires SKILL INIT/OFFENSIVE
     Buff          = "SKILL INIT/BUFF",
     Debuff        = "SKILL INIT/OFFENSIVE",
@@ -348,16 +348,12 @@ do
         local usable_sp = RAIL.Self:GetUsableSP(skill)
         if skill[1] and usable_sp <= skill.SPCost + 1 then
           -- Find the highest level available with the usable SP
-          local found = false
           for i=skill.Level,1,-1 do
             if skill[i] and usable_sp > skill.SPCost then
-              found = true
               skill = skill[i]
               break
             end
           end
-          
-          -- Check
         end
     
         -- Fire an event for this potential skill-target combo
