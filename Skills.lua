@@ -832,10 +832,10 @@ do
         }
       elseif id == ARCHER10 then
         return {
-          Pushback  = AllSkills[8214][1],   -- arrow repel
-          --AllSkills[8223][1],             -- berserk (passive)
-          Attack    = AllSkills[8215][1],   -- focused arrow strike
-          Buff      = AllSkills[8223][5],   -- weapon quicken
+          Pushback      = AllSkills[8214][1],   -- arrow repel
+          --AllSkills[8223][1],                 -- berserk (passive)
+          AreaOfEffect  = AllSkills[8215][1],   -- focused arrow strike
+          Buff          = AllSkills[8223][5],   -- weapon quicken
         }
       elseif id == LANCER01 then
         return {
