@@ -585,7 +585,7 @@ RAIL.Event["AI CYCLE"]:Register(1000,                 -- Priority
     -- Workaround a strange bug that sometimes causes AI to stop after
     -- only using a skill in a cycle
     if
-      true and    -- manual toggle
+      false and    -- manual toggle
       not RAIL.Target.Attack and
       not RAIL.Target.Move
     then
