@@ -225,7 +225,7 @@ do
       -- Check if the function is base64 encoded
       if string.sub(data,1,7) == "base64:" then
         -- Decode it
-        data = RAIL.Base64:Decode(string.sub(data,8))
+        data = Base64:Decode(string.sub(data,8))
         pregenerated = true
       end
 

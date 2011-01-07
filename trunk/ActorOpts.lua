@@ -191,48 +191,23 @@ do
     [1012] = "Roda Frog",
     [1013] = "Wolf",
     [1014] = "Spore",
+    [1015] = "Zombie",
     -- ...
     [1025] = "Boa",
     -- ...
     [1031] = "Poporing",
     -- ...
-
-
     [1038] = "Osiris",            -- MVP
     [1039] = "Baphomet",          -- MVP
+    -- ...
     [1042] = "Steel Chonchon",
+    -- ...
     [1046] = "Doppelganger",      -- MVP
+    -- ...
     [1059] = "Mistress",          -- MVP
-    [1086] = "Golden Thief Bug",  -- MVP
-    [1087] = "Orc Hero",          -- MVP
-
     -- ...
-    
-    [1111] = "Drainliar",
-
-    -- ...
-
-    [1139] = "Mantis",
-    
-    -- ...
-    
-    [1152] = "Orc Skeleton",
-    [1153] = "Orc Zombie",
-
-    -- ...
-
-    [1177] = "Zenorc",
-    
-    -- ...
-
-    [1880] = "Wood Goblin",
-    [1881] = "Les",
-
-
-
-    -- Specialized below
-
-    -- Plants / Mushrooms
+    [1076] = "Skeleton",
+    [1077] = "Poison Spore",
     [1078] = "Red Plant",
     [1079] = "Blue Plant",
     [1080] = "Green Plant",
@@ -241,13 +216,37 @@ do
     [1083] = "Shining Plant",
     [1084] = "Black Mushroom",
     [1085] = "Red Mushroom",
-
-    -- Alchemist Summons
-    [1555] = "Summoned Parasite",
-    [1575] = "Summoned Flora",
-    [1579] = "Summoned Hydra",
-    [1589] = "Summoned Mandragora",
-    [1590] = "Summoned Geographer",
+    [1086] = "Golden Thief Bug",  -- MVP
+    [1087] = "Orc Hero",          -- MVP
+    -- ...
+    [1095] = "Andre",
+    [1096] = "Angeling",          -- Miniboss
+    [1097] = "Ant Egg",
+    -- ...
+    [1105] = "Deniro",
+    -- ...
+    [1111] = "Drainliar",
+    -- ...
+    [1121] = "Giearth",
+    -- ...
+    [1139] = "Mantis",
+    -- ...
+    [1152] = "Orc Skeleton",
+    [1153] = "Orc Zombie",
+    -- ...
+    [1160] = "Piere",
+    -- ...
+    [1176] = "Vitata",
+    [1177] = "Zenorc",
+    -- ...
+    [1555] = "Summoned Parasite",     -- Alchemist Summon
+    [1575] = "Summoned Flora",        -- Alchemist Summon
+    [1579] = "Summoned Hydra",        -- Alchemist Summon
+    [1589] = "Summoned Mandragora",   -- Alchemist Summon
+    [1590] = "Summoned Geographer",   -- Alchemist Summon
+    -- ...
+    [1880] = "Wood Goblin",
+    [1881] = "Les",
   }
 
   -- Add homunculus names
