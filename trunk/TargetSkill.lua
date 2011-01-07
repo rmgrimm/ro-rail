@@ -23,7 +23,7 @@ RAIL.Event["AI CYCLE"]:Register(-35,                    -- Priority
                                 function()
   -- Map of patterns to event names
   local pattern_event_map = {
-    AreaOfEffect  = "SKILL INIT/AREA EFFECT",   -- TODO: Use custom TileMap for AoE skills
+    AreaOfEffect  = "SKILL INIT/AREA EFFECT",
     Attack        = "SKILL INIT/ATTACK",        -- also fires SKILL INIT/OFFENSIVE
     Buff          = "SKILL INIT/BUFF",
     Debuff        = "SKILL INIT/OFFENSIVE",
@@ -526,9 +526,16 @@ do
     end
 
     -- Check that the skill is allowed
-    if not actor:IsSkillAllowed(skill.Level) then
+    local allowed,level = actor:IsSkillAllowed(skill.Level)
+    
+    if not allowed then
       -- Don't continue this event
       return false
+    end
+
+    if level ~= skill.Level then
+      -- Change the skill level that will be used
+      self.Event.Args[1] = AllSkills[skill.ID][level]
     end
   end)
 

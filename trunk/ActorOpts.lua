@@ -33,6 +33,8 @@ RAIL.Validate.ActorOptions.Default = {is_subtable=true,
   KiteDistance = {"number",-1,1,nil,{ [-1] = true, },},
   KiteCondition = {"function",function() return false end,unsaved = true},
 
+  TargetCondition = {"function",function() return true end,unsaved = true},
+
   SkillsAllowed = {"boolean",true},
   MinSkillLevel = {"number",1,1,10},
   MaxSkillLevel = {"number",10,1,10},

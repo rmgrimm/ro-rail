@@ -55,6 +55,9 @@ do
 
       -- Log the firing of the event
       RAIL.LogT(95,"+Event \"{1}\" fired...",self.Name)
+      
+      -- Set the event arguments
+      self.Args = arg
 
       -- Reset the event return
       self.RetVal = {}
@@ -101,7 +104,7 @@ do
           local func_ticks = GetTick()
 
           -- Run the function
-          continue,skip_from,skip_to = cur:Func(unpack(arg))
+          continue,skip_from,skip_to = cur:Func(unpack(self.Args))
 
           -- Measure the time taken
           func_ticks = GetTick() - func_ticks
@@ -166,6 +169,9 @@ do
                               ticks,
                               RAIL.Event[performance].Log:Get()))
       end
+      
+      -- Clear the args (for garbage collection)
+      self.Args = nil
 
       -- Return any return value set by the event handlers
       return unpack(self.RetVal)
