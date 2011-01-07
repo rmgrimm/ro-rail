@@ -39,10 +39,14 @@ V_MERTYPE           = 12  -- Mercenary Type
 
 -- Return values for GetV(V_HOMUNTYPE,id)
 do
+  HomuTypes = {}
   local names = {"LIF","AMISTR","FILIR","VANILMIRTH"}
   local function GenerateConst(suffix,base)
     for i=1,4 do
-      _G[names[i] .. suffix] = base + i
+      local var_name = string.format("%s%s",names[i],suffix)
+      _G[var_name] = base + i
+      HomuTypes[var_name] = base + i
+      HomuTypes[base + i] = var_name
     end
   end
   GenerateConst("",    0)
@@ -53,9 +57,13 @@ end
 
 -- Return values for GetV(V_MERTYPE,id)
 do
+  MercTypes = {}
   local function GenerateConst(name,base)
     for i=1,10 do
-      _G[string.format("%s%.2d",name,i)] = base + i
+      local var_name = string.format("%s%.2d",name,i)
+      _G[var_name] = base + i
+      MercTypes[var_name] = base + i
+      MercTypes[base + i] = var_name
     end
   end
   GenerateConst("ARCHER",   0)
@@ -415,7 +423,12 @@ RAIL.Event["AI CYCLE"]:Register(0,                    -- Priority
     Friends = {},
     Other = {},
   }
+end)
 
+RAIL.Event["AI CYCLE"]:Register(5,                    -- Priority
+                                "Owner/Self Update",  -- Handler name
+                                -1,                   -- Max runs (infinite)
+                                function()
   RAIL.Owner:Update()
   RAIL.Self:Update()
 end)

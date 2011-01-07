@@ -365,7 +365,12 @@ do
 
       -- Loop through each actor in the group
       for id,actor in pairs(targets) do
-        if type(id) == "number" then
+        -- Check that the pair isn't the name of the table and that the
+        -- actor-target condition is acceptable
+        if
+          type(id) == "number" and
+          actor.BattleOpts.TargetCondition(RAIL._G,actor)
+        then
           -- Check if a potential attack target has been found yet
           if not attack then
             -- Run this actor through the attack selection event
@@ -403,7 +408,7 @@ do
           end
         end
       end
-    until attack and target
+    until attack and skill
   end)
 end
 

@@ -1019,3 +1019,47 @@ do
   end)
 end
 
+-- Workaround for RO not updating Amistr's position when castling
+if not RAIL.Mercenary then
+  RAIL.Event["AI CYCLE"]:Register(-41,              -- Priority
+                                  "Amistr Check",   -- Handler name
+                                  1,                -- Max runs
+                                  function(self)
+    -- Check if the homunculus type is Amistr
+    if string.upper(string.sub(HomuTypes[RAIL.Self.AI_Type],1,1)) == "A" then
+      -- Register an event to run every cycle and check for Castling cast
+      RAIL.Event["AI CYCLE"]:Register(1,                  -- Priority
+                                      "Castling Check",   -- Handler name
+                                      -1,                 -- Max runs (infinite)
+                                      function(self)
+        -- Get the alchemist's current position
+        local o_x,o_y = GetV(V_POSITION,RAIL.Owner.ID)
+        
+        -- Check if the owner's position is amistr's position last cycle
+        if
+          o_x == RAIL.Self.X[0] and
+          o_y == RAIL.Self.Y[0] and
+          o_x ~= RAIL.Owner.X[0] and
+          o_y ~= RAIL.Owner.Y[0]
+        then
+          -- Castling was probably cast, do the work around
+          
+          -- The Amistr will be at the owner's old position according to the server
+          local s_x,s_y = RAIL.Owner.X[0],RAIL.Owner.Y[0]
+          
+          -- Move back and forth to force a sync of position between client
+          -- server
+          local x_mod = o_x - s_x
+          x_mod = x_mod / math.abs(x_mod)
+
+          local y_mod = o_y - s_y
+          y_mod = y_mod / math.abs(y_mod)
+
+          Move(RAIL.Self.ID,s_x + x_mod, s_y + y_mod)
+          RAIL.Target.Chase = { s_x, s_y }
+        end
+      end)
+    end
+  end)
+end
+

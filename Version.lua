@@ -26,6 +26,7 @@ end
 --	Note: View the subversion commit notes for more full changelog.
 --		(This is maintained to regularly bump version number.)
 
+-- 2011-01-06 -- Fix a few minor logical errors; Fix MaxSkillLevel; Add TargetCondition option for actors; Amistr will fix incorrect position after castling
 -- 2010-12-15 -- Minor tweaks
 -- 2010-12-14 -- Revision 200: Implement AoE skills
 -- 2010-12-13 -- Move KiteMode options to ActorOpts.lua; implement better idle-return; implemented screen-wide actor friending/unfriending.

@@ -543,7 +543,7 @@ do
     if f_rs.ActorOptions and type(f_rs.ActorOptions) == "table" then
       t_rs.ActorOptions = {
         ByID = f_rs.ActorOptions.ByID,
-        ByType = f_rs.ActorOptions.ByID,
+        ByType = f_rs.ActorOptions.ByType,
       }
     end
     
