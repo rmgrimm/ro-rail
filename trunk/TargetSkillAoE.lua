@@ -109,7 +109,7 @@ RAIL.Event["TARGET SELECT/ENEMY/SKILL"]:Register(0,                   -- Priorit
     -- Don't check this anymore
     self.RunsLeft = 0
   end
-  
+
   -- Ensure the actor should be counted
   if not actor:IsSkillAllowed(10) then
     return
@@ -137,12 +137,16 @@ RAIL.Event["TARGET SELECT/ENEMY/SKILL"]:Register(0,                   -- Priorit
     end
 
     -- Check if the skill targets an actor and this one is better than previous
-    if
-      skill.TargetType == "actor" and
-      map(actor_x,actor_y).AoEBestActor.BattleOpts.Priority < actor_prio
-    then
-      -- Set this actor as the best
-      map(actor_x,actor_y).AoEBestActor = actor
+    if skill.TargetType == "actor" then
+      local cell = map(actor_x,actor_y)
+
+      if
+        not cell.AoEBestActor or
+        cell.AoEBestActor.BattleOpts.Priority < actor_prio
+      then
+        -- Set this actor as the best
+        cell.AoEBestActor = actor
+      end
     end
   end
 end)

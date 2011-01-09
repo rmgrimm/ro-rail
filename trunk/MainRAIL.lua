@@ -167,8 +167,8 @@ require "Config"
 
 -- Setup a foundation API
 require "Serialize"
-require "Utils"
 require "Event"
+require "Utils"
 require "State"
 require "Log"
 require "TileMap"
