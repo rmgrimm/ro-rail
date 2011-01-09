@@ -920,7 +920,20 @@ do
   -- RAIL allowed to attack monster?
   Actor.IsAttackAllowed = function(self)
     -- Determine if we are allowed to attack the monster
-    return self:IsEnemy() and self.BattleOpts.AttackAllowed
+    if not self:IsEnemy() then
+      return false
+    end
+
+    if not self.BattleOpts.AttackAllowed then
+      return false
+    end
+
+    local last_attack = self.BattleOpts.LastAttack or 0
+    if GetTick() < last_attack + self.BattleOpts.TicksBetweenAttack then
+      return false
+    end
+    
+    return true
   end
 
   -- RAIL allowed to cast against monster?
@@ -1283,9 +1296,8 @@ do
     -- After sending an attack, this actor can never be kill-stealed (until Actor.Expire)
     self.BattleOpts.FreeForAll = true
     
-    -- Set the target as previously-targeted so that it will not be removed if
-    -- aggressive mode turns off
-    self.BattleOpts.PreviouslyTargeted = true
+    -- Set the last attack time to now
+    self.BattleOpts.LastAttack = GetTick()
   end
 
   Actor.SkillObject = function(self,skill)
@@ -1295,9 +1307,8 @@ do
     -- And never see this actor as kill-stealing
     self.BattleOpts.FreeForAll = true
 
-    -- Set the target as previously-targeted so that it will not be removed if
-    -- aggressive mode turns off
-    self.BattleOpts.PreviouslyTargeted = true
+    -- Set the last skill time to now
+    self.BattleOpts.LastSkill = GetTick()
   end
 
   -----------------------

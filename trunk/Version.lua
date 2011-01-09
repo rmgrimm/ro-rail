@@ -26,6 +26,7 @@ end
 --	Note: View the subversion commit notes for more full changelog.
 --		(This is maintained to regularly bump version number.)
 
+-- 2011-01-08 -- Add obstacle detection.
 -- 2011-01-07 -- Fix State.lua loading functions from the state-file.
 -- 2011-01-06 -- Fix a few minor logical errors; Fix MaxSkillLevel; Add TargetCondition option for actors; Amistr will fix incorrect position after castling
 -- 2010-12-15 -- Minor tweaks

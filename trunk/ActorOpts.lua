@@ -5,10 +5,21 @@ RAIL.Validate.ActorOptions.Default = {is_subtable=true,
   Friend = {"boolean",false},
   FreeForAll = {"boolean",false},
 
+  TargetCondition = {"function",function() return true end,unsaved = true},
+
   Priority = {"number",1,1},    -- higher number, higher priority; eg, 10 is higher than 1
   AttackAllowed = {"boolean",true},
   DefendOnly = {"boolean",false},
   DisableChase = {"boolean",false},
+
+  SkillsAllowed = {"boolean",true},
+  MinSkillLevel = {"number",1,1,10},
+  MaxSkillLevel = {"number",10,1,10},
+  MaxCastsAgainst = {"number",-1,-1}, -- -1 is unlimited
+
+  TicksBetweenSkills = {"number",0,0},
+  TicksBetweenAttack = {"number",0,0},
+
 
   -- KiteMode options are:
   --    always    - will always run away from the monster
@@ -32,14 +43,6 @@ RAIL.Validate.ActorOptions.Default = {is_subtable=true,
   },},
   KiteDistance = {"number",-1,1,nil,{ [-1] = true, },},
   KiteCondition = {"function",function() return false end,unsaved = true},
-
-  TargetCondition = {"function",function() return true end,unsaved = true},
-
-  SkillsAllowed = {"boolean",true},
-  MinSkillLevel = {"number",1,1,10},
-  MaxSkillLevel = {"number",10,1,10},
-  TicksBetweenSkills = {"number",0,0},
-  MaxCastsAgainst = {"number",-1,-1}, -- -1 is unlimited
 
   -- amount of time to ignore the actor
   -- removed: DefaultIgnoreTicks = {"number",10000,1000},
@@ -197,14 +200,16 @@ do
     -- ...
     [1031] = "Poporing",
     -- ...
-    [1038] = "Osiris",            -- MVP
-    [1039] = "Baphomet",          -- MVP
+    [1038] = "Osiris",                -- MVP
+    [1039] = "Baphomet",              -- MVP
     -- ...
     [1042] = "Steel Chonchon",
     -- ...
-    [1046] = "Doppelganger",      -- MVP
+    [1046] = "Doppelganger",          -- MVP
     -- ...
-    [1059] = "Mistress",          -- MVP
+    [1057] = "Yoyo",
+    [1058] = "Metaller",
+    [1059] = "Mistress",              -- MVP
     -- ...
     [1076] = "Skeleton",
     [1077] = "Poison Spore",
@@ -216,11 +221,12 @@ do
     [1083] = "Shining Plant",
     [1084] = "Black Mushroom",
     [1085] = "Red Mushroom",
-    [1086] = "Golden Thief Bug",  -- MVP
-    [1087] = "Orc Hero",          -- MVP
+    [1086] = "Golden Thief Bug",      -- MVP
+    [1087] = "Orc Hero",              -- MVP
+    [1088] = "Vocal",                 -- Miniboss
     -- ...
     [1095] = "Andre",
-    [1096] = "Angeling",          -- Miniboss
+    [1096] = "Angeling",              -- Miniboss
     [1097] = "Ant Egg",
     -- ...
     [1105] = "Deniro",
@@ -238,6 +244,8 @@ do
     -- ...
     [1176] = "Vitata",
     [1177] = "Zenorc",
+    -- ...
+    [1214] = "Choco",                 -- Miniboss
     -- ...
     [1555] = "Summoned Parasite",     -- Alchemist Summon
     [1575] = "Summoned Flora",        -- Alchemist Summon

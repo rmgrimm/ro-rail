@@ -303,7 +303,10 @@ do
     local maintain,n = { Name = "Maintain", },0
     for id,actor in pairs(RAIL.ActorLists.Enemies) do
       -- Check that the actor has been targeted before
-      if actor.BattleOpts.PreviouslyTargeted then
+      if
+        actor.BattleOpts.LastAttack ~= nil or
+        actor.BattleOpts.LastSkill ~= nil
+      then
         maintain[id] = actor
         n = n + 1
       end
