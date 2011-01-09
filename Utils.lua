@@ -187,104 +187,184 @@ do
 		end
 
 		-- Check actor-tracking
-		if not GetV then
-			GetV = {
-				default = function(id)
-					if id == -1 then
-						return -1,-1
-					else
-						return 0,0
-					end
-				end,
-				[0] = function(id)	-- V_OWNER
-					return 0
-				end,
-				[7] = function(id)	-- V_HOMUNTYPE
-					if RAIL.Mercenary then
-						return
-					end
-
-					-- owner
-					if id == 0 then
-						-- Alchemist
-						return 18
-					end
-
-					-- self
-					if id == 1 then
-						-- evolved alternates:
-						-- Lif = 13
-						-- Amistr = 14
-						-- Filir = 15
-						-- Vani = 16
-						return 13
-					end
-
-					return -1
-				end,
-				[12] = function(id)	-- V_MERTYPE
-					if not RAIL.Mercenary then
-						return
-					end
-
-          -- ARCHER02 = 2
-					return 2
-				end,
-			}
-			setmetatable(GetV,{
-				__call = function(self,v,id)
-					return (self[v] or self.default)(id)
-				end,
+		if
+      not GetV or
+      not GetActors or
+      not IsMonster
+    then
+      local Owner_id = 1134002
+      local AI_id = 5319
+      local actors = {
+        [Owner_id] = {
+          X = 33, Y = 82,
+          Type = 18,              -- Alchemist
+          IsMonster = 0,
+          Motion = MOTION.STAND,
+          Target = -1,
+          HP = 99, MaxHP = 100,
+          SP = 99, MaxSP = 100,
+        },
+        [AI_id] = {
+          X = 33, Y = 82,
+          Type = ARCHER10,
+          IsMonster = 0,
+          Motion = MOTION.STAND,
+          Target = -1,
+          HP = 98, MaxHP = 100,
+          SP = 98, MaxSP = 100,
+        },
+        [59867] = { X = 31, Y = 81, Type = 1000, IsMonster = 1, Target = Owner_id, Motion = MOTION.ATTACK, },
+        [59930] = { X = 34, Y = 81, Type = 1000, IsMonster = 1, Target = Owner_id, Motion = MOTION.MOVE, },
+        [59920] = { X = 33, Y = 81, Type = 1000, IsMonster = 1, Target = Owner_id, Motion = MOTION.ATTACK, },
+        [59876] = { X = 32, Y = 80, Type = 1000, IsMonster = 1, Target = Owner_id, Motion = MOTION.MOVE, },
+        [59838] = { X = 44, Y = 74, Type = 1000, IsMonster = 1, Target = Owner_id, Motion = MOTION.MOVE, },
+        [59942] = { X = 45, Y = 70, Type = 1000, IsMonster = 1, Target = Owner_id, Motion = MOTION.STAND, },
+      }
+      GetActors = function()
+        local ret,i = {},1
+        for id in pairs(actors) do
+          ret[i] = id
+          i = i + 1
+        end
+        
+        return ret
+      end
+      IsMonster = function(id)
+        if actors[id] then
+          return actors[id].IsMonster
+        end
+        
+        return 0
+      end
+			GetV = setmetatable({},{
+        __call = function(self,v_,...)
+          if type(self[v_]) == "function" then
+            return self[v_](unpack(arg))
+          end
+          
+          return -1
+        end
 			})
-			TraceAI("GetV() not supplied, undefined behavior may occur.")
-			sane = false
-		end
-		if not GetActors then
-			GetActors = function()
-				return {
-					0,		-- owner
-					1,		-- self
-				}
+			GetV[V_OWNER] = function(id) return Owner_id end
+			GetV[V_POSITION] = function(id)
+			 if actors[id] then
+			   return actors[id].X,actors[id].Y
+			  end
+			  
+			  return -1,-1
 			end
-			TraceAI("GetActors() not supplied, undefined behavior may occur.")
-			sane = false
-		end
-		if not IsMonster then
-			IsMonster = function(actor_id)
-				-- Check a few conditions for non-monsters
-				if
-					actor_id < 0 or
-					--actor_id == id or
-					--actor_id == GetV(0,id) or	-- GetV(V_OWNER,id)
-					false		-- (no other conditions)
+			GetV[V_TYPE] = function(id) end
+			GetV[V_MOTION] = function(id)
+        if actors[id] then
+			   return actors[id].Motion
+			  end
 
-					-- Note: Don't check for ID ranges of NPCs, Players, etc,
-					--	IsMonster isn't supplied, so the environment isn't sane anyway...
-				then
-					return 0
-				end
+        return -1
+		  end
+		  GetV[V_ATTACKRANGE] = function(id)
+		    local t = actors[AI_id].Type
+		    if RAIL.Mercenary and t <= 10 then
+		      return 10
+		    end
+		    
+		    return 2
+		  end
+		  GetV[V_TARGET] = function(id)
+		    if actors[id] then
+		      return actors[id].Target
+		    end
+		    
+		    return -1
+		  end
+		  GetV[V_SKILLATTACKRANGE] = GetV[V_ATTACKRANGE]
+		  GetV[V_HOMUNTYPE] = function(id)
+		    if RAIL.Mercenary then
+		      return
+		    end
+		    
+		    if actors[id] then
+		      return actors[id].Type
+		    end
+		    
+		    return -1
+		  end
+		  GetV[V_HP] = function(id)
+		    if actors[id] then
+		      return actors[id].HP or -1
+		    end
+		    
+		    return -1
+		  end
+		  GetV[V_SP] = function(id)
+		    if actors[id] then
+		      return actors[id].SP or -1
+		    end
 
-				-- Default all but self and owner to monsters
-				return 1
-			end
-			TraceAI("IsMonster() not supplied, undefined behavior may occur.")
+		    return -1
+		  end
+		  GetV[V_MAXHP] = function(id)
+		    if actors[id] then
+		      return actors[id].MaxHP or -1
+		    end
+
+		    return -1
+		  end
+		  GetV[V_MAXSP] = function(id)
+		    if actors[id] then
+		      return actors[id].MaxSP or -1
+		    end
+
+		    return -1
+		  end
+		  GetV[V_MERTYPE] = function(id)
+		    if not RAIL.Mercenary then
+		      return
+		    end
+		    
+		    return actors[AI_id].Type
+		  end
+		  
+		  RAIL.Event["AI CYCLE"]:Register(-100,
+		                                  "Replace AI ID",
+		                                  -1,
+		                                  function(self,id)
+        self.Event.Args[1] = AI_id
+		  end)
+
+			TraceAI("GetV(), GetActors(), or IsMonster() not supplied, undefined behavior may occur.")
 			sane = false
 		end
 
 		-- Check tick count
 		if not GetTick then
 			GetTick = function()
-				return -1
+				return os.clock() * 1000
 			end
 			TraceAI("GetTick() not supplied, undefined behavior may occur.")
 			sane = false
 		end
-		
+
 		if not Move then
 		  Move = function(id,x,y)
-		    TraceAI("Move(" .. x .. "," .. y .. ")")
+		    TraceAI("Move(" .. id .. "," .. x .. "," .. y .. ")")
 		  end
 		  TraceAI("Move() not supplied, undefined behavior may occur.")
+		  sane = false
+		end
+
+		if not SkillObject then
+		  SkillObject = function(self_id,level,skill_id,target_id)
+		    TraceAI("SkillObject(" .. self_id .. "," .. level .. "," .. skill_id .. "," .. target_id .. ")")
+		  end
+		  TraceAI("SkillObject() not supplied, undefined behavior may occur.")
+		  sane = false
+		end
+
+		if not Attack then
+		  Attack = function(self_id,target_id)
+		    TraceAI("Attack(" .. self_id .. "," .. target_id .. ")")
+		  end
+		  TraceAI("Attack() not supplied, undefined behavior may occur.")
 		  sane = false
 		end
 
