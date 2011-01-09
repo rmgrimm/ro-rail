@@ -630,6 +630,8 @@ do
                                   1,                    -- Max runs
                                   function(self,id)
     last.X,last.Y = RAIL.Self.X[0],RAIL.Self.Y[0]
+    last.StartX,last.StartY = last.X,last.Y
+    last.Start = GetTick()
   end)
   RAIL.Event["AI CYCLE"]:Register(1000,                 -- Priority
                                   "Move Action",        -- Handler name
