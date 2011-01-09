@@ -600,7 +600,7 @@ RAIL.Event["AI CYCLE"]:Register(1000,                 -- Priority
     if
       false and    -- manual toggle
       not RAIL.Target.Attack and
-      not RAIL.Target.Move
+      not RAIL.Target.Chase
     then
       -- Don't let this get prevented by RAIL.Target.Chase action...
       local x,y = GetV(V_POSITION,id)
@@ -624,13 +624,25 @@ RAIL.Event["AI CYCLE"]:Register(1000,             -- Priority
 end)
 
 do
-  local last_x,last_y
+  local last = {}
+  RAIL.Event["AI CYCLE"]:Register(-30,                  -- Priority
+                                  "Last Move Init",     -- Handler name
+                                  1,                    -- Max runs
+                                  function(self,id)
+    last.X,last.Y = RAIL.Self.X[0],RAIL.Self.Y[0]
+  end)
   RAIL.Event["AI CYCLE"]:Register(1000,                 -- Priority
                                   "Move Action",        -- Handler name
                                   -1,                   -- Max runs (negative means infinite)
                                   function(self,id)     -- Handler function
     if not RAIL.Target.Chase then
-      return
+      -- No chase target, and we're close to our last one, do nothing
+      if RAIL.Self:DistanceTo(last.X,last.Y) < 2 then
+        return
+      end
+      
+      -- Set the chase target to the last target
+      RAIL.Target.Chase = { last.X, last.Y }
     end
     
     -- TODO: Remove this after it's unneeded
@@ -648,42 +660,135 @@ do
       return
     end
 
+    -- Get the position to move to
     local x,y = unpack(RAIL.Target.Chase)
 
-    -- Make sure the target coords are short enough that the server won't ignore them
-    do
-      local angle,dist = RAIL.Self:AngleTo(x,y)
-      local orig_dist = dist
-      while dist > 10 do
-        dist = dist / 2
-      end
+    -- Check if we've already arrived
+    if RAIL.Self:BlocksTo(x,y) == 0 then
+      -- We're there, do nothing
+      return
+    end
 
-      -- Plot a shorter distance in the same direction
-      if dist ~= orig_dist then
-        x,y = RoundNumber(RAIL.Self:AnglePlot(angle,dist))
-      end
+    -- Get the angle and original distance for the move
+    local angle,dist = RAIL.Self:AngleTo(x,y)
+    
+    -- Check that the distance isn't too far
+    if dist > 9 then
+      -- Bring the distance down
+      dist = 9
+      
+      -- Replot x and y
+      x,y = RoundNumber(RAIL.Self:AnglePlot(angle,dist))
     end
     
-    -- Check if we tried to move here last cycle
-    if x == last_x and y == last_y then
-      -- TODO: (Alter move such that repeated moves to same location aren't ignored)
+    -- Check if the tile is unpassable
+    if TileMap(x,y).Passable == false then
+      -- Search for a nearby tile that is passable
+      local initial = -1
+      local found = false
+      while dist > 1 and not found do
+        dist = dist - 2 + initial
+        initial = 0
+
+        for tile,t_x,t_y in TileMap:TilesAround(x,y,1) do
+          if tile.Passable ~= false then
+            -- Set the new move target
+            x,y = t_x,t_y
+
+            -- Get the new distance and angle to it
+            angle,dist = RAIL.Self:AngleTo(x,y)
+
+            -- Stop looping
+            found = true
+            break
+          end
+        end
+      end -- dist > 1 and not found
+    end -- TileMap(x,y).Passable == false
+
+    -- Check if we tried to move here last cycle and it failed
+    if x == last.X and y == last.Y then
+      -- Send the move command again if it's been interrupted by skill
+      -- or attack
+      if
+        RAIL.Target.Attack ~= nil or
+        RAIL.Target.Skill ~= nil
+      then
+        -- Send the move
+        Move(RAIL.Self.ID,x,y)
+        
+        -- Reset the start time and location
+        last.Start = GetTick()
+        last.StartX = RAIL.Self.X[0]
+        last.StartY = RAIL.Self.Y[0]
+        
+        -- Don't continue processing
+        return
+      end
+
+      -- If we're moving, leave it alone
+      if RAIL.Self.Motion[0] == MOTION.MOVE then
+        return
+      end
+
+      -- Check if the last move command was sent less than 750ms ago
+      if GetTick() - last.Start < 750 then
+        -- Don't worry about it yet
+        return
+      end
+
+      -- If we haven't moved at all, the tile is probably unmovable
+      -- (RO ignores moves to unmovable tiles)
+      if RAIL.Self:BlocksTo(last.StartX,last.StartY) == 0 then
+        -- Check if the tile status is unknown
+        if TileMap(x,y).Passable == nil then
+          -- Log it
+          RAIL.LogT(20,"Tile at ({1},{2}) marked as unpassable!",x,y)
+          
+          -- Also send to TraceAI if log is managed separately
+          if
+            false and         -- manual toggle
+            not RAIL.UseTraceAI
+          then
+            TraceAI(RAIL.formatT("Tile at ({1},{2}) marked as unpassable!",
+                                 x,
+                                 y))
+          end
+
+          -- Mark it as unmovable
+          TileMap(x,y).Passable = false
+
+          -- Don't move this cycle
+          return
+        end
+
+        -- If tile status is known to be movable, it's probably on the other
+        -- side of a wall
+        if TileMap(x,y).Passable then
+          -- TODO: Figure out a good option here. Try to move around?
+          --       Shorten distance in order to find blocking tile?
+        end
+      end
+
+      -- Probably tile lag, send a dummy move command to our own position and
+      -- then back again to reset the movement
+      Move(RAIL.Self.ID,RAIL.Self.X[0],RAIL.Self.Y[0])
+      Move(RAIL.Self.ID,x,y)
+      return
     end
 
-    if
-      x ~= last_x or
-      y ~= last_y or
-      RAIL.Target.Attack ~= nil or
-      RAIL.Target.Skill ~= nil
-    then
-      -- Log it
-      RAIL.LogT(85,"Moving to ({1},{2}).",x,y)
+    -- Log it
+    RAIL.LogT(85,"Moving to ({1},{2}).",x,y)
 
-      -- Send the move
-      Move(id,x,y)
-
-      last_x = x
-      last_y = y
-    end
+    -- Send the move
+    Move(id,x,y)
+    
+    -- Save the last move
+    last.X = x
+    last.Y = y
+    last.Start = GetTick()
+    last.StartX = RAIL.Self.X[0]
+    last.StartY = RAIL.Self.Y[0]
   end)
 end
 

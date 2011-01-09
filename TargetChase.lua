@@ -217,6 +217,16 @@ do
       return false
     end
   end)
+  
+  RAIL.Event["TARGET SELECT/ENEMY/CHASE"]:Register(50,                        -- Priority
+                                                   "Moving Range Reduction",  -- Handler name
+                                                   -1,                        -- Max runs (infinite)
+                                                   function(self,actor,range)
+    -- If the actor is moving, reduce range by 1
+    if actor.Motion[0] == MOTION.MOVE then
+      self.Event.Args[2] = range - 1
+    end
+  end)
 
   RAIL.Event["TARGET SELECT/ENEMY/CHASE"]:Register(100,                 -- Priority
                                                    "Add to ChaseMap",   -- Handler name

@@ -257,7 +257,21 @@ RAIL.Event["ACTOR UPDATE"]:Register(10,               -- Priority
                                     "Tile Passable",  -- Handler name
                                     -1,               -- Max runs (negative means infinite)
                                     function(self,actor)
+  -- Check that the actor is at a valid tile
+  if actor.X[0] == -1 or actor.Y[0] == -1 then
+    return
+  end
+
+  -- Get the cell that the actor is at
+  local cell = TileMap(actor.X[0],actor.Y[0])
+
+  -- Check if it has previously been marked unpassable
+  if cell.Passable == false then
+    -- Log it
+    RAIL.LogT(20,"Tile at ({1},{2}) was erroneously marked unpassable; fixing.",actor.X[0],actor.Y[0])
+  end
+
   -- The location the actor is on is definitely passable
-  TileMap(actor.X[0],actor.Y[0]).Passable = true
+  cell.Passable = true
 end)
 
