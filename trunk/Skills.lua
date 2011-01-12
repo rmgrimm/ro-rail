@@ -190,7 +190,12 @@ do
       Range = 0,
       SplashRange = 2,  -- 0 = 1; 1 = 3x3; 2 = 5x5; 3 = 7x7; ...
       MaxLevel = 10,
-      SPCost = function(level) return 21 - math.ceil(level/2) end,
+      SPCost = 30,
+      HPCost = function(level)
+        -- This doesn't seem to cost HP from mercenaries;
+        --return 21 - math.ceil(level/2)
+        return 0
+      end,
       CastDelay = 2 * 1000,
     },
     [8203] = {
@@ -279,7 +284,8 @@ do
     },
     [8213] = {
       Name = "Remove Trap",
-      -- TODO: are traps actors?
+      -- TODO: are traps actors? no.
+      -- TODO: How is this targeted?
       CastFunction = function(self,target) end,
       MaxLevel = 1,
       SPCost = 5,
@@ -647,20 +653,28 @@ do
       return false
     end,
     ["defending"] = function(_G)
-      -- Check if owner or self are being attacked
-      if
-        _G.RAIL.Owner.TargetOf:GetN() > 0 or
-        _G.RAIL.Self.TargetOf:GetN() > 0
-      then
-        return true
+      -- Check if owner is being attacked
+      for i=1,_G.RAIL.Owner.TargetOf:GetN() do
+        if _G.RAIL.Owner.TargetOf[i]:IsEnemy() then
+          return true
+        end
+      end
+
+      -- Check if the AI is being attacked
+      for i=1,_G.RAIL.Self.TargetOf:GetN() do
+        if _G.RAIL.Self.TargetOf[i]:IsEnemy() then
+          return true
+        end
       end
 
       return false
     end,
     ["defending_self"] = function(_G)
       -- Check if we're being attacked
-      if _G.RAIL.Self.TargetOf:GetN() > 0 then
-        return true
+      for i=1,_G.RAIL.Self.TargetOf:GetN() do
+        if _G.RAIL.Self.TargetOf[i]:IsEnemy() then
+          return true
+        end
       end
 
       return false
@@ -737,6 +751,7 @@ do
           Range = function_or_number(parameters.Range,i,GetV(V_SKILLATTACKRANGE,RAIL.Self.ID,id)),
           SplashRange = function_or_number(parameters.SplashRange,i,0),
           SPCost = function_or_number(parameters.SPCost,i),
+          HPCost = function_or_number(parameters.HPCost,i),
           CastTime = function_or_number(parameters.CastTime,i),
           CastDelay = function_or_number(parameters.CastDelay,i),
           Duration = function_or_number(parameters.Duration,i),
@@ -1046,7 +1061,7 @@ if not RAIL.Mercenary then
           
           -- The Amistr will be at the owner's old position according to the server
           local s_x,s_y = RAIL.Owner.X[0],RAIL.Owner.Y[0]
-          
+
           -- Move back and forth to force a sync of position between client
           -- server
           local x_mod = o_x - s_x

@@ -213,12 +213,12 @@ do
           HP = 98, MaxHP = 100,
           SP = 98, MaxSP = 100,
         },
-        [59867] = { X = 31, Y = 81, Type = 1000, IsMonster = 1, Target = Owner_id, Motion = MOTION.ATTACK, },
-        [59930] = { X = 34, Y = 81, Type = 1000, IsMonster = 1, Target = Owner_id, Motion = MOTION.MOVE, },
-        [59920] = { X = 33, Y = 81, Type = 1000, IsMonster = 1, Target = Owner_id, Motion = MOTION.ATTACK, },
-        [59876] = { X = 32, Y = 80, Type = 1000, IsMonster = 1, Target = Owner_id, Motion = MOTION.MOVE, },
-        [59838] = { X = 44, Y = 74, Type = 1000, IsMonster = 1, Target = Owner_id, Motion = MOTION.MOVE, },
-        [59942] = { X = 45, Y = 70, Type = 1000, IsMonster = 1, Target = Owner_id, Motion = MOTION.STAND, },
+        [59867] = { X = 31, Y = 81, Type = 1002, IsMonster = 1, Target = Owner_id, Motion = MOTION.ATTACK, },
+        [59930] = { X = 34, Y = 81, Type = 1002, IsMonster = 1, Target = Owner_id, Motion = MOTION.MOVE, },
+        [59920] = { X = 33, Y = 81, Type = 1002, IsMonster = 1, Target = Owner_id, Motion = MOTION.ATTACK, },
+        [59876] = { X = 32, Y = 80, Type = 1002, IsMonster = 1, Target = Owner_id, Motion = MOTION.MOVE, },
+        [59838] = { X = 44, Y = 74, Type = 1002, IsMonster = 1, Target = Owner_id, Motion = MOTION.MOVE, },
+        [59942] = { X = 45, Y = 70, Type = 1002, IsMonster = 1, Target = Owner_id, Motion = MOTION.STAND, },
       }
       GetActors = function()
         local ret,i = {},1

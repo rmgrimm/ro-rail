@@ -195,17 +195,41 @@ do
     [1013] = "Wolf",
     [1014] = "Spore",
     [1015] = "Zombie",
-    -- ...
+    [1016] = "Archer Skeleton",
+    [1017] = "Female Thief Bug",
+    [1018] = "Creamy",
+    [1019] = "Peco Peco",
+    [1020] = "Mandragora",
+    [1021] = "Male Thief Bug",
+    -- 1022?
+    [1023] = "Orc Warrior",
+    [1024] = "Worm Tail",
     [1025] = "Boa",
-    -- ...
+    [1026] = "Munak",
+    -- 1027?
+    [1028] = "Soldier Skeleton",
+    [1029] = "Isis",
+    [1030] = "Anacondaq",
     [1031] = "Poporing",
-    -- ...
+    [1032] = "Verit",
+    [1033] = "Elder Willow",
+    [1034] = "Thara Frog",
+    [1035] = "Hunter Fly",
+    [1036] = "Ghoul",
+    [1037] = "Side Winder",
     [1038] = "Osiris",                -- MVP
     [1039] = "Baphomet",              -- MVP
-    -- ...
+    [1040] = "Golem",
+    [1041] = "Mummy",
     [1042] = "Steel Chonchon",
-    -- ...
+    -- 1043?
+    [1044] = "Obeaune",
+    [1045] = "Marc",
     [1046] = "Doppelganger",          -- MVP
+    [1047] = "Peco Peco Egg",
+    [1048] = "Thief Bug Egg",
+    [1049] = "Picky",
+    [1050] = "Picky (Shell)",
     -- ...
     [1057] = "Yoyo",
     [1058] = "Metaller",
@@ -237,21 +261,32 @@ do
     -- ...
     [1139] = "Mantis",
     -- ...
+    [1145] = "Martin",
+    -- ...
+    [1151] = "Myst",
     [1152] = "Orc Skeleton",
     [1153] = "Orc Zombie",
     -- ...
     [1160] = "Piere",
     -- ...
+    [1169] = "Skel Worker",
+    -- ...
     [1176] = "Vitata",
     [1177] = "Zenorc",
     -- ...
+    [1209] = "Cramp",
+    -- ...
     [1214] = "Choco",                 -- Miniboss
+    -- ...
+    [1273] = "Orc Lady",
     -- ...
     [1555] = "Summoned Parasite",     -- Alchemist Summon
     [1575] = "Summoned Flora",        -- Alchemist Summon
     [1579] = "Summoned Hydra",        -- Alchemist Summon
     [1589] = "Summoned Mandragora",   -- Alchemist Summon
     [1590] = "Summoned Geographer",   -- Alchemist Summon
+    -- ...
+    [1686] = "Orc Baby",
     -- ...
     [1880] = "Wood Goblin",
     [1881] = "Les",

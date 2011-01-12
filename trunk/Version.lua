@@ -26,6 +26,7 @@ end
 --	Note: View the subversion commit notes for more full changelog.
 --		(This is maintained to regularly bump version number.)
 
+-- 2011-01-12 -- Fix the cost of Magnum Break. More monster names in ActorOpts.lua
 -- 2011-01-09 -- Fix actor-targeted AoE skills. Revamp the simulation in Utils.lua. Small bug fixes.
 -- 2011-01-08 -- Add obstacle detection.
 -- 2011-01-07 -- Fix State.lua loading functions from the state-file.
